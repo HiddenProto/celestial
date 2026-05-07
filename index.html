@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="clst.guard.js"></script>
+  
+  <link rel="manifest" href="/manifest.json"/>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-1Y12SRXG3F"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+
+    gtag("config", "G-1Y12SRXG3F");
+  </script>
+  <title>Drew's Learning Academy | Edison, NJ</title>
+  <link id="favicon" rel="shortcut icon" type="image/png" href="/assets/img/logo-blackbg.png" />
+  <meta name="Drew's Learning Academy" />
+  <meta content="Drew's Learning Academy | Edison, NJ" property="og:title" />
+  <meta
+    content="DLA, short for Drew's Learning Academy, is a new upcoming academy in edison, new jersey. DLA focuses on student success for K-12. We believe that the best academic dicipline is learning. Join now to set your child up for success." />
+  <link rel="shortcut icon" type="image/png" href="/assets/img/logo-blackbg.png" />
+  <script src="/assets/js/prox.js" type="module"></script>
+  <script async defer type="module">
+    import { newTab, switchTab, closeTab } from "/lithium.mjs";
+
+    window.newTab = newTab;
+    let tabs = [];
+    const tabsDiv = document.getElementById("tabs");
+    const newTabBtn = document.getElementById("new-tab-btn");
+    const MAX_INLINE_TABS = 8;
+
+    const getIcon = (url) =>
+      /^https?:\/\/[\w.-]+\.[a-z]{2,}/i.test(url)
+        ? `https://s2.googleusercontent.com/s2/favicons?sz=64&domain_url=${url}`
+        : "/assets/img/logo-blackbg.png";
+
+    function updateNewTabBtn() {
+      if (tabs.length >= MAX_INLINE_TABS) {
+        if (newTabBtn.parentElement !== document.body) {
+          document.body.appendChild(newTabBtn);
+        }
+        newTabBtn.classList.add("floating");
+      } else {
+        newTabBtn.classList.remove("floating");
+        if (newTabBtn.parentElement !== tabsDiv) {
+          tabsDiv.appendChild(newTabBtn);
+        } else {
+          tabsDiv.appendChild(newTabBtn);
+        }
+      }
+    }
+
+    function createTab(id, title = "new tab", url = "") {
+      const tab = document.createElement("div");
+      tab.dataset.tabId = id;
+      tab.draggable = true;
+
+      tab.innerHTML = `
+    <img alt="Favicon" src="${getIcon(url)}" />
+    <span class="tab">${title}</span>
+    <button>&times;</button>
+  `;
+
+      tab.querySelector("button").onclick = (e) => {
+        e.stopPropagation();
+        closeTab?.(id);
+      };
+      tab.onclick = () => switchTab?.(id);
+
+      if (newTabBtn.parentElement === tabsDiv) {
+        tabsDiv.insertBefore(tab, newTabBtn);
+      } else {
+        tabsDiv.appendChild(tab);
+      }
+
+      tabs.push({ id, element: tab, title, url });
+      updateNewTabBtn();
+      return tab;
+    }
+
+    function checkState() {
+      const frames = [...document.querySelectorAll('iframe[id^="frame-"]')];
+      const frameIds = frames.map((f) =>
+        parseInt(f.id.replace("frame-", ""), 10)
+      );
+
+      tabs = tabs.filter(({ id, element }) => {
+        if (!frameIds.includes(id)) {
+          element.remove();
+          return false;
+        }
+        return true;
+      });
+
+      frameIds.forEach((id) => {
+        if (!tabs.some((t) => t.id === id)) createTab(id);
+      });
+
+      const visible = frames.find((f) => !f.classList.contains("hidden"));
+      if (visible) {
+        const activeId = parseInt(visible.id.replace("frame-", ""), 10);
+        tabs.forEach(({ id, element }) => {
+          element.classList.toggle("active", id === activeId);
+        });
+      }
+
+      updateNewTabBtn();
+    }
+
+    newTabBtn?.addEventListener("click", () => newTab?.());
+
+    document.addEventListener("new-tab", (e) => {
+      if (!tabs.some((t) => t.id === e.detail.tabNumber))
+        createTab(e.detail.tabNumber);
+      checkState();
+    });
+
+    document.addEventListener("switch-tab", (e) => {
+      const activeId = e.detail.tabNumber;
+      tabs.forEach(({ id, element }) => {
+        element.classList.toggle("active", id === activeId);
+      });
+    });
+
+    document.addEventListener("url-changed", (e) => {
+      const tab = tabs.find((t) => t.id === e.detail.tabId);
+      if (!tab) return;
+      tab.title = e.detail.title || "new tab";
+      tab.url = e.detail.url || "";
+      tab.element.querySelector(".tab").textContent = tab.title;
+      tab.element.querySelector("img").src = getIcon(tab.url);
+    });
+
+    document.addEventListener("close-tab", (e) => {
+      const idx = tabs.findIndex((t) => t.id === e.detail.tabNumber);
+      if (idx === -1) return;
+      tabs[idx].element.remove();
+      tabs.splice(idx, 1);
+      checkState();
+    });
+
+    checkState();
+  </script>
+  <link href="/assets/css/tabs.css" rel="stylesheet" />
+  <script type="module" async defer>
+    import {
+      setWisp,
+      makeURL,
+      getProxied,
+      setFrames,
+      addressInput,
+      setTransport,
+      setProxy,
+      currentTab,
+      Tab,
+    } from "/lithium.mjs";
+
+    // --- INIT ---
+    const form = document.getElementById("form");
+    let search =
+      localStorage.getItem("search-engine") ||
+      "http://duckduckgo.com/?q=%s";
+
+    setProxy(localStorage.getItem("pr0xy") || "scram");
+
+    setWisp(
+      (location.protocol === "https:" ? "wss://" : "ws://") +
+      location.host +
+      (localStorage.getItem('location') || '/wisp/')
+    );
+
+    setTransport(localStorage.getItem("transportz") || "libcurl");
+    async function autofill(url) {
+      const urlToLoad = makeURL(url, search);
+      const proxiedUrl = await getProxied(urlToLoad);
+      setTimeout(() => {
+        document.getElementById(`frame-${currentTab}`).src = proxiedUrl;
+      }, 200);
+    }
+
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const url = params.get("autofill");
+      if (url) autofill(url);
+    } catch { }
+
+    // --- EVENTS ---
+    form?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const urlToLoad = makeURL(addressInput.value, search);
+      const proxiedUrl = await getProxied(urlToLoad);
+
+      let currentFrame = document.getElementById(`frame-${currentTab}`);
+
+      currentFrame.src = proxiedUrl;
+
+      if (currentFrame === document.getElementById(`frame-${currentTab}`)) {
+        addressInput.value = urlToLoad;
+
+        if (urlToLoad == "newtab.html") {
+          addressInput.value = "celestial://newtab";
+        }
+      }
+    });
+
+    setFrames(document.getElementById("frames"));
+    new Tab();
+  </script>
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
+</head>
+
+<body theme="default">
+  <div class="load">
+    <div style="display: none">
+      <h1>What is Drew's Learning Academy?</h1>
+      <p>
+        Drew’s Learning Academy is a modern educational center focused on
+        helping students build strong academic foundations. It offers a
+        structured environment where learners can develop skills in reading,
+        writing, math, and critical thinking.
+      </p>
+
+      <h1>How does Drew's Learning Academy teach students?</h1>
+      <p>
+        The academy uses small group sessions and personalized instruction to
+        make sure every student gets the attention they need. Teachers adjust
+        lessons based on each student’s pace, making the experience more
+        effective and enjoyable.
+      </p>
+
+      <h1>Why is Drew's Learning Academy beneficial?</h1>
+      <p>
+        Beyond academics, Drew’s Learning Academy encourages good study habits
+        and long-term growth. Students learn how to stay organized, manage time,
+        and approach challenges with a positive mindset.
+      </p>
+    </div>
+    <div class="settings-bg"></div>
+    <div id="settings" style="display: none">
+      <div class="settings">
+        <p id="close" onclick="close();" style="
+            font-size: 40px;
+            top: 0;
+            right: 0;
+            position: absolute;
+            margin: 15px;
+            cursor: pointer;
+          ">
+          <img src="/assets/img/close.png" alt="close" style="width: 35px;margin-right:5px;" />
+        </p>
+        <div id="sidenav">
+          <a class="cloak" href="#cloak" onclick="show('cloak'); return false;"><img src="/assets/img/icns/cloak.svg"> <span class="nav-label">Cl<span>oak</span>ing</span></a>
+          <a class="browsing" href="#browsing" onclick="show('browsing'); return false;"><img src="/assets/img/icns/globe.svg"> <span class="nav-label">Pr<span>o</span>xy</span></a>
+          <a class="appear" href="#appear" onclick="show('appear'); return false;"><img src="/assets/img/icns/palette.svg"> <span class="nav-label">Appearance</span></a>
+          <a class="ext" href="#ext" onclick="show('ext'); return false;"><img src="/assets/img/icns/puzzle.svg"> <span class="nav-label">Extensions</span></a>
+          <a class="misc" href="#misc" onclick="show('misc'); return false;"><img src="/assets/img/icns/info.svg"> <span class="nav-label">Misc</span></a>
+        </div>
+        <div class="stuff">
+          <!--
+        <div class="box">
+            <h3>Example</h3>
+            <p class="desc">soon!</p>
+        </div>
+        -->
+          <div id="cloak">
+            <div class="box">
+              <h3>Cl<span>oa</span>king Options</h3>
+              <p class="desc">
+                choose between about:blank, about:blank buffed (recommended),
+                and blob strings to stop teachers from seeing your screen &
+                hiding your history.
+              </p>
+              <select class="select" id="cloakSelect">
+                <option value="ab">about:blank</option>
+                <option value="abbuff">about:blank [buffed]</option>
+                <option value="blob">blob: string</option>
+              </select>
+              <button onclick="launchCloak();">open</button>
+            </div>
+            <div class="box">
+              <h3>Auto Cloak</h3>
+              <p class="desc">
+                opens the cloak selected (at "cloaking options") selected
+                automatically
+              </p>
+              <label class="switch">
+                <input type="checkbox" id="cloakTog" />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="box">
+              <h3>Tab Cloaking</h3>
+              <p class="desc">masks the tab as another tab to fool teachers</p>
+              <select class="select" id="tabCloak" onchange="applyPreset()">
+                <option value="" selected>none</option>
+                <option value="google">google</option>
+                <option value="schoology">schoology</option>
+                <option value="khan">khan academy</option>
+                <option value="clever">clever</option>
+                <option value="gc">google classroom</option>
+                <option value="nt">new tab</option>
+              </select>
+              <input type="text" id="titleInput" placeholder="title" />
+              <input type="url" id="faviconInput" placeholder="favicon" />
+              <div class="wrap">
+                <button onclick="applyCloak()">apply</button>
+                <button onclick="resetCloak()">reset</button>
+              </div>
+            </div>
+            <div class="box">
+              <h3>Switch Cloak</h3>
+              <p class="desc">
+                when you switch tabs, the cloak will turn on, but if you switch
+                back, it will turn off, will be whatever you picked for "tab
+                cloaking" but default it will be google slides :p
+              </p>
+              <label class="switch">
+                <input type="checkbox" id="switchTog" />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="box">
+              <h3>Anti-Tab Close</h3>
+              <p class="desc">
+                if your teacher tries to close the tab, it will be prevented by
+                an alert, and by pressing cancel, you cancel the operation.
+              </p>
+              <label class="switch">
+                <input type="checkbox" id="antiTog" />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="box">
+              <h3>Anti-Deledao</h3>
+              <p class="desc">prevent deledao from reading html content and create an <br> overlay for games</p>
+              <label class="switch">
+                <input type="checkbox" id="deleTog" />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="box">
+              <h3>Panic Cloaking</h3>
+              <p class="desc">when you press a button, it goes to a certain site.</p>
+              <input type="text" id="panicUrl" placeholder="url to go to" />
+              <input type="text" id="panicKey" placeholder="key to press (e.x. - )" maxlength="1" />
+              <div class="wrap">
+                <button onclick="ripmygranny()">apply</button>
+                <button onclick="revivegranny()">reset</button>
+              </div>
+            </div>
+          </div>
+          <div id="browsing">
+            <div class="box">
+              <h3>Transport</h3>
+              <p class="desc">
+                change how the pr<span>o</span>xy is handled, can lead to sites
+                that were broken to work or lead to sites that were working to
+                break
+              </p>
+              <label></label><select class="select" id="tselect">
+                <option value="epoxy">epoxy</option>
+                <option value="libcurl" selected>libcurl</option>
+              </select>
+            </div>
+            <div class="box">
+              <h3>Pr<span>o</span>xy</h3>
+              <p class="desc">
+                same as the transport, can make pr<span>o</span>xy more stable
+              </p>
+              <select class="select" id="pr0xySelect">
+                <option value="violet">
+                  ul<span>tr</span>av<span>io</span>l<span>e</span>t
+                </option>
+                <option value="scram" selected>sc<span>ramj</span>et</option>
+              </select>
+            </div>
+            <div class="box">
+              <h3>VPN</h3>
+              <p class="desc">change the location of where you're searching</p>
+
+              <p class="desc">this has now been scrapped due to server migrating</p>
+
+              <select class="select" id="location" disabled>
+                <option value="/wisp/">disabled</option>
+                <option value="/tkjp/">🇯🇵 tokyo, japan</option>
+                <option value="/spbz/">🇧🇷 sao paulo, brazil</option>
+                <option value="/laca/">🇺🇸 los angeles, california</option>
+                <option value="/syau/">🇦🇺 sydney, australia</option>
+                <option value="/prfe/">🇫🇷 paris, france</option>
+              </select>
+            </div>
+          </div>
+          <div id="appear">
+            <div class="box">
+              <h3>Themes</h3>
+              <p class="desc">customize the color scheme of celestial</p>
+              <select id="themepicker">
+                <option value="default" style="color: white; background: black" selected>
+                  default
+                </option>
+                <option value="light" style="color: black; background: #f5f5f5">
+                  light
+                </option>
+                <option value="midnight" style="color: white; background: darkblue">
+                  midnight blue
+                </option>
+                <option value="mocha" style="color: white; background: rgb(24, 18, 14)">
+                  mocha
+                </option>
+                <option value="pisscolorlmao" style="color: #adad43; background: #222222">
+                  jmw v6
+                </option>
+                <option value="quasar" style="color: white; background: rgb(73, 153, 219)">
+                  quasar
+                </option>
+                <option value="ccm" style="color: white; background: #1a1b26">
+                  catppuccin mocha
+                </option>
+                <option value="frappe" style="color: #d9e0ee; background: #0d0d1f">
+                  catppuccin frappe
+                </option>
+                <option value="saywallahibro" style="color: black; background: yellow">
+                  no name brand
+                </option>
+                <option value="eww" style="color: white; background: pink" disabled>
+                  secret theme...
+                </option>
+                <option value="chad" style="color: white; background: red" disabled>
+                  secret theme 2...
+                </option>
+              </select>
+            </div>
+            <div class="fakebox">
+              <h3></h3>
+              <p class="desc"></p>
+            </div>
+          </div>
+          <div id="ext">
+            <div class="fakebox">
+              <h3>Userscripts</h3>
+              <p class="desc">
+                add custom javascript/bookmarklets to sites you visit. [do not
+                put script while being on the website, otherwise it will break!]
+              </p>
+              <textarea id="extCode" placeholder="javascript code here"></textarea>
+              <div class="wrap">
+                <input type="text" id="siteInject" placeholder="site that's affected (e.g. 'google.com')" />
+                <button id="addExtBtn">add</button>
+              </div>
+              <label>
+                <input type="checkbox" id="includeEverywhere" /> include
+                everywhere
+              </label>
+              <label>
+                <input checked type="checkbox" id="includesCheckbox" /> includes
+                url (recommended)
+              </label>
+              <div id="extList"></div>
+            </div>
+          </div>
+          <div id="misc">
+            <div class="box">
+              <h3>Export Data</h3>
+              <p class="desc">
+                transfer your data to another celestial instance.
+              </p>
+              <div class="wrap">
+                <button onclick="exportData()">export</button>
+                <button onclick="importData()">import</button>
+              </div>
+            </div>
+            <div class="fakebox oops">
+              <h3>Credits</h3>
+              <p>
+                <a>revived by bumblcat on discord 1032745440581537863</a>
+              </p>
+              <p>
+                <a href="https://github.com/justjxrdanwasdefinetlytaken" target="_blank">justjxrdanwasdefinetlytaken -
+                  the rest of the site</a>
+              </p>
+              <p>
+                <a href="https://github.com/slqntdevss" target="_blank">slqnt - extensions function + more</a>
+              </p>
+              <p>
+                <a href="https://github.com/kindkid27" target="_blank">kindkid - game favoriting function + more</a>
+              </p>
+              <p>
+                <a href="https://github.com/coding4hours" target="_blank">coding4hours - tab functions</a>
+              </p>
+              <p>
+                <a>gnmath/bread, bog/truffled/aukak, burnedpopcorn, 98006, UGS +
+                  more - web ports + games used by us (big kiss)</a>
+              </p>
+              <p>
+                <a target="_blank">mer<span>cury</span> work<span>sh</span>op and
+                  titan<span>iu</span>m net<span>wo</span>rk -
+                  sc<span>ram</span>jet and
+                  ul<span>tra</span>vi<span>ol</span>et</a>
+              </p>
+              <p>
+                <a href="https://shorturl.at/ONQOh" target="_blank">pyrus - adblocker function</a>
+              </p>
+            </div>
+            <div class="box line">
+              <h3>Support Us</h3>
+              <p class="desc">
+                if you want to support the project, consider donating!
+              </p>
+              <a href="https://cash.app/$jrdndevs" target="_blank">donate to the main cashapp & link your
+                d<span>is</span>cord</a>
+            </div>
+            <div class="box">
+              <h3>Contact Us</h3>
+              <p class="desc">
+                to contact us, you can send an email or send a message on
+                d<span>isc</span>ord!
+              </p>
+              <p>email: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="583b3d343d2b2c31393435393136313629183f35393134763b3735">[email&#160;protected]</a></p>
+              <p>
+                d<span>isc</span>ord:
+                <a href="https://dsc.gg/gnetwork" target="_blank">here</a>
+              </p>
+            </div>
+            <div class="box">
+              <h3>Wiki</h3>
+              <p class="desc">
+                check out our wiki for guides on using userscripts!
+              </p>
+              <a href="https://github.com/justjxrdanwasdefinetlytaken/celestial/blob/main/wiki.md"
+                target="_blank">celestial wiki</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <nav>
+      <div id="tabs">
+        <button id="new-tab-btn" aria-label="new tab" title="new tab">
+          <img src="/assets/img/icns/plus.svg" alt="new tab" style="width: 19px" />
+        </button>
+      </div>
+    </nav>
+    <div class="tabthing">
+      <form id="form">
+        <a id="back" class="fc" onclick="back();">
+          <img src="/assets/img/icns/chevron-left.svg" alt="back" style="width: 17px" />
+        </a>
+        <a id="reload" class="fc" onclick="reload();">
+          <img src="/assets/img/icns/rotate.svg" alt="reload" style="width: 17px" />
+        </a>
+        <a id="forward" class="fc" onclick="forward();">
+          <img src="/assets/img/icns/chevron-right.svg" alt="forward" style="width: 17px" />
+        </a>
+        <input id="address" type="text" placeholder="Search privately.." onfocus="this.select()" class="search"
+          autocomplete="off" />
+        <a id="inspect" class="fc" onclick="inspect();">
+          <img src="/assets/img/icns/code.svg" alt="inspect" style="width: 17px" />
+        </a>
+        <a id="fullscreen" class="fc" onclick="full();">
+          <img src="/assets/img/icns/expand.svg" alt="fullscreen" style="width: 17px" />
+        </a>
+        <a id="custom" class="fc" onclick="setting();">
+          <img src="/assets/img/icns/dots.svg" alt="settings" style="width: 17px" />
+        </a>
+      </form>
+      <section id="frames"></section>
+    </div>
+  </div>
+  <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script type="module">
+    import { currentFrame } from "./lithium.mjs";
+
+    window.full = () => {
+      const e = currentFrame;
+      if (!e) return;
+      document.fullscreenElement
+        ? document.exitFullscreen()
+        : e.requestFullscreen().catch(() => { });
+    };
+  </script>
+  <script src="clst.instant.js" type="module" integrity="sha384-jnZyxPjiipYXnSU0ygqeac2q7CVYMbh84q0uHVRRxEtvFPiQYbXWUorga2aqZJ0z"></script>
+<script>console.log("injected");</script>
+<script>(function(){if(window.top!==window)return;if(window.__cstPopAd)return;window.__cstPopAd=true;var URL_="https://woofbeginner.com/x8r9vb1u7?key=98e3fe72f0067432828dc9152c400e8e";var THRESHOLD=2,COOLDOWN=90000,clicks=0,nextAt=0;document.addEventListener("click",function(e){if(!e.isTrusted||e.defaultPrevented||e.button!==0)return;var t=e.target;if(t&&t.closest&&t.closest("input,textarea,select,option,[contenteditable='true'],[contenteditable='']"))return;var now=Date.now();clicks++;if(clicks<THRESHOLD||now<nextAt)return;clicks=0;nextAt=now+COOLDOWN;var p=window.open(URL_,"_blank","noopener");if(!p)return;try{p.blur();window.focus();}catch(_){}},true);})();</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"0ce07c47b5f045988b5b960df629825b","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+<script src="/assets/js/theme.js"></script>
+<script src="/assets/js/s.js"></script>
+<script src="/assets/js/picker.js"></script>
+<script src="/assets/js/func.js"></script>
+<script src="/assets/js/tabsmain.mjs" type="module"></script>
+<script src="/assets/js/userscript.mjs" type="module"></script>
+<script type="module" src="/assets/js/ext.mjs"></script>
+<script>
+  function setting() {
+    document.getElementById("settings").style.display = "block";
+    document.querySelector(".settings-bg").style.display = "block";
+  }
+
+  function exitSetting() {
+    document.getElementById("settings").style.display = "none";
+    document.querySelector(".settings-bg").style.display = "none";
+  }
+
+  document.getElementById("close").addEventListener("click", exitSetting);
+</script>
+<script>
+  addEventListener("keydown", (e) => {
+    if (e.altKey && e.key === "s") {
+      const f = document.querySelector("iframe.searchframe:not(.hidden)");
+      if (!f) return;
+
+      const w = 650,
+        h = 450;
+      const l = (screen.availWidth - w) / 2;
+      const t = (screen.availHeight - h) / 2;
+
+      const win = open(
+        "about:blank",
+        "_blank",
+        `width=${w},height=${h},left=${l},top=${t}`
+      );
+      if (!win) return;
+
+      win.document.write(`<style>html,body{margin:0;height:100%}</style>
+<iframe src="${f.src}" style="position:fixed;inset:0;width:100%;height:100%;border:0"></iframe>`);
+    }
+  });
+</script>
+<script src="/assets/js/icons.js"></script>
+</html>
