@@ -169,7 +169,7 @@
 
     setProxy(localStorage.getItem("pr0xy") || "scram");
 
-    const _wispLoc = localStorage.getItem('location') || 'wss://wisp.mercurywork.shop';
+    const _wispLoc = localStorage.getItem('location') || 'wss://wisp.mercurywork.shop/';
     setWisp(
       (_wispLoc.startsWith('wss://') || _wispLoc.startsWith('ws://'))
         ? _wispLoc
