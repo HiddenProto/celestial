@@ -369,44 +369,55 @@
             </div>
           </div>
           <div id="browsing">
+            <style>
+              .info-icon {
+                display: inline-flex; align-items: center; justify-content: center;
+                width: 15px; height: 15px; border-radius: 50%;
+                background: rgba(255,255,255,0.13); font-size: 10px; font-weight: bold;
+                font-style: normal; cursor: help; position: relative; margin-left: 6px;
+                vertical-align: middle; flex-shrink: 0; user-select: none;
+              }
+              .info-icon::before { content: 'i'; }
+              .info-icon .tip {
+                display: none; position: absolute; left: 20px; top: 50%;
+                transform: translateY(-50%); background: var(--pallet2);
+                border: 1px solid var(--border); border-radius: 8px;
+                padding: 10px 12px; font-size: 12px; line-height: 1.5; width: 230px;
+                z-index: 99999; text-align: left; pointer-events: none;
+                box-shadow: 0 4px 16px rgba(0,0,0,0.4); font-weight: normal;
+              }
+              .info-icon:hover .tip { display: block; }
+              #wispCustom { margin-top: 6px; width: 100%; box-sizing: border-box; }
+            </style>
             <div class="box">
-              <h3>Transport</h3>
+              <h3>Transport <span class="info-icon"><span class="tip">Controls how proxied requests are sent through the network.<br><br><b>epoxy</b> — WebAssembly-based, better site compatibility. Slower. Type: <b>client-side</b>.<br><br><b>libcurl</b> — C-based, faster and more stable. Recommended. Type: <b>client-side</b>.</span></span></h3>
               <p class="desc">
                 change how the pr<span>o</span>xy is handled, can lead to sites
-                that were broken to work or lead to sites that were working to
-                break
+                that were broken to work or lead to sites that were working to break
               </p>
-              <label></label><select class="select" id="tselect">
+              <select class="select" id="tselect">
                 <option value="epoxy">epoxy</option>
                 <option value="libcurl" selected>libcurl</option>
               </select>
             </div>
             <div class="box">
-              <h3>Pr<span>o</span>xy</h3>
+              <h3>Pr<span>o</span>xy <span class="info-icon"><span class="tip">Controls how page content is rewritten for proxying.<br><br><b>ultraviolet</b> — older rewriter, works with some legacy sites. Type: <b>client-side</b>.<br><br><b>scramjet</b> — newer, faster, actively maintained. Recommended. Type: <b>client-side</b>.</span></span></h3>
               <p class="desc">
                 same as the transport, can make pr<span>o</span>xy more stable
               </p>
               <select class="select" id="pr0xySelect">
-                <option value="violet">
-                  ul<span>tr</span>av<span>io</span>l<span>e</span>t
-                </option>
+                <option value="violet">ul<span>tr</span>av<span>io</span>l<span>e</span>t</option>
                 <option value="scram" selected>sc<span>ramj</span>et</option>
               </select>
             </div>
             <div class="box">
-              <h3>VPN</h3>
-              <p class="desc">change the location of where you're searching</p>
-
-              <p class="desc">this has now been scrapped due to server migrating</p>
-
-              <select class="select" id="location" disabled>
-                <option value="/wisp/">disabled</option>
-                <option value="/tkjp/">🇯🇵 tokyo, japan</option>
-                <option value="/spbz/">🇧🇷 sao paulo, brazil</option>
-                <option value="/laca/">🇺🇸 los angeles, california</option>
-                <option value="/syau/">🇦🇺 sydney, australia</option>
-                <option value="/prfe/">🇫🇷 paris, france</option>
+              <h3>Wisp Server <span class="info-icon"><span class="tip">The backend WebSocket server that relays your proxy traffic. Required for the proxy to work.<br><br><b>mercury workshop</b> — free public community server. Shared with other users. Type: <b>public server</b>.<br><br><b>custom</b> — enter your own wisp server URL. Type: <b>self-hosted server</b>.</span></span></h3>
+              <p class="desc">the server that routes your proxied traffic</p>
+              <select class="select" id="wispSelect">
+                <option value="wss://wisp.mercurywork.shop/">mercury workshop (default)</option>
+                <option value="custom">custom server...</option>
               </select>
+              <input id="wispCustom" class="select" placeholder="wss://your-server/" style="display:none;" />
             </div>
           </div>
           <div id="appear">

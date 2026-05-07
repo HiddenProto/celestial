@@ -1,8 +1,7 @@
-// lmao ion feel like making this support modules so imma just import and change
-// mind change
 const pr0xySelect = document.getElementById('pr0xySelect');
 const transportsele = document.getElementById('tselect');
-const locationSelect = document.getElementById('location');
+const wispSelect = document.getElementById('wispSelect');
+const wispCustom = document.getElementById('wispCustom');
 
 pr0xySelect.addEventListener('change', () => {
     localStorage.setItem('pr0xy', pr0xySelect.value);
@@ -14,28 +13,44 @@ transportsele.addEventListener('change', () => {
     location.reload();
 });
 
-locationSelect.addEventListener('change', () => {
-    localStorage.setItem('location', locationSelect.value);
-    location.reload();
+wispSelect.addEventListener('change', () => {
+    if (wispSelect.value === 'custom') {
+        wispCustom.style.display = 'block';
+        wispCustom.focus();
+    } else {
+        wispCustom.style.display = 'none';
+        localStorage.setItem('location', wispSelect.value);
+        location.reload();
+    }
+});
+
+wispCustom.addEventListener('change', () => {
+    const val = wispCustom.value.trim();
+    if (val.startsWith('wss://') || val.startsWith('ws://')) {
+        localStorage.setItem('location', val);
+        location.reload();
+    }
+});
+
+wispCustom.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') wispCustom.dispatchEvent(new Event('change'));
 });
 
 window.addEventListener('DOMContentLoaded', () => {
     const savedProxy = localStorage.getItem('pr0xy');
-    if (savedProxy && [...pr0xySelect.options].some(opt => opt.value === savedProxy)) {
+    if (savedProxy && [...pr0xySelect.options].some(o => o.value === savedProxy))
         pr0xySelect.value = savedProxy;
-    }
-});
 
-window.addEventListener('DOMContentLoaded', () => {
     const savedTransport = localStorage.getItem('transportz');
-    if (savedTransport && [...transportsele.options].some(opt => opt.value === savedTransport)) {
+    if (savedTransport && [...transportsele.options].some(o => o.value === savedTransport))
         transportsele.value = savedTransport;
-    }
-});
 
-window.addEventListener('DOMContentLoaded', () => {
-    const savedLocation = localStorage.getItem('location');
-    if (savedLocation && [...locationSelect.options].some(opt => opt.value === savedLocation)) {
-        locationSelect.value = savedLocation;
+    const savedWisp = localStorage.getItem('location') || 'wss://wisp.mercurywork.shop/';
+    if ([...wispSelect.options].some(o => o.value === savedWisp)) {
+        wispSelect.value = savedWisp;
+    } else if (savedWisp && savedWisp !== 'wss://wisp.mercurywork.shop/') {
+        wispSelect.value = 'custom';
+        wispCustom.style.display = 'block';
+        wispCustom.value = savedWisp;
     }
 });
