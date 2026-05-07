@@ -1,0 +1,338 @@
+[
+    {
+		"name": "Animetsu",
+        "img": "/assets/img/tls/animetsu.png",
+		"url": "https://animetsu.net",
+        "categories": ["popular", "movies"]
+	},
+    {
+		"name": "Youtube",
+        "img": "/assets/img/tls/yt.png",
+		"url": "https://www.youtube.com",
+        "categories": ["sm", "popular"]
+	},
+    {
+		"name": "Gemini AI",
+        "img": "/assets/img/tls/gemini.png",
+		"url": "https://gemini.google.com",
+        "categories": ["popular", "ai"]
+	},
+    {
+		"name": "Grok",
+        "img": "/assets/img/tls/grok.png",
+		"url": "https://grok.com",
+        "categories": ["ai", "popular"]
+	},
+    {
+		"name": "Cineby",
+        "img": "/assets/img/tls/cineby.png",
+		"url": "https://www.cineby.sc/",
+        "categories": ["popular", "movies"]
+	},
+    {
+		"name": "Neal.fun",
+        "img": "/assets/img/tls/nealfun.png",
+		"url": "https://neal.fun",
+        "categories": ["gamesites", "popular", "fun"]
+	},
+    {
+		"name": "KBH Ga<span>me</span>s",
+        "img": "/assets/img/tls/kbhgames.png",
+		"url": "https://kbhgames.com",
+        "categories": ["fun", "gamesites"]
+	},
+    {
+		"name": "Snokido",
+        "img": "/assets/img/tls/snokido.png",
+		"url": "https://snokido.com",
+        "categories": ["fun", "gamesites"]
+	},
+    {
+		"name": "Xbox Cloud Gaming",
+        "img": "/assets/img/tls/xcg.png",
+		"url": "https://www.xbox.com/en-us/play",
+        "categories": ["cg", "gamesites"]
+	},
+    {
+		"name": "Ge<span>for</span>ce Now",
+        "img": "/assets/img/tls/gefn.png",
+		"url": "https://shorturl.at/uzh5G",
+        "categories": ["cg", "gamesites"]
+	},
+    {
+		"name": "Amazon Luna",
+        "img": "/assets/img/tls/luna.png",
+		"url": "https://luna.amazon.com",
+        "categories": ["cg", "gamesites"]
+	},
+    {
+		"name": "Now.gg/Nowgg.fun",
+        "img": "/assets/img/tls/nggfun.png",
+		"url": "https://nowgg.fun",
+        "categories": ["cg", "gamesites"]
+	},
+    {
+		"name": "Cool Math Ga<span>me</span>s",
+        "img": "/assets/img/tls/cmg.png",
+		"url": "https://coolmathgames.com",
+        "categories": ["gamesites"]
+	},
+    {
+		"name": "Di<span>sc</span>ord",
+        "img": "/assets/img/tls/dsc.png",
+		"url": "https://shorturl.at/sDr4V",
+        "categories": ["sm", "popular"]
+	},
+    {
+		"name": "Twitch",
+        "img": "/assets/img/tls/twitch.png",
+		"url": "https://twitch.tv",
+        "categories": ["sm", "movies", "popular"]
+	},
+    {
+		"name": "Tiktok",
+        "img": "/assets/img/tls/tiktok.png",
+		"url": "https://tiktok.com",
+        "categories": ["sm"]
+	},
+    {
+		"name": "Chess.com",
+        "img": "/assets/img/tls/chesscom.png",
+		"url": "https://chess.com",
+        "categories": ["fun"]
+	},
+    {
+		"name": "Visual Studio Code",
+        "img": "/assets/img/tls/vsc.png",
+		"url": "https://vscode.dev",
+        "categories": ["misc"]
+	},
+    {
+		"name": "Github",
+        "img": "/assets/img/tls/gh.png",
+		"url": "https://github.com",
+        "categories": ["misc"]
+	},
+    {
+		"name": "ESPN",
+        "img": "/assets/img/tls/espn.png",
+		"url": "https://espn.com",
+        "categories": ["misc", "sm"]
+	},
+    {
+		"name": "MaxPreps",
+        "img": "/assets/img/tls/maxpreps.png",
+		"url": "https://maxpreps.com",
+        "categories": ["misc"]
+	},
+    {
+		"name": "Snapchat",
+        "img": "/assets/img/tls/snap.png",
+		"url": "https://web.snapchat.com",
+        "categories": ["sm"]
+	},
+    {
+		"name": "Instagram",
+        "img": "/assets/img/tls/ig.png",
+		"url": "https://instagram.com",
+        "categories": ["sm", "popular"]
+	},
+    {
+		"name": "Galaxy.click",
+        "img": "/assets/img/tls/gc.png",
+		"url": "https://galaxy.click",
+        "categories": ["gamesites", "misc"]
+	},
+    {
+		"name": "Sandboxels",
+        "img": "/assets/img/tls/sbx.png",
+		"url": "https://sandboxels.r74n.com/",
+        "categories": ["gamesites", "fun"]
+	},
+    {
+		"name": "Crazyga<span>m</span>es",
+        "img": "/assets/img/tls/crzygs.png",
+		"url": "https://crazygames.com",
+        "categories": ["gamesites"]
+	},
+    {
+		"name": "Pixlr",
+        "img": "/assets/img/tls/pixlr.png",
+		"url": "https://pixlr.com",
+        "categories": ["misc"]
+	},
+    {
+		"name": "ZeroGPT",
+        "img": "/assets/img/tls/zgpt.png",
+		"url": "https://zerogpt.com",
+        "categories": ["ai", "misc", "popular"]
+	},
+    {
+		"name": "AI Humanizer",
+        "img": "/assets/img/tls/grammarly.png",
+		"url": "https://www.grammarly.com/ai-humanizer",
+        "categories": ["ai", "misc", "popular"]
+	},
+    {
+		"name": "Newgrounds",
+        "img": "/assets/img/tls/newgrounds.png",
+		"url": "https://newgrounds.com",
+        "categories": ["sm", "misc"]
+	},
+    {
+		"name": "Invidious",
+        "img": "/assets/img/tls/invidious.png",
+		"url": "https://inv.thepixora.com/feed/popular",
+        "categories": ["sm", "popular"]
+	},
+    {
+		"name": "Vercel",
+        "img": "/assets/img/tls/vercel.png",
+		"url": "https://vercel.com",
+        "categories": ["misc"]
+	},
+    {
+		"name": "DuckDuckGo",
+        "img": "/assets/img/tls/duckduckgo.png",
+		"url": "https://duckduckgo.com",
+        "categories": ["misc", "popular"]
+	},
+    {
+		"name": "Crunchyroll",
+        "img": "/assets/img/tls/crunchyroll.png",
+		"url": "https://crunchyroll.com",
+        "categories": ["movies"]
+	},
+    {
+		"name": "Netflix",
+        "img": "/assets/img/tls/netflix.png",
+		"url": "https://netflix.com",
+        "categories": ["movies", "popular"]
+	},
+    {
+		"name": "Youtube Music",
+        "img": "/assets/img/tls/ytm.png",
+		"url": "https://music.youtube.com",
+        "categories": ["music", "popular"]
+	},
+    {
+		"name": "Soundcloud",
+        "img": "/assets/img/tls/soundcloud.png",
+		"url": "https://soundcloud.com",
+        "categories": ["music"]
+	},
+    {
+		"name": "Streamex",
+        "img": "/assets/img/tls/streamex.png",
+		"url": "https://streamex.net",
+        "categories": ["movies", "popular"]
+	},
+    {
+		"name": "Prescripts",
+        "img": "/assets/img/tls/prescript.png",
+		"url": "https://prescript.neocities.org",
+        "categories": ["misc"]
+	},
+    {
+		"name": "ChatGPT",
+        "img": "/assets/img/tls/chatgpt.png",
+		"url": "https://chatgpt.com",
+        "categories": ["ai", "misc"]
+	},
+    {
+		"name": "Duck.ai",
+        "img": "/assets/img/tls/duck.png",
+		"url": "https://duck.ai",
+        "categories": ["ai", "misc", "popular"]
+	},
+    {
+		"name": "MyInstants [soundboard]",
+        "img": "/assets/img/tls/myinstants.png",
+		"url": "https://myinstants.com",
+        "categories": ["misc", "popular"]
+	},
+    {
+		"name": "Fawa Sports Streaming",
+        "img": "/assets/img/tls/fawa.png",
+		"url": "https://fawanews.sc",
+        "categories": ["movies", "popular"]
+	},
+    {
+		"name": "Atsumaru",
+        "img": "/assets/img/tls/atsu.png",
+		"url": "https://atsu.moe",
+        "categories": ["misc", "popular"]
+	},
+    {
+		"name": "CrystalTube",
+        "img": "/assets/img/tls/crystaltube.png",
+		"url": "https://yt.ghst.best",
+        "categories": ["movies", "sm", "popular"]
+	},
+    {
+		"name": "Musicthing.space",
+        "img": "/assets/img/tls/musicthing.png",
+		"url": "https://musicthing.space/music/",
+        "categories": ["music", "popular"]
+	},
+    {
+		"name": "Microsoft Teams",
+        "img": "/assets/img/tls/teams.png",
+		"url": "https://teams.microsoft.com/free",
+        "categories": ["misc", "popular"]
+	},
+    {
+		"name": "Facebook",
+        "img": "/assets/img/tls/facebook.png",
+		"url": "https://facebook.com",
+        "categories": ["sm", "popular"]
+	},
+    {
+		"name": "Tubi",
+        "img": "/assets/img/tls/tubi.png",
+		"url": "https://tubi.tv",
+        "categories": ["movies", "popular"]
+	},
+    {
+		"name": "Paramount+",
+        "img": "/assets/img/tls/paramount.png",
+		"url": "https://paramountplus.com",
+        "categories": ["movies", "popular"]
+	},
+    {
+		"name": "Hulu",
+        "img": "/assets/img/tls/hulu.png",
+		"url": "https://hulu.com",
+        "categories": ["movies", "popular"]
+	},
+    {
+		"name": "The Roku Channel",
+        "img": "/assets/img/tls/roku.png",
+		"url": "https://therokuchannel.roku.com",
+        "categories": ["movies", "popular"]
+	},
+    {
+		"name": "Blooket Hacks",
+        "img": "/assets/img/tls/blooket.png",
+		"url": "https://blooketbot.schoolcheats.net/",
+        "categories": ["misc", "popular"]
+	},
+    {
+		"name": "Gimkit Hacks",
+        "img": "/assets/img/tls/gimkit.png",
+		"url": "https://gim.villainsrule.xyz/join",
+        "categories": ["misc", "popular"]
+	},
+    {
+		"name": "Lovable",
+        "img": "/assets/img/tls/lovable.png",
+		"url": "https://lovable.dev",
+        "categories": ["ai", "popular"]
+	},
+    {
+		"name": "!! SUGGEST AN APP",
+        "img": "/assets/img/gms/!!suggest.png",
+		"url": "https://forms.gle/ELsciiPdpuofGk4v8",
+        "categories": ["misc"]
+	}
+]

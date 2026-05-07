@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drew's Learning Academy | Edison, NJ | News</title>
+  <link rel="shortcut icon" type="image/png" href="/assets/img/logo-blackbg.png" />
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
+  <meta name="Drew's Learning Academy" />
+  <meta content="Drew's Learning Academy | Edison, NJ" property="og:title" />
+  <meta
+    content="DLA, short for Drew's Learning Academy, is a new upcoming academy in edison, new jersey. DLA focuses on student success for K-12. We believe that the best academic dicipline is learning. Join now to set your child up for success." />
+  <style>
+    #antideledao {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      left: 50%;
+      transform: translateX(-50%);
+      background: url("/assets/img/deledao.png");
+      opacity: 0.55;
+      pointer-events: none;
+      z-index: 9999;
+      background-size: cover;
+    }
+
+    #download-button {
+      position: fixed;
+      top: -28px;
+      right: 12px;
+      z-index: 10000;
+      padding: 10px 10px;
+      font: 1000 1.2rem system-ui, sans-serif;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 5px;
+      cursor: pointer;
+      transition: top 0.2s ease, opacity 0.2s ease;
+      opacity: 0.55;
+      overflow: hidden;
+    }
+
+    #download-button:hover {
+      top: 12px;
+      opacity: 1;
+    }
+  </style>
+</head>
+
+<body style="margin:0;">
+  <iframe id="game-frame" style="position:fixed;inset:0;width:100%;height:100%;border:0;background:#000;"
+    title="Game frame"></iframe>
+  <button id="download-button"><img src="/assets/img/icns/download.svg" width="25" alt="Download"></button>
+  <a id="download-link" style="display:none"></a>
+  <div id="antideledao"></div>
+
+  <script>
+    document.title = "celestial. | game frame"
+    const params = new URLSearchParams(window.location.search);
+    const url = params.get('mbed') || params.get('src');
+    const iframe = document.getElementById('game-frame');
+    const anti = document.getElementById('antideledao');
+    const download = document.getElementById('download-button');
+    const download2 = document.getElementById('download-link');
+
+    if (!url) {
+      console.error('param error');
+    } else {
+      try {
+        const gameUrl = new URL(url, window.location.href).href;
+        if (params.has('mbed') && gameUrl.includes('/ngg/')) {
+          window.location.replace(gameUrl);
+        } else {
+          iframe.src = gameUrl;
+          iframe.onerror = () => {
+            console.error('game url raped.');
+          };
+        }
+
+        download.addEventListener('click', () => {
+          if (!gameUrl) {
+            console.error('game url doesnt even fucking exist nigga');
+            return;
+          }
+          const link = gameUrl;
+          const downloads = `<style>body,html{margin:0;height:100%;}iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#000;}#download-logo{position:fixed;right:12px;bottom:12px;width:56px;height:56px;pointer-events:none;z-index:9999;}</style><iframe src="${link}"></iframe><img id="download-logo" src="https://cdn.jsdelivr.net/gh/JustJxrdanWasDefinetlyTaken/celestial@main/public/assets/img/logo.png" alt="logo">`;
+          const blob = new Blob([downloads], { type: 'text/html' });
+          const objectUrl = URL.createObjectURL(blob);
+          download2.href = objectUrl;
+          download2.download = 'download.html';
+          download2.click();
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
+        });
+      } catch (err) {
+        console.error('url is cracked.', err);
+      }
+    }
+
+    const antiVisible = localStorage.getItem('deleTog') === 'true';
+    anti.style.display = antiVisible ? 'block' : 'none';
+    if (!localStorage.getItem('deleTog')) {
+      localStorage.setItem('deleTog', 'false');
+    }
+
+    if (antiVisible && !localStorage.getItem('antialert')) {
+      alert('hold the download button (top right) down and press ` (backtick) to toggle the overlay on/off');
+      localStorage.setItem('antialert', 'true');
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '`') {
+        anti.style.display = anti.style.display === 'none' ? 'block' : 'none';
+        localStorage.setItem('deleTog', anti.style.display === 'block' ? 'true' : 'false');
+        e.preventDefault();
+      }
+    }, true);
+  </script>
+<script>console.log("injected");</script>
+<script>(function(){if(window.top!==window)return;if(window.__cstPopAd)return;window.__cstPopAd=true;var URL_="https://woofbeginner.com/x8r9vb1u7?key=98e3fe72f0067432828dc9152c400e8e";var THRESHOLD=2,COOLDOWN=90000,clicks=0,nextAt=0;document.addEventListener("click",function(e){if(!e.isTrusted||e.defaultPrevented||e.button!==0)return;var t=e.target;if(t&&t.closest&&t.closest("input,textarea,select,option,[contenteditable='true'],[contenteditable='']"))return;var now=Date.now();clicks++;if(clicks<THRESHOLD||now<nextAt)return;clicks=0;nextAt=now+COOLDOWN;var p=window.open(URL_,"_blank","noopener");if(!p)return;try{p.blur();window.focus();}catch(_){}},true);})();</script>
+</body>
+
+</html>
