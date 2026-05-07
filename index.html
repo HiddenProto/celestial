@@ -244,6 +244,17 @@
       </p>
     </div>
     <div class="settings-bg"></div>
+
+    <!-- First-visit disclaimer -->
+    <div class="disclaimer-bg" style="display:none;position:fixed;inset:0;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);background:rgba(0,0,0,0.45);z-index:99999;"></div>
+    <div id="disclaimer" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--pallet2);border:0.7px solid var(--border);color:var(--color);padding:28px 24px 20px;border-radius:12px;z-index:100000;width:440px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+      <h2 style="margin:0 0 14px;font-size:18px;">Unofficial Revival</h2>
+      <p style="margin:0 0 10px;font-size:14px;line-height:1.5;">This version of <b>celestial.</b> was revived by <a href="https://www.roblox.com/users/5736900664/profile" target="_blank" style="color:var(--color)">bumblcat</a> and is <b>not the official site</b>.</p>
+      <p style="margin:0 0 10px;font-size:14px;line-height:1.5;">The original celestial. lives at <a href="/tab.html?autofill=https://creditrepair911.us" style="color:var(--color)">creditrepair911.us</a> and receives official updates that may not be reflected here. Games, apps, and content are from the original as of the revival date.</p>
+      <p style="margin:0 0 16px;font-size:12px;opacity:0.6;line-height:1.4;">Some features may differ or be unavailable. This disclaimer only shows once.</p>
+      <button onclick="dismissDisclaimer()" style="width:100%;padding:10px;background:var(--button);color:var(--color);border:none;border-radius:6px;cursor:pointer;font-size:14px;">I understand, continue</button>
+    </div>
+
     <div id="settings" style="display: none">
       <div class="settings">
         <p id="close" onclick="close();" style="
@@ -483,6 +494,9 @@
                 <a href="https://www.roblox.com/users/5736900664/profile" target="_blank">revived by bumblcat on discord</a>
               </p>
               <p>
+                <a href="/tab.html?autofill=https://creditrepair911.us" style="color:var(--color)">creditrepair911.us - original celestial. site</a>
+              </p>
+              <p>
                 <a href="https://github.com/justjxrdanwasdefinetlytaken" target="_blank">justjxrdanwasdefinetlytaken -
                   the rest of the site</a>
               </p>
@@ -598,6 +612,45 @@
 <script src="/assets/js/userscript.mjs" type="module"></script>
 <script type="module" src="/assets/js/ext.mjs"></script>
 <script>
+  // First-visit disclaimer
+  function dismissDisclaimer() {
+    document.getElementById("disclaimer").style.display = "none";
+    document.querySelector(".disclaimer-bg").style.display = "none";
+    localStorage.setItem("cst-disclaimer", "seen");
+  }
+  window.addEventListener("load", function () {
+    if (!localStorage.getItem("cst-disclaimer")) {
+      document.getElementById("disclaimer").style.display = "block";
+      document.querySelector(".disclaimer-bg").style.display = "block";
+    }
+  });
+
+  // Keep all proxy navigations inside celestial instead of opening new browser tabs
+  function interceptIframeOpen(iframe) {
+    if (iframe.dataset.openPatched) return;
+    iframe.dataset.openPatched = "1";
+    try {
+      const iwin = iframe.contentWindow;
+      if (!iwin) return;
+      iwin.open = function (url) {
+        if (!url) return null;
+        import("/lithium.mjs").then(({ newTab, Tab, getProxied, makeURL }) => {
+          const t = new Tab();
+          getProxied(makeURL(url)).then(proxied => { t.frame.src = proxied; });
+        });
+        return null;
+      };
+    } catch (e) {}
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    const observer = new MutationObserver(function () {
+      document.querySelectorAll("iframe.searchframe").forEach(function (f) {
+        f.addEventListener("load", function () { interceptIframeOpen(f); }, { once: false });
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
+
   function setting() {
     document.getElementById("settings").style.display = "block";
     document.querySelector(".settings-bg").style.display = "block";

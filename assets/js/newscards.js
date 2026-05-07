@@ -95,9 +95,9 @@ function toggleFavorite(gameName) {
   storage.set(FAVORITES_KEY, favorites);
 }
 
-// main game func
-fetch("/assets/json/books.json")
-  .then((res) => res.json())
+// main game func — try live source first, fall back to local
+const _fetchGames = (urls) => fetch(urls[0]).then(r => { if (!r.ok) throw 0; return r.json(); }).catch(() => urls.length > 1 ? _fetchGames(urls.slice(1)) : Promise.reject());
+_fetchGames(["https://creditrepair911.us/assets/json/books.json", "/assets/json/books.json"])
   .then((games) => {
     const originalGames = [...games];
 
@@ -139,8 +139,7 @@ fetch("/assets/json/books.json")
   });
 
 function rngGame() {
-  fetch("/assets/json/books.json")
-    .then((res) => res.json())
+  _fetchGames(["https://creditrepair911.us/assets/json/books.json", "/assets/json/books.json"])
     .then((games) => {
       const available = games.filter(
         (g) =>
@@ -158,8 +157,7 @@ function rngGame() {
 }
 
 function gameCount() {
-  fetch("/assets/json/books.json")
-    .then((r) => r.json())
+  _fetchGames(["https://creditrepair911.us/assets/json/books.json", "/assets/json/books.json"])
     .then((d) => {
       const input = document.querySelector(".textbook");
       input.placeholder = `search through ${(d.modules || d).length} games..`;
