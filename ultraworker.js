@@ -2,10 +2,7 @@ importScripts(
   "/violet/violet.bundle.js",
 )
 importScripts("/violet/violet.config.js")
-importScripts(__uv$config.sw)
 importScripts("/scram/scramjet.all.js");
-
-
 
 if (navigator.userAgent.includes("Firefox")) {
   Object.defineProperty(globalThis, "crossOriginIsolated", {
@@ -14,7 +11,6 @@ if (navigator.userAgent.includes("Firefox")) {
   })
 }
 
-const uv = new UVServiceWorker()
 const { ScramjetServiceWorker } = $scramjetLoadWorker();
 const scramjet = new ScramjetServiceWorker();
 
@@ -27,14 +23,9 @@ async function handleRequest(event) {
   if (scramjet.route(event)) {
     return scramjet.fetch(event)
   }
-
-
-  if (uv.route(event)) return await uv.fetch(event);
-    
   return await fetch(event.request)
 }
 
 self.addEventListener("fetch", (event) => {
   event.respondWith(handleRequest(event))
 })
-
