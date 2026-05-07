@@ -169,10 +169,11 @@
 
     setProxy(localStorage.getItem("pr0xy") || "scram");
 
+    const _wispLoc = localStorage.getItem('location') || 'wss://wisp.mercurywork.shop';
     setWisp(
-      (location.protocol === "https:" ? "wss://" : "ws://") +
-      location.host +
-      (localStorage.getItem('location') || '/wisp/')
+      (_wispLoc.startsWith('wss://') || _wispLoc.startsWith('ws://'))
+        ? _wispLoc
+        : (location.protocol === "https:" ? "wss://" : "ws://") + location.host + _wispLoc
     );
 
     setTransport(localStorage.getItem("transportz") || "libcurl");
