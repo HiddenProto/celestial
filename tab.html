@@ -77,6 +77,35 @@
 
   <body theme="default">
     <div class="upd-bg"></div>
+    <style>
+      #update-log details summary {
+        cursor: pointer;
+        font-size: 1.05rem;
+        font-weight: bold;
+        padding: 8px 0;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        user-select: none;
+      }
+      #update-log details summary::before {
+        content: '▶';
+        font-size: 0.75rem;
+        transition: transform 0.2s;
+        display: inline-block;
+      }
+      #update-log details[open] summary::before {
+        transform: rotate(90deg);
+      }
+      #update-log details {
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding: 4px 12px;
+        margin: 8px 0;
+        background: rgba(255,255,255,0.04);
+      }
+    </style>
     <div id="update-log" style="display: none">
       <p
         id="close"
@@ -98,74 +127,84 @@
       </div>
       <p style="background:rgba(255,255,255,0.07);border-radius:8px;padding:10px;font-size:13px;">this is an unofficial revival of celestial. hosted by <a href="https://www.roblox.com/users/5736900664/profile" target="_blank" style="color:var(--color)">bumblcat</a>. the original site is at <a href="/tab.html?autofill=https://creditrepair911.us" style="color:var(--color)">creditrepair911.us</a>.</p>
       <hr>
-<h2>revival changes:</h2>
-<p>- revived and redeployed to callanambulance.vercel.app</p>
-<p>- fixed proxy backend (wisp server)</p>
-<p>- fixed service worker (removed broken UV references)</p>
-<p>- all sites now stay within celestial instead of opening new tabs</p>
-<p>- added first-visit disclaimer</p>
-<p>- removed ad injection (was spawning inappropriate pop-up ads)</p>
-<p>- added breakaway theme (glitch/crack effect)</p>
-<hr>
-<h2>original 05/06 content:</h2>
-<p>- added an option to add celestial as an app</p>
-<p>- improved loading times by ~400ms</p>
-<hr>
-<hr>
-<h2>games:</h2>
-<p>- fixed speed stars game</p>
-<p>- fixed cuphead game</p>
-<p>- fixed dreadhead parkour game</p>
-<p>- fixed webblox/roblox 2016 game</p>
-<p>- fixed bendy and the ink machine game</p>
-<p>- fixed one on one soccer</p>
-<p>- fixed web page slowtimes</p>
-<p>- fixed Plague Inc game</p>
-<p>- fixed inscryption</p>
-<p>- fixed night in the woods</p>
-<p>- added 20 minutes till dawn game [PORT]</p>
-<p>- added 10 minutes till dawn</p>
-<p>- added Gacha Life game</p>
-<p>- added Sonic 1, 2, 3, and CD game</p>
-<p>- added sonic EXE game</p>
-<p>- added Rocket Goal.io game</p>
-<p>- added Fears To Fathom; Home Alone game</p>
-<p>- added -3 (Minus Three) game</p>
-<p>- added RE:RUN game [PORT]</p>
-<p>- added raft: survival game [PORT]</p>
-<p>- added slendytubbies 1, 2 and 2d [PORT]</p>
-<p>- added fih game [PORT]</p>
-<p>- added uvuvwe.. game [PORT]</p>
-<p>- added needy streamer overload game [PORT]</p>
-<p>- added space waves</p>
-<p>- added flash player</p>
-<p>- added 1 on 1 football</p>
-<p>- added deepest sword</p>
-<p>- added miside [PORT]</p>
-<p>- added cruelty squad [PORT]</p>
-<p>- added super liquid soccer</p>
-<p>- added papers, please</p>
-<p>- added grow a garden</p>
-<p>- added academytale [PORT]</p>
-<p>- added seven days in purgatory [PORT]</p>
-<p>- added stickman dragon fight</p>
-<p>- added tattletail [PORT]</p>
-<p>- added schoolboy runaway</p>
-<p>- added dude theft auto</p>
-<p>- added lacey's flash games [PORT]</p>
-<p>- added human expiditure program [PORT]</p>
-<p>- added blade ball</p>
-<p>- added the baby in yellow [PORT]</p>
-<p>- added 4th and goal 2022</p>
-<p>- added spaceflight simulator [PORT]</p>
-<p>- added five nights at frickbears 3 [PORT]</p>
-<p>- added 60 seconds santa and burger run</p>
-<p>- added T cubed (t3, triple t basics) [PORT]</p>
-<p>- added gacha club</p>
-<p>- added gachaverse</p>
-<p>- added epstein clicker [PORT]</p>
-<p>- added soccer skills euro cup</p>
-<hr><hr>
+
+      <details open>
+        <summary>revival changes</summary>
+        <p>- revived and redeployed to callanambulance.vercel.app</p>
+        <p>- fixed proxy backend (wisp server)</p>
+        <p>- fixed service worker (removed broken UV references)</p>
+        <p>- all sites now stay within celestial instead of opening new tabs</p>
+        <p>- added first-visit disclaimer</p>
+        <p>- removed ad injection (was spawning inappropriate pop-up ads)</p>
+        <p>- added breakaway theme (glitch/crack effect) — live dynamic cracks, retracts &amp; repeats</p>
+        <p>- added midnight, mocha, quasar, ccm, frappe, chad, saywallahibro &amp; more themes</p>
+        <p>- games that aren't hosted now show a clean "unavailable" screen instead of a broken 404</p>
+        <p>- fixed missing download button icon in game frame</p>
+      </details>
+
+      <details open>
+        <summary>original 05/06 content</summary>
+        <p>- added an option to add celestial as an app</p>
+        <p>- improved loading times by ~400ms</p>
+      </details>
+
+      <details>
+        <summary>games (fixes &amp; additions)</summary>
+        <p>- fixed speed stars game</p>
+        <p>- fixed cuphead game</p>
+        <p>- fixed dreadhead parkour game</p>
+        <p>- fixed webblox/roblox 2016 game</p>
+        <p>- fixed bendy and the ink machine game</p>
+        <p>- fixed one on one soccer</p>
+        <p>- fixed web page slowtimes</p>
+        <p>- fixed Plague Inc game</p>
+        <p>- fixed inscryption</p>
+        <p>- fixed night in the woods</p>
+        <p>- added 20 minutes till dawn game [PORT]</p>
+        <p>- added 10 minutes till dawn</p>
+        <p>- added Gacha Life game</p>
+        <p>- added Sonic 1, 2, 3, and CD game</p>
+        <p>- added sonic EXE game</p>
+        <p>- added Rocket Goal.io game</p>
+        <p>- added Fears To Fathom; Home Alone game</p>
+        <p>- added -3 (Minus Three) game</p>
+        <p>- added RE:RUN game [PORT]</p>
+        <p>- added raft: survival game [PORT]</p>
+        <p>- added slendytubbies 1, 2 and 2d [PORT]</p>
+        <p>- added fih game [PORT]</p>
+        <p>- added uvuvwe.. game [PORT]</p>
+        <p>- added needy streamer overload game [PORT]</p>
+        <p>- added space waves</p>
+        <p>- added flash player</p>
+        <p>- added 1 on 1 football</p>
+        <p>- added deepest sword</p>
+        <p>- added miside [PORT]</p>
+        <p>- added cruelty squad [PORT]</p>
+        <p>- added super liquid soccer</p>
+        <p>- added papers, please</p>
+        <p>- added grow a garden</p>
+        <p>- added academytale [PORT]</p>
+        <p>- added seven days in purgatory [PORT]</p>
+        <p>- added stickman dragon fight</p>
+        <p>- added tattletail [PORT]</p>
+        <p>- added schoolboy runaway</p>
+        <p>- added dude theft auto</p>
+        <p>- added lacey's flash games [PORT]</p>
+        <p>- added human expiditure program [PORT]</p>
+        <p>- added blade ball</p>
+        <p>- added the baby in yellow [PORT]</p>
+        <p>- added 4th and goal 2022</p>
+        <p>- added spaceflight simulator [PORT]</p>
+        <p>- added five nights at frickbears 3 [PORT]</p>
+        <p>- added 60 seconds santa and burger run</p>
+        <p>- added T cubed (t3, triple t basics) [PORT]</p>
+        <p>- added gacha club</p>
+        <p>- added gachaverse</p>
+        <p>- added epstein clicker [PORT]</p>
+        <p>- added soccer skills euro cup</p>
+      </details>
+
+      <hr>
       <p>
         - join the d<span>isc</span>ord for more links!
         <a
