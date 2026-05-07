@@ -140,3 +140,139 @@ body[theme="saywallahibro"] {
   --pallet2: #cabb37;
   --settings:#e8d200;
 }
+
+/* ═══════════════════════════════════════════════════════
+   BREAKAWAY — glitched screen cracking apart
+   ═══════════════════════════════════════════════════════ */
+body[theme="breakaway"] {
+  --background: #070707;
+  --color: #dedede;
+  --pallet: #111111;
+  --pallet-hover: #1c1c1c;
+  --button: #280404;
+  --border: rgba(210, 35, 35, 0.55);
+  --input: rgba(210, 35, 35, 0.09);
+  --pallet2: #0d0d0d;
+  --settings: #190404;
+  animation: bk-screen 9s steps(1) infinite;
+}
+
+/* whole-screen flicker */
+@keyframes bk-screen {
+  0%,87%,100% { filter: none; }
+  88%  { filter: brightness(1.6) saturate(3) hue-rotate(6deg); }
+  89%  { filter: brightness(0.4) contrast(2.2); }
+  90%  { filter: none; }
+  91%  { filter: brightness(1.15) hue-rotate(-10deg) saturate(2); }
+  92%  { filter: none; }
+}
+
+/* scanlines overlay */
+body[theme="breakaway"]::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99997;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(0,0,0,0.22) 3px,
+    rgba(0,0,0,0.22) 4px
+  );
+  opacity: 0.65;
+}
+
+/* crack lines overlay — SVG */
+body[theme="breakaway"]::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99998;
+  background: url('/assets/img/crack.svg') no-repeat center center / cover;
+  opacity: 0;
+  animation: bk-crack 6s steps(1) infinite;
+}
+
+@keyframes bk-crack {
+  0%,78%,100% { opacity: 0; }
+  79%  { opacity: 0.85; }
+  80%  { opacity: 0.2; }
+  81%  { opacity: 0.7; }
+  82%  { opacity: 0; }
+  83%  { opacity: 0.5; }
+  88%  { opacity: 0.9; }
+  89%  { opacity: 0.3; }
+  90%  { opacity: 0.7; }
+  91%  { opacity: 0; }
+}
+
+/* text glitch — RGB channel split */
+body[theme="breakaway"] h1,
+body[theme="breakaway"] h2,
+body[theme="breakaway"] h3 {
+  display: inline-block;
+  animation: bk-txt 11s steps(1) infinite;
+}
+body[theme="breakaway"] h2 { animation-delay: -3.5s; }
+body[theme="breakaway"] h3 { animation-delay: -7s; }
+
+@keyframes bk-txt {
+  0%,88%,100% { transform: none; text-shadow: none; }
+  89%  { transform: translateX(5px) skewX(-3deg);
+         text-shadow: -4px 0 rgba(255,0,0,0.95), 4px 0 rgba(0,255,255,0.8); }
+  90%  { transform: translateX(-3px);
+         text-shadow: 3px 0 rgba(255,0,0,0.7), -3px 0 rgba(0,255,255,0.55); }
+  91%  { transform: none; text-shadow: none; }
+  92%  { transform: skewX(1.5deg) translateY(2px);
+         text-shadow: 2px 0 rgba(255,0,0,0.4); }
+  93%  { transform: none; text-shadow: none; }
+}
+
+/* card shake + RGB tear */
+body[theme="breakaway"] .card {
+  animation: bk-card 13s steps(1) infinite;
+}
+body[theme="breakaway"] .card:nth-child(3n+1) { animation-delay: -3s; }
+body[theme="breakaway"] .card:nth-child(3n+2) { animation-delay: -6.5s; }
+body[theme="breakaway"] .card:nth-child(5n)   { animation-delay: -10s; }
+body[theme="breakaway"] .card:nth-child(7n)   { animation-delay: -1.5s; }
+
+@keyframes bk-card {
+  0%,90%,100% { transform: none; filter: none; box-shadow: none; }
+  91%  { transform: translateX(5px);
+         filter: brightness(1.4) saturate(2.5);
+         box-shadow: -4px 0 0 rgba(255,0,0,0.85), 4px 0 0 rgba(0,255,255,0.6); }
+  92%  { transform: translateX(-3px) skewX(1deg); filter: none; box-shadow: none; }
+  93%  { transform: none; }
+}
+
+/* panel/select border corruption */
+body[theme="breakaway"] .fakebox,
+body[theme="breakaway"] select,
+body[theme="breakaway"] .select {
+  animation: bk-border 8s steps(1) infinite;
+}
+
+@keyframes bk-border {
+  0%,90%,100% { box-shadow: none; }
+  91%  { box-shadow: 0 0 0 1px rgba(255,0,0,0.9), 2px 0 0 1px rgba(0,255,255,0.4); }
+  92%  { box-shadow: none; }
+  93%  { box-shadow: -1px 0 0 1px rgba(255,0,0,0.6); }
+  94%  { box-shadow: none; }
+}
+
+/* red glow on hover */
+body[theme="breakaway"] .card:hover {
+  box-shadow: 0 0 14px rgba(255,30,30,0.55), 0 0 3px rgba(255,0,0,0.9) !important;
+  border-color: rgba(255,50,50,0.85) !important;
+}
+
+/* settings/input focus — corrupted red glow */
+body[theme="breakaway"] input:focus,
+body[theme="breakaway"] select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(200,30,30,0.7), 0 0 8px rgba(255,0,0,0.4);
+}

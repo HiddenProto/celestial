@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+  <g stroke="rgb(255,55,55)" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- main crack — upper right -->
+    <path d="M580,260 L760,110 L920,60" stroke-width="2" opacity="0.85"/>
+    <!-- branch off upper right -->
+    <path d="M720,155 L830,130 L910,210" stroke-width="1.1" opacity="0.6"/>
+    <path d="M760,110 L800,60 L840,30" stroke-width="0.9" opacity="0.5"/>
+    <!-- crack to the right -->
+    <path d="M580,260 L880,245 L1180,310 L1440,290" stroke-width="1.6" opacity="0.72"/>
+    <path d="M900,248 L950,300 L1010,310" stroke-width="0.9" opacity="0.45"/>
+    <!-- crack lower right -->
+    <path d="M580,260 L740,490 L830,720 L910,900" stroke-width="2.1" opacity="0.8"/>
+    <path d="M700,440 L800,460 L870,580 L860,700" stroke-width="1" opacity="0.5"/>
+    <path d="M750,490 L820,530 L780,620" stroke-width="0.8" opacity="0.4"/>
+    <!-- crack lower left -->
+    <path d="M580,260 L430,470 L360,700 L320,900" stroke-width="1.7" opacity="0.73"/>
+    <path d="M470,390 L360,415 L290,370" stroke-width="1" opacity="0.5"/>
+    <path d="M410,500 L350,550 L310,540" stroke-width="0.8" opacity="0.42"/>
+    <!-- crack upper left -->
+    <path d="M580,260 L400,175 L240,90 L80,30" stroke-width="1.6" opacity="0.68"/>
+    <path d="M440,195 L380,250 L310,240" stroke-width="0.9" opacity="0.48"/>
+    <!-- crack straight left -->
+    <path d="M580,260 L330,258 L100,280 L0,270" stroke-width="1.3" opacity="0.62"/>
+    <path d="M380,260 L360,320 L300,350" stroke-width="0.8" opacity="0.42"/>
+    <!-- crack upward -->
+    <path d="M580,260 L560,130 L530,0" stroke-width="1.1" opacity="0.58"/>
+    <!-- short center splinters -->
+    <path d="M580,260 L640,330 L700,310" stroke-width="0.9" opacity="0.7"/>
+    <path d="M580,260 L545,330 L510,355" stroke-width="0.85" opacity="0.65"/>
+    <path d="M580,260 L615,240 L650,215" stroke-width="0.8" opacity="0.65"/>
+    <path d="M580,260 L555,225 L540,200" stroke-width="0.8" opacity="0.6"/>
+  </g>
+  <!-- impact glow -->
+  <circle cx="580" cy="260" r="14" fill="rgba(255,50,50,0.15)"/>
+  <circle cx="580" cy="260" r="5" fill="rgba(255,80,80,0.5)"/>
+  <circle cx="580" cy="260" r="2" fill="rgba(255,120,120,0.9)"/>
+</svg>
