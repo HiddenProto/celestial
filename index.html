@@ -167,7 +167,7 @@
       localStorage.getItem("search-engine") ||
       "http://duckduckgo.com/?q=%s";
 
-    setProxy(localStorage.getItem("pr0xy") || "scram");
+    setProxy(localStorage.getItem("pr0xy") || "scramjet");
 
     const _wispLoc = localStorage.getItem('location') || 'wss://celestial-wisp.onrender.com/';
     setWisp(
@@ -391,7 +391,7 @@
               .cf-locked { opacity: 0.4 !important; pointer-events: none !important; cursor: not-allowed !important; }
             </style>
             <div class="box">
-              <h3>☁️ Cloudflare Mode <span class="info-icon"><span class="tip">Optimizes the pr<span>o</span>xy to better handle Cloudflare-protected sites.<br><br>Automatically switches transport to <b>epoxy</b> and pr<span>o</span>xy to <b>Bumblcat RRC</b> for best compatibility.</span></span></h3>
+              <h3>☁️ Cloudflare Mode <span class="info-icon"><span class="tip">Optimizes the pr<span>o</span>xy to better handle Cloudflare-protected sites.<br><br>Automatically switches transport to <b>epoxy</b> and pr<span>o</span>xy to <b>scramjet</b> for best compatibility.</span></span></h3>
               <p class="desc">better compatibility with cloudflare-protected sites</p>
               <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:4px;">
                 <input type="checkbox" id="cfModeTog" />
@@ -410,13 +410,13 @@
               </select>
             </div>
             <div class="box">
-              <h3>Pr<span>o</span>xy <span class="info-icon"><span class="tip">Controls how page content is rewritten for proxying.<br><br><b>Bumblcat RRC</b> — private fork of scramjet, faster + improved. Recommended. Type: <b>client-side</b>.<br><br><b>scramjet</b> — original scramjet engine, legacy option. Type: <b>client-side</b>.<br><br><b>ultraviolet</b> — older rewriter, works with some legacy sites. Type: <b>client-side</b>.</span></span></h3>
+              <h3>Pr<span>o</span>xy <span class="info-icon"><span class="tip">Controls how page content is rewritten for proxying.<br><br><b>scramjet</b> — original scramjet engine. Recommended. Type: <b>client-side</b>.<br><br><b>bumblcat rrc (WIP)</b> — private scramjet fork, work in progress, may not render sites correctly yet. Type: <b>client-side</b>.<br><br><b>ultraviolet</b> — older rewriter, works with some legacy sites. Type: <b>client-side</b>.</span></span></h3>
               <p class="desc">
                 change which rewriter engine handles pr<span>o</span>xied pages
               </p>
               <select class="select" id="pr0xySelect">
-                <option value="scram" selected>bumblcat rrc</option>
-                <option value="scramjet">sc<span>ram</span>jet</option>
+                <option value="scram">bumblcat rrc (WIP)</option>
+                <option value="scramjet" selected>sc<span>ram</span>jet</option>
                 <option value="violet">ul<span>tr</span>av<span>io</span>l<span>e</span>t</option>
               </select>
             </div>

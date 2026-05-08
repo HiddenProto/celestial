@@ -362,7 +362,7 @@ function applySettings() {
     setTransport(localStorage.getItem("transportz") || "libcurl");
   }
   if (typeof setProxy === "function") {
-    setProxy(localStorage.getItem("pr0xy") || "scram");
+    setProxy(localStorage.getItem("pr0xy") || "scramjet");
   }
 
   const savedTitle = localStorage.getItem("savedTitle");
@@ -443,7 +443,7 @@ function cookieStorage() {
 
   // Restore saved values into selects
   tselect.value = localStorage.getItem('transportz') || 'libcurl';
-  pr0xySelect.value = localStorage.getItem('pr0xy') || 'scram';
+  pr0xySelect.value = localStorage.getItem('pr0xy') || 'scramjet';
   const savedWisp = localStorage.getItem('location') || 'wss://celestial-wisp.onrender.com/';
   if ([...wispSelect.options].some(o => o.value === savedWisp)) {
     wispSelect.value = savedWisp;
@@ -515,12 +515,12 @@ function cookieStorage() {
       if (!localStorage.getItem('cfmode_prev_transport'))
         localStorage.setItem('cfmode_prev_transport', localStorage.getItem('transportz') || 'libcurl');
       if (!localStorage.getItem('cfmode_prev_proxy'))
-        localStorage.setItem('cfmode_prev_proxy', localStorage.getItem('pr0xy') || 'scram');
+        localStorage.setItem('cfmode_prev_proxy', localStorage.getItem('pr0xy') || 'scramjet');
 
       // Force CF-optimal settings
       localStorage.setItem('cfmode', '1');
       localStorage.setItem('transportz', 'epoxy');
-      localStorage.setItem('pr0xy', 'scram');
+      localStorage.setItem('pr0xy', 'scramjet');
 
       // Update selects to show locked values
       const t = document.getElementById('tselect');
@@ -532,7 +532,7 @@ function cookieStorage() {
     } else {
       // Restore previous settings
       const prevTransport = localStorage.getItem('cfmode_prev_transport') || 'libcurl';
-      const prevProxy    = localStorage.getItem('cfmode_prev_proxy')     || 'scram';
+      const prevProxy    = localStorage.getItem('cfmode_prev_proxy')     || 'scramjet';
 
       localStorage.setItem('transportz', prevTransport);
       localStorage.setItem('pr0xy', prevProxy);
@@ -580,7 +580,7 @@ function exportData() {
     deleTog: localStorage.getItem("deleTog") || "false",
     theme: localStorage.getItem("theme") || "default",
     transportz: localStorage.getItem("transportz") || "libcurl",
-    pr0xy: localStorage.getItem("pr0xy") || "scram",
+    pr0xy: localStorage.getItem("pr0xy") || "scramjet",
     customBg: localStorage.getItem("customBg") || "",
     panicUrl: localStorage.getItem("panicUrl") || "",
     panicKey: localStorage.getItem("panicKey") || "",
