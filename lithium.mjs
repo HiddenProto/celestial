@@ -53,6 +53,13 @@ async function registerSW() {
 await import("/violet/violet.bundle.js");
 await import("/violet/violet.config.js");
 await import("/scram/brc.js");
+// Compatibility shim: controller.api.js references $brc.BrcHeaders, but this
+// version of brc.js exports it as ScramjetHeaders. Alias it so the Controller
+// request handler doesn't throw "Cannot read properties of undefined (reading
+// 'fromRawHeaders')".
+if (window.$brc && !window.$brc.BrcHeaders && window.$brc.ScramjetHeaders) {
+	window.$brc.BrcHeaders = window.$brc.ScramjetHeaders;
+}
 
 //////////////////////////////
 ///      BRC Controller    ///
@@ -200,7 +207,21 @@ async function ensureBRC() {
 
 			console.log("lethal.js: BRC controller ready ✦");
 			document.dispatchEvent(new CustomEvent("brc-ready"));
-			try { window.top.document.dispatchEvent(new CustomEvent("brc-ready")); } catch {}
+			// Only forward events to the top frame when running inside a subframe
+			// (e.g. tab.html). In the top frame document === window.top.document so
+			// dispatching twice would fire every listener twice → duplicate toasts.
+			try {
+				if (window !== window.top) {
+					window.top.document.dispatchEvent(new CustomEvent("brc-ready"));
+				}
+			} catch {}
+
+			// Keep the SW alive by sending a heartbeat every 25 s.
+			// Chrome terminates idle SWs after ~30 s, which wipes the registered route
+			// prefixes in controller.sw.js (i[]).  The heartbeat prevents that.
+			setInterval(() => {
+				navigator.serviceWorker.controller?.postMessage?.({ type: "keepalive" });
+			}, 25000);
 		} catch (e) {
 			console.warn("lethal.js: BRC init failed —", e.message);
 			brcController = null;
@@ -208,7 +229,12 @@ async function ensureBRC() {
 			ensureScramjet().catch(() => {});
 			const failEv = new CustomEvent("brc-failed", { detail: { error: e.message } });
 			document.dispatchEvent(failEv);
-			try { window.top.document.dispatchEvent(new CustomEvent("brc-failed", { detail: { error: e.message } })); } catch {}
+			// Only forward to top when in a subframe (avoid duplicate notifications)
+			try {
+				if (window !== window.top) {
+					window.top.document.dispatchEvent(new CustomEvent("brc-failed", { detail: { error: e.message } }));
+				}
+			} catch {}
 		}
 	})();
 	return _brcInitPromise;
