@@ -176,10 +176,13 @@ async function ensureBRC() {
 
 			brcController = new Controller({ serviceworker: sw, transport });
 
-			// Wait for WASM to load and SW handshake to complete (with 30s timeout)
+			// Wait for WASM to load and SW handshake to complete.
+			// 8s timeout — with brc.wasm cached in the SW this always resolves in
+			// ~150-300ms. The short timeout means failures surface quickly instead
+			// of hanging navigations for 30 seconds.
 			await Promise.race([
 				brcController.wait(),
-				new Promise((_, reject) => setTimeout(() => reject(new Error("BRC ready timeout")), 30000)),
+				new Promise((_, reject) => setTimeout(() => reject(new Error("BRC ready timeout")), 8000)),
 			]);
 
 			// Wire up any existing tabs
@@ -324,11 +327,17 @@ export function getProxy() {
 export async function getProxied(input) {
 	const url = makeURL(input);
 	if (proxyOption === "scram") {
-		// Non-blocking fast path: only use BRC if it's already fully ready.
-		// This avoids blocking navigation on WASM load time (1-5s) or the 30s
-		// failure timeout. BRC continues initialising in the background and will
-		// be used once it's ready on the next navigation.
-		if (brcController) {
+		// Wait for BRC with a 1.5s timeout before falling back to scramjet.
+		// With brc.wasm cached in the SW, BRC is ready in ~150-300ms so this
+		// race almost always resolves immediately. The 1.5s cap only fires on the
+		// very first-ever page load (cold cache) so the user still gets a response
+		// quickly rather than hanging.
+		const brcReady = await Promise.race([
+			ensureBRC().then(() => !!brcController),
+			new Promise(resolve => setTimeout(() => resolve(false), 1500)),
+		]);
+
+		if (brcReady && brcController) {
 			let frame = brcFrameMap.get(currentTab);
 			// Frame might be missing due to a race between tab creation and BRC
 			// init completing — create it on the fly if so.
@@ -343,7 +352,7 @@ export async function getProxied(input) {
 			}
 			if (frame) return frame.prefix + encodeURIComponent(url);
 		}
-		// BRC not ready yet — use scramjet immediately (already pre-warmed).
+		// BRC timed out or failed — use scramjet (already pre-warmed alongside BRC).
 		await ensureScramjet();
 		if (_scramjetController) {
 			try { return _scramjetController.encodeUrl(url); } catch(e) {}

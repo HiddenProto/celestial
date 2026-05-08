@@ -36,8 +36,18 @@ if (navigator.userAgent.includes("Firefox")) {
   })
 }
 
-self.addEventListener("install", () => {
-  self.skipWaiting()
+// Cache name — bump the version suffix to force a cache refresh after deploys
+const BRC_CACHE = "brc-wasm-v1";
+// Files to pre-cache on install so BRC WASM is always available instantly
+const BRC_PRECACHE = ["/scram/brc.wasm"];
+
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+  // Pre-cache BRC WASM so controller init is fast (~150ms) on every page load
+  // after the first visit instead of waiting for a network fetch each time.
+  event.waitUntil(
+    caches.open(BRC_CACHE).then(cache => cache.addAll(BRC_PRECACHE)).catch(() => {})
+  );
 })
 
 self.addEventListener("activate", (event) => {
@@ -49,6 +59,19 @@ self.addEventListener("activate", (event) => {
 const SCRAMJET_PREFIX = "/scramjet/";
 
 async function handleRequest(event) {
+  // Serve BRC WASM from the SW cache so controller init is instant on warm loads.
+  // Cache-first: if the file is cached return it immediately; otherwise fetch,
+  // cache the response, and return it (populates cache for next time).
+  const { pathname } = new URL(event.request.url);
+  if (BRC_PRECACHE.includes(pathname)) {
+    const cache = await caches.open(BRC_CACHE);
+    const cached = await cache.match(event.request);
+    if (cached) return cached;
+    const response = await fetch(event.request);
+    if (response.ok) cache.put(event.request, response.clone()).catch(() => {});
+    return response;
+  }
+
   // BRC routes — handled via Controller RPC back to the main page
   if (typeof $brcController !== "undefined" && $brcController.shouldRoute(event)) {
     return $brcController.route(event)
