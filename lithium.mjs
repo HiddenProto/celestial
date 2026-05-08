@@ -210,7 +210,7 @@ registerSW()
 	.then(async () => {
 		console.log("lethal.js: SW registered");
 		// Eagerly init BRC if it's the selected proxy
-		if ((localStorage.getItem("pr0xy") || "scram") === "scram") {
+		if (localStorage.getItem("pr0xy") === "scram") {
 			ensureBRC().catch(() => {});
 		}
 	})
