@@ -65,6 +65,42 @@ const brcFrameMap = new Map();
 /** @type {Promise<void>|null} Singleton init promise */
 let _brcInitPromise = null;
 
+//////////////////////////////
+///    Scramjet (legacy)    ///
+//////////////////////////////
+/** @type {any} Original scramjet controller instance */
+let _scramjetController = null;
+/** @type {Promise<void>|null} Singleton scramjet init promise */
+let _scramjetInitPromise = null;
+
+/**
+ * Ensures the original scramjet controller is initialized. Safe to call multiple times.
+ */
+async function ensureScramjet() {
+	if (_scramjetInitPromise) return _scramjetInitPromise;
+	_scramjetInitPromise = (async () => {
+		try {
+			await _loadScript("/sj/scramjet.all.js");
+			const { ScramjetController } = window.$scramjetLoadController();
+			_scramjetController = new ScramjetController({
+				files: {
+					wasm: "/sj/scramjet.wasm.wasm",
+					all: "/sj/scramjet.all.js",
+					sync: "/sj/scramjet.sync.js",
+				},
+				naiiveRewriter: true,
+				scramitize: false,
+			});
+			_scramjetController.init();
+			console.log("lethal.js: scramjet controller ready");
+		} catch (e) {
+			console.warn("lethal.js: scramjet init failed —", e.message);
+			_scramjetController = null;
+		}
+	})();
+	return _scramjetInitPromise;
+}
+
 /**
  * Creates a ProxyTransport for BRC based on the current transport setting.
  * Reads from localStorage directly so it works before setTransport/setWisp are called.
@@ -119,9 +155,12 @@ async function ensureBRC() {
 			await _loadScript("/scram/controller.api.js");
 
 			// Wait for a SW controller to be active
+			// Double-check inside the promise to avoid a race where the event fires
+			// before our listener is registered (controller already active).
 			let sw = navigator.serviceWorker.controller;
 			if (!sw) {
 				await new Promise((resolve) => {
+					if (navigator.serviceWorker.controller) { resolve(); return; }
 					navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true });
 				});
 				sw = navigator.serviceWorker.controller;
@@ -260,6 +299,8 @@ export async function setProxy(proxy) {
 		await import("/violet/violet.config.js");
 	}
 	proxyOption = proxy;
+	// Eagerly pre-init scramjet if selected
+	if (proxy === "scramjet") ensureScramjet().catch(() => {});
 }
 
 /**
@@ -289,6 +330,15 @@ export async function getProxied(input) {
 			const topWin = window.top !== window ? window.top : window;
 			if (typeof topWin.notify === "function") topWin.notify("BRC not ready yet — falling back to UV", "warning", 4000);
 		} catch {};
+	} else if (proxyOption === "scramjet") {
+		await ensureScramjet();
+		if (_scramjetController) {
+			try {
+				return _scramjetController.encodeUrl(url);
+			} catch (e) {
+				console.warn("lethal.js: scramjet encodeUrl failed —", e.message);
+			}
+		}
 	}
 	return window.__uv$config.prefix + window.__uv$config.encodeUrl(url);
 }
