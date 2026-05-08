@@ -125,9 +125,9 @@
           window.location.replace(gameUrl);
         } else if (url.startsWith('/assets/src/')) {
           fetch(url, { method: 'HEAD' }).then(r => {
-            if (!r.ok) showUnavailable();
+            if (r.status === 404) showUnavailable();
             else iframe.src = gameUrl;
-          }).catch(() => showUnavailable());
+          }).catch(() => { iframe.src = gameUrl; }); // network error → just try loading
         } else {
           iframe.src = gameUrl;
           iframe.onerror = () => {
