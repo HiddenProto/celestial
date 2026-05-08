@@ -54,8 +54,8 @@ await import("/violet/violet.bundle.js");
 await import("/violet/violet.config.js");
 
 await import("/scram/brc.js");
-const { BrcController } = window.$brcLoadController();
-const scramjet = new BrcController({
+const { BrcController, ScramjetController } = (window.$brcLoadController || window.$scramjetLoadController)();
+const scramjet = new (BrcController || ScramjetController)({
 	files: {
 		wasm: "/scram/brc.wasm",
 		all: "/scram/brc.js",
