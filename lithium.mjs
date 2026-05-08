@@ -209,9 +209,12 @@ async function ensureBRC() {
 registerSW()
 	.then(async () => {
 		console.log("lethal.js: SW registered");
-		// Eagerly init BRC if it's the selected proxy
+		// Eagerly init BRC if it's the selected proxy.
+		// Also pre-warm scramjet as the fallback so it's ready instantly if BRC
+		// isn't done loading yet when the user first navigates.
 		if (localStorage.getItem("pr0xy") === "scram") {
 			ensureBRC().catch(() => {});
+			ensureScramjet().catch(() => {});
 		}
 	})
 	.catch((err) =>
@@ -321,13 +324,26 @@ export function getProxy() {
 export async function getProxied(input) {
 	const url = makeURL(input);
 	if (proxyOption === "scram") {
-		await ensureBRC();
-		const frame = brcFrameMap.get(currentTab);
-		if (frame && brcController) {
-			// BRC URL: frame prefix + encoded URL (matches what the SW intercepts)
-			return frame.prefix + encodeURIComponent(url);
+		// Non-blocking fast path: only use BRC if it's already fully ready.
+		// This avoids blocking navigation on WASM load time (1-5s) or the 30s
+		// failure timeout. BRC continues initialising in the background and will
+		// be used once it's ready on the next navigation.
+		if (brcController) {
+			let frame = brcFrameMap.get(currentTab);
+			// Frame might be missing due to a race between tab creation and BRC
+			// init completing — create it on the fly if so.
+			if (!frame) {
+				const iframe = document.getElementById(`frame-${currentTab}`);
+				if (iframe) {
+					try {
+						frame = brcController.createFrame(iframe);
+						brcFrameMap.set(currentTab, frame);
+					} catch(e) {}
+				}
+			}
+			if (frame) return frame.prefix + encodeURIComponent(url);
 		}
-		// BRC not ready — fall back to scramjet
+		// BRC not ready yet — use scramjet immediately (already pre-warmed).
 		await ensureScramjet();
 		if (_scramjetController) {
 			try { return _scramjetController.encodeUrl(url); } catch(e) {}
