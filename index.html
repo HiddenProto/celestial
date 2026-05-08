@@ -414,7 +414,8 @@
               <h3>Wisp Server <span class="info-icon"><span class="tip">The backend WebSocket server that relays your proxy traffic. Required for the proxy to work.<br><br><b>mercury workshop</b> — free public community server. Shared with other users. Type: <b>public server</b>.<br><br><b>custom</b> — enter your own wisp server URL. Type: <b>self-hosted server</b>.</span></span></h3>
               <p class="desc">the server that routes your proxied traffic</p>
               <select class="select" id="wispSelect">
-                <option value="wss://wisp.mercurywork.shop/">mercury workshop (default)</option>
+                <option value="wss://celestial-wisp.onrender.com/">bumblcat's server (recommended)</option>
+                <option value="wss://wisp.mercurywork.shop/">mercury workshop</option>
                 <option value="wss://anura.pro/wisp/">anura (free)</option>
                 <option value="wss://wisp.nodeppt.com/">nodeppt (free)</option>
                 <option value="custom">custom server...</option>
@@ -709,6 +710,7 @@
 // Wisp auto-test
 window.__testWisp = function() {
   const servers = [
+    'wss://celestial-wisp.onrender.com/',
     'wss://wisp.mercurywork.shop/',
     'wss://anura.pro/wisp/',
     'wss://wisp.nodeppt.com/'
