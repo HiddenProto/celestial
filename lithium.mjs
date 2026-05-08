@@ -95,6 +95,18 @@ async function _createBRCTransport() {
 	return new LibcurlClient({ wisp });
 }
 
+/** Injects a script tag and waits for it to load (needed for IIFE scripts). */
+function _loadScript(src) {
+	return new Promise((resolve, reject) => {
+		if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+		const s = document.createElement("script");
+		s.src = src;
+		s.onload = resolve;
+		s.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+		document.head.appendChild(s);
+	});
+}
+
 /**
  * Ensures the BRC Controller is initialized. Safe to call multiple times.
  * Resolves when BRC is ready (or failed gracefully).
@@ -103,8 +115,8 @@ async function ensureBRC() {
 	if (_brcInitPromise) return _brcInitPromise;
 	_brcInitPromise = (async () => {
 		try {
-			// Load controller API — sets window.$brcController global
-			await import("/scram/controller.api.js");
+			// Load controller API as script tag (IIFE — sets window.$brcController)
+			await _loadScript("/scram/controller.api.js");
 
 			// Wait for a SW controller to be active
 			let sw = navigator.serviceWorker.controller;
