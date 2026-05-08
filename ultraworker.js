@@ -44,17 +44,26 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim())
 })
 
+// Scramjet's hard-coded URL prefix — only call loadConfig for actual scramjet URLs
+// so we never block BRC WASM fetches or other non-scramjet requests.
+const SCRAMJET_PREFIX = "/scramjet/";
+
 async function handleRequest(event) {
   // BRC routes — handled via Controller RPC back to the main page
   if (typeof $brcController !== "undefined" && $brcController.shouldRoute(event)) {
     return $brcController.route(event)
   }
-  // Original scramjet routes
+  // Scramjet routes — only for URLs that actually start with /scramjet/
+  // IMPORTANT: do NOT call loadConfig() for any other URL; it blocks until the
+  // main page responds, which hangs BRC WASM fetches and causes the ready timeout.
   if (scramjet) {
     try {
-      await scramjet.loadConfig();
-      if (scramjet.route(event)) {
-        return scramjet.fetch(event);
+      const { pathname } = new URL(event.request.url);
+      if (pathname.startsWith(SCRAMJET_PREFIX)) {
+        await scramjet.loadConfig();
+        if (scramjet.route(event)) {
+          return scramjet.fetch(event);
+        }
       }
     } catch(e) {}
   }

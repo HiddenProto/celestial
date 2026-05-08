@@ -196,6 +196,8 @@ async function ensureBRC() {
 		} catch (e) {
 			console.warn("lethal.js: BRC init failed —", e.message);
 			brcController = null;
+			// Pre-warm scramjet immediately so the fallback is ready when the user navigates
+			ensureScramjet().catch(() => {});
 			const failEv = new CustomEvent("brc-failed", { detail: { error: e.message } });
 			document.dispatchEvent(failEv);
 			try { window.top.document.dispatchEvent(new CustomEvent("brc-failed", { detail: { error: e.message } })); } catch {}
@@ -325,11 +327,12 @@ export async function getProxied(input) {
 			// BRC URL: frame prefix + encoded URL (matches what the SW intercepts)
 			return frame.prefix + encodeURIComponent(url);
 		}
-		// BRC not ready yet — show notification (works from iframes via window.top)
-		try {
-			const topWin = window.top !== window ? window.top : window;
-			if (typeof topWin.notify === "function") topWin.notify("BRC not ready yet — falling back to UV", "warning", 4000);
-		} catch {};
+		// BRC not ready — fall back to scramjet
+		await ensureScramjet();
+		if (_scramjetController) {
+			try { return _scramjetController.encodeUrl(url); } catch(e) {}
+		}
+		// Final fallback: UV
 	} else if (proxyOption === "scramjet") {
 		await ensureScramjet();
 		if (_scramjetController) {
