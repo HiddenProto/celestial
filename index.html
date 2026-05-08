@@ -391,13 +391,13 @@
               .cf-locked { opacity: 0.4 !important; pointer-events: none !important; cursor: not-allowed !important; }
             </style>
             <div class="box">
-              <h3>☁️ Cloudflare Mode <span class="info-icon"><span class="tip">Optimizes the pr<span>o</span>xy to better handle Cloudflare-protected sites.<br><br>Automatically switches transport to <b>epoxy</b> and pr<span>o</span>xy to <b>scramjet</b>.<br><br>Transport, pr<span>o</span>xy, and wisp settings are <b>locked</b> while enabled to prevent incompatible combinations.</span></span></h3>
+              <h3>☁️ Cloudflare Mode <span class="info-icon"><span class="tip">Optimizes the pr<span>o</span>xy to better handle Cloudflare-protected sites.<br><br>Automatically switches transport to <b>epoxy</b> and pr<span>o</span>xy to <b>Bumblcat RRC</b>.<br><br>Transport, pr<span>o</span>xy, and wisp settings are <b>locked</b> while enabled to prevent incompatible combinations.</span></span></h3>
               <p class="desc">better compatibility with cloudflare-protected sites — locks transport &amp; pr<span>o</span>xy to optimal settings</p>
               <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:4px;">
                 <input type="checkbox" id="cfModeTog" />
                 <span>enable cloudflare bypass mode</span>
               </label>
-              <p id="cfmode-note" style="display:none;font-size:.73rem;margin-top:8px;opacity:.55;line-height:1.4;">🔒 transport &amp; pr<span>o</span>xy locked — using <b>epoxy</b> + <b>scramjet</b> for best cloudflare compatibility</p>
+              <p id="cfmode-note" style="display:none;font-size:.73rem;margin-top:8px;opacity:.55;line-height:1.4;">🔒 transport &amp; pr<span>o</span>xy locked — using <b>epoxy</b> + <b>bumblcat rrc</b> for best cloudflare compatibility</p>
             </div>
             <div class="box">
               <h3>Transport <span class="info-icon"><span class="tip">Controls how proxied requests are sent through the network.<br><br><b>epoxy</b> — WebAssembly-based, better site compatibility. Slower. Type: <b>client-side</b>.<br><br><b>libcurl</b> — C-based, faster and more stable. Recommended. Type: <b>client-side</b>.</span></span></h3>
@@ -411,13 +411,13 @@
               </select>
             </div>
             <div class="box">
-              <h3>Pr<span>o</span>xy <span class="info-icon"><span class="tip">Controls how page content is rewritten for proxying.<br><br><b>ultraviolet</b> — older rewriter, works with some legacy sites. Type: <b>client-side</b>.<br><br><b>scramjet</b> — newer, faster, actively maintained. Recommended. Type: <b>client-side</b>.</span></span></h3>
+              <h3>Pr<span>o</span>xy <span class="info-icon"><span class="tip">Controls how page content is rewritten for proxying.<br><br><b>Bumblcat RRC</b> — private fork of scramjet, faster + improved. Recommended. Type: <b>client-side</b>.<br><br><b>ultraviolet</b> — older rewriter, works with some legacy sites. Type: <b>client-side</b>.</span></span></h3>
               <p class="desc">
-                same as the transport, can make pr<span>o</span>xy more stable
+                change which rewriter engine handles pr<span>o</span>xied pages
               </p>
               <select class="select" id="pr0xySelect">
+                <option value="scram" selected>bumblcat rrc ✦</option>
                 <option value="violet">ul<span>tr</span>av<span>io</span>l<span>e</span>t</option>
-                <option value="scram" selected>sc<span>ramj</span>et</option>
               </select>
             </div>
             <div class="box">
