@@ -742,7 +742,8 @@
         window.notify("Bumblcat RRC proxy active ✦", "success", 4000);
       });
       document.addEventListener("brc-failed", (e) => {
-        window.notify("BRC unavailable — using scramjet fallback", "warning", 7000);
+        const reason = e.detail?.error ? ` (${e.detail.error})` : "";
+        window.notify(`BRC unavailable${reason} — using scramjet fallback`, "warning", 10000);
       });
     })();
   </script>

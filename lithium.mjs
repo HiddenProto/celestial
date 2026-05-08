@@ -152,11 +152,13 @@ async function ensureBRC() {
 	_brcInitPromise = (async () => {
 		try {
 			// Load controller API as script tag (IIFE — sets window.$brcController)
+			console.log("lethal.js: BRC [1/5] loading controller.api.js…");
 			await _loadScript("/scram/controller.api.js");
 
 			// Wait for a SW controller to be active
 			// Double-check inside the promise to avoid a race where the event fires
 			// before our listener is registered (controller already active).
+			console.log("lethal.js: BRC [2/5] waiting for SW controller…");
 			let sw = navigator.serviceWorker.controller;
 			if (!sw) {
 				await new Promise((resolve) => {
@@ -167,8 +169,10 @@ async function ensureBRC() {
 			}
 			if (!sw) throw new Error("no SW controller available");
 
+			console.log("lethal.js: BRC [3/5] creating transport…");
 			const transport = await _createBRCTransport();
 
+			console.log("lethal.js: BRC [4/5] creating Controller…");
 			const { Controller, config } = window.$brcController;
 			config.brcPath     = "/scram/brc.js";
 			config.injectPath  = "/scram/controller.inject.js";
@@ -180,6 +184,7 @@ async function ensureBRC() {
 			// 8s timeout — with brc.wasm cached in the SW this always resolves in
 			// ~150-300ms. The short timeout means failures surface quickly instead
 			// of hanging navigations for 30 seconds.
+			console.log("lethal.js: BRC [5/5] waiting for WASM + SW handshake…");
 			await Promise.race([
 				brcController.wait(),
 				new Promise((_, reject) => setTimeout(() => reject(new Error("BRC ready timeout")), 8000)),
