@@ -53,13 +53,13 @@ async function registerSW() {
 await import("/violet/violet.bundle.js");
 await import("/violet/violet.config.js");
 
-await import("/scram/scramjet.all.js");
-const { ScramjetController } = window.$scramjetLoadController();
-const scramjet = new ScramjetController({
+await import("/scram/brc.js");
+const { BrcController } = window.$brcLoadController();
+const scramjet = new BrcController({
 	files: {
-		wasm: "/scram/scramjet.wasm.wasm",
-		all: "/scram/scramjet.all.js",
-		sync: "/scram/scramjet.sync.js",
+		wasm: "/scram/brc.wasm",
+		all: "/scram/brc.js",
+		sync: "/scram/brc.sync.js",
 	},
 	flags: {
 		rewriterLogs: false,

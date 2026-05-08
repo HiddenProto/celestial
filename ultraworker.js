@@ -2,7 +2,7 @@ importScripts(
   "/violet/violet.bundle.js",
 )
 importScripts("/violet/violet.config.js")
-importScripts("/scram/scramjet.all.js");
+importScripts("/scram/brc.js");
 
 if (navigator.userAgent.includes("Firefox")) {
   Object.defineProperty(globalThis, "crossOriginIsolated", {
