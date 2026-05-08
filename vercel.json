@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/assets/src/:path*",
+      "destination": "https://creditrepair911.us/assets/src/:path*"
+    }
+  ]
+}
