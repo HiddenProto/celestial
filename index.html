@@ -630,6 +630,124 @@
   </script>
   <script src="clst.instant.js" type="module" integrity="sha384-jnZyxPjiipYXnSU0ygqeac2q7CVYMbh84q0uHVRRxEtvFPiQYbXWUorga2aqZJ0z"></script>
 
+  <!-- ===== Notification System ===== -->
+  <style>
+    #notif-container {
+      position: fixed; bottom: 20px; right: 20px;
+      display: flex; flex-direction: column; gap: 10px;
+      z-index: 999999; pointer-events: none;
+      max-width: 340px; width: 100%;
+    }
+    .notif {
+      background: var(--pallet2, #18181b);
+      border: 1px solid var(--border, rgba(255,255,255,0.1));
+      border-radius: 12px; padding: 12px 14px 0;
+      font-size: 0.82rem; line-height: 1.4; color: var(--fg, #e4e4e7);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+      pointer-events: all; overflow: hidden;
+      animation: notif-in 0.25s cubic-bezier(.21,1.02,.73,1) both;
+      transition: opacity 0.3s, transform 0.3s;
+      position: relative;
+    }
+    .notif.notif-out {
+      opacity: 0; transform: translateX(30px);
+    }
+    @keyframes notif-in {
+      from { opacity: 0; transform: translateX(30px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    .notif-top {
+      display: flex; align-items: flex-start; gap: 9px; padding-bottom: 10px;
+    }
+    .notif-icon {
+      font-size: 1rem; flex-shrink: 0; line-height: 1.4;
+    }
+    .notif-body { flex: 1; }
+    .notif-title {
+      font-weight: 650; font-size: 0.78rem; margin-bottom: 2px;
+      opacity: 0.6; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .notif-msg { font-size: 0.82rem; }
+    .notif-close {
+      background: none; border: none; cursor: pointer; color: inherit;
+      opacity: 0.4; font-size: 1rem; padding: 0 0 0 6px; line-height: 1;
+      flex-shrink: 0; transition: opacity 0.15s;
+    }
+    .notif-close:hover { opacity: 0.9; }
+    .notif-bar {
+      height: 3px; margin: 0 -14px; border-radius: 0;
+      transform-origin: left; animation-name: notif-shrink;
+      animation-timing-function: linear; animation-fill-mode: forwards;
+    }
+    @keyframes notif-shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+    /* type colours */
+    .notif[data-t="success"] { border-left: 3px solid #22c55e; }
+    .notif[data-t="success"] .notif-bar { background: #22c55e; }
+    .notif[data-t="error"]   { border-left: 3px solid #ef4444; }
+    .notif[data-t="error"]   .notif-bar { background: #ef4444; }
+    .notif[data-t="warning"] { border-left: 3px solid #f59e0b; }
+    .notif[data-t="warning"] .notif-bar { background: #f59e0b; }
+    .notif[data-t="info"]    { border-left: 3px solid #3b82f6; }
+    .notif[data-t="info"]    .notif-bar { background: #3b82f6; }
+  </style>
+  <div id="notif-container" aria-live="polite"></div>
+  <script>
+    (function () {
+      const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
+      const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
+      const container = document.getElementById("notif-container");
+
+      /**
+       * Show a notification toast.
+       * @param {string} message
+       * @param {"success"|"error"|"warning"|"info"} [type="info"]
+       * @param {number} [duration=6000] ms
+       */
+      window.notify = function (message, type = "info", duration = 6000) {
+        if (!["success","error","warning","info"].includes(type)) type = "info";
+
+        const el = document.createElement("div");
+        el.className = "notif";
+        el.setAttribute("data-t", type);
+        el.setAttribute("role", "alert");
+        el.innerHTML = `
+          <div class="notif-top">
+            <span class="notif-icon">${ICONS[type]}</span>
+            <div class="notif-body">
+              <div class="notif-title">${LABELS[type]}</div>
+              <div class="notif-msg">${message.replace(/</g,"&lt;")}</div>
+            </div>
+            <button class="notif-close" aria-label="dismiss">✕</button>
+          </div>
+          <div class="notif-bar" style="animation-duration:${duration}ms"></div>`;
+
+        const dismiss = () => {
+          el.classList.add("notif-out");
+          setTimeout(() => el.remove(), 320);
+        };
+        el.querySelector(".notif-close").addEventListener("click", dismiss);
+        setTimeout(dismiss, duration);
+
+        container.appendChild(el);
+      };
+
+      // Listen for custom events from lithium.mjs
+      document.addEventListener("notify", (e) => {
+        const { type = "info", message = "", duration = 6000 } = e.detail || {};
+        window.notify(message, type, duration);
+      });
+
+      // BRC lifecycle notifications
+      document.addEventListener("brc-ready", () => {
+        window.notify("Bumblcat RRC proxy active ✦", "success", 4000);
+      });
+      document.addEventListener("brc-failed", (e) => {
+        const msg = e.detail?.error || "unknown error";
+        window.notify(`BRC unavailable — using UV fallback (${msg})`, "warning", 7000);
+      });
+    })();
+  </script>
+
 
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"0ce07c47b5f045988b5b960df629825b","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>

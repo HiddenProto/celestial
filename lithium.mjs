@@ -52,31 +52,109 @@ async function registerSW() {
 }
 await import("/violet/violet.bundle.js");
 await import("/violet/violet.config.js");
-
 await import("/scram/brc.js");
-const { BrcController } = window.$brcLoadController();
-const scramjet = new BrcController({
-	files: {
-		wasm: "/scram/brc.wasm",
-		all: "/scram/brc.js",
-		sync: "/scram/brc.sync.js",
-	},
-	flags: {
-		rewriterLogs: false,
-		naiiveRewriter: false,
-		scramitize: false,
-	},
-	siteFlags: {
-		"https://www.google.com/(search|sorry).*": {
-			naiiveRewriter: true,
-		},
-	},
-});
-scramjet.init();
 
+//////////////////////////////
+///      BRC Controller    ///
+//////////////////////////////
+
+/** @type {any} Active BRC Controller instance, null until initialized */
+let brcController = null;
+/** @type {Map<number, any>} tabNumber → BRC Frame instance */
+const brcFrameMap = new Map();
+/** @type {Promise<void>|null} Singleton init promise */
+let _brcInitPromise = null;
+
+/**
+ * Creates a ProxyTransport for BRC based on the current transport setting.
+ * Reads from localStorage directly so it works before setTransport/setWisp are called.
+ */
+async function _createBRCTransport() {
+	// Read wisp from localStorage — setWisp may not have been called yet
+	const savedWisp = localStorage.getItem("location") || "wss://celestial-wisp.onrender.com/";
+	const wisp = wispURL || (
+		(savedWisp.startsWith("wss://") || savedWisp.startsWith("ws://"))
+			? savedWisp
+			: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + savedWisp
+	);
+
+	// CF mode forces epoxy; otherwise use saved transport preference
+	const cfMode = localStorage.getItem("cfmode") === "1";
+	const savedTransport = localStorage.getItem("transportz") || "libcurl";
+	const useEpoxy = cfMode || savedTransport === "epoxy";
+
+	if (useEpoxy) {
+		try {
+			const { default: EpoxyTransport } = await import("/epoxy/index.mjs");
+			return new EpoxyTransport({ wisp });
+		} catch (e) {
+			console.warn("lethal.js: epoxy transport failed, trying libcurl:", e.message);
+		}
+	}
+	const { default: LibcurlClient } = await import("/curl/index.mjs");
+	return new LibcurlClient({ wisp });
+}
+
+/**
+ * Ensures the BRC Controller is initialized. Safe to call multiple times.
+ * Resolves when BRC is ready (or failed gracefully).
+ */
+async function ensureBRC() {
+	if (_brcInitPromise) return _brcInitPromise;
+	_brcInitPromise = (async () => {
+		try {
+			// Load controller API — sets window.$brcController global
+			await import("/scram/controller.api.js");
+
+			// Wait for a SW controller to be active
+			let sw = navigator.serviceWorker.controller;
+			if (!sw) {
+				await new Promise((resolve) => {
+					navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true });
+				});
+				sw = navigator.serviceWorker.controller;
+			}
+			if (!sw) throw new Error("no SW controller available");
+
+			const transport = await _createBRCTransport();
+
+			const { Controller, config } = window.$brcController;
+			config.brcPath     = "/scram/brc.js";
+			config.injectPath  = "/scram/controller.inject.js";
+			config.wasmPath    = "/scram/brc.wasm";
+
+			brcController = new Controller({ serviceworker: sw, transport });
+
+			// Wire up any existing tabs
+			document.querySelectorAll('iframe[id^="frame-"]').forEach((iframe) => {
+				const num = parseInt(iframe.id.replace("frame-", ""), 10);
+				if (!brcFrameMap.has(num)) {
+					try { brcFrameMap.set(num, brcController.createFrame(iframe)); } catch {}
+				}
+			});
+
+			console.log("lethal.js: BRC controller ready ✦");
+			document.dispatchEvent(new CustomEvent("brc-ready"));
+			try { window.top.document.dispatchEvent(new CustomEvent("brc-ready")); } catch {}
+		} catch (e) {
+			console.warn("lethal.js: BRC init failed —", e.message);
+			brcController = null;
+			const failEv = new CustomEvent("brc-failed", { detail: { error: e.message } });
+			document.dispatchEvent(failEv);
+			try { window.top.document.dispatchEvent(new CustomEvent("brc-failed", { detail: { error: e.message } })); } catch {}
+		}
+	})();
+	return _brcInitPromise;
+}
 
 registerSW()
-	.then(() => console.log("lethal.js: SW registered"))
+	.then(async () => {
+		console.log("lethal.js: SW registered");
+		// Eagerly init BRC if it's the selected proxy
+		if ((localStorage.getItem("pr0xy") || "scram") === "scram") {
+			ensureBRC().catch(() => {});
+		}
+	})
 	.catch((err) =>
 		console.error("lethal.js: failed to register service worker:", err),
 	);
@@ -181,7 +259,19 @@ export function getProxy() {
  */
 export async function getProxied(input) {
 	const url = makeURL(input);
-	if (proxyOption === "scram") return scramjet.encodeUrl(url);
+	if (proxyOption === "scram") {
+		await ensureBRC();
+		const frame = brcFrameMap.get(currentTab);
+		if (frame && brcController) {
+			// BRC URL: frame prefix + encoded URL (matches what the SW intercepts)
+			return frame.prefix + encodeURIComponent(url);
+		}
+		// BRC not ready yet — show notification (works from iframes via window.top)
+		try {
+			const topWin = window.top !== window ? window.top : window;
+			if (typeof topWin.notify === "function") topWin.notify("BRC not ready yet — falling back to UV", "warning", 4000);
+		} catch {};
+	}
 	return window.__uv$config.prefix + window.__uv$config.encodeUrl(url);
 }
 
@@ -217,6 +307,15 @@ export class Tab {
 
 		this.frame.addEventListener("load", () => this.handleLoad());
 
+		// Register a BRC frame for this tab (async — non-blocking)
+		const tabNum = this.tabNumber;
+		const frameEl = this.frame;
+		ensureBRC().then(() => {
+			if (brcController && !brcFrameMap.has(tabNum)) {
+				try { brcFrameMap.set(tabNum, brcController.createFrame(frameEl)); } catch {}
+			}
+		}).catch(() => {});
+
 		document.dispatchEvent(
 			new CustomEvent("new-tab", {
 				detail: { tabNumber: tabCounter },
@@ -249,6 +348,7 @@ export class Tab {
 	 */
 	close() {
 		this.frame.remove();
+		brcFrameMap.delete(this.tabNumber);
 
 		document.dispatchEvent(
 			new CustomEvent("close-tab", {

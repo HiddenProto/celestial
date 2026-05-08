@@ -4,6 +4,13 @@ importScripts(
 importScripts("/violet/violet.config.js")
 importScripts("/scram/brc.js");
 
+// BRC controller SW module — deployed alongside brc.js once the workflow includes controller dist
+try {
+  importScripts("/scram/controller.sw.js");
+} catch(e) {
+  console.warn("[ultraworker] BRC controller SW not available:", e.message);
+}
+
 if (navigator.userAgent.includes("Firefox")) {
   Object.defineProperty(globalThis, "crossOriginIsolated", {
     value: true,
@@ -11,19 +18,21 @@ if (navigator.userAgent.includes("Firefox")) {
   })
 }
 
-const { ScramjetServiceWorker } = $scramjetLoadWorker();
-const scramjet = new ScramjetServiceWorker();
-
 self.addEventListener("install", () => {
   self.skipWaiting()
 })
 
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim())
+})
+
 async function handleRequest(event) {
-  await scramjet.loadConfig()
-  if (scramjet.route(event)) {
-    return scramjet.fetch(event)
+  // BRC routes — handled via Controller RPC back to the main page
+  if (typeof $brcController !== "undefined" && $brcController.shouldRoute(event)) {
+    return $brcController.route(event)
   }
-  return await fetch(event.request)
+  // Non-proxied resources pass through normally
+  return fetch(event.request)
 }
 
 self.addEventListener("fetch", (event) => {
