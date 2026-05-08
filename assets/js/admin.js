@@ -1,37 +1,43 @@
 /* ============================================================
-   CELESTIAL ADMIN SYSTEM v1
+   CELESTIAL ADMIN SYSTEM v2
    Konami: ← → ← → ↑ ↓ A B  →  passcode  →  admin panel
+   Keys require admin online to activate. Single-use.
    ============================================================ */
 (function () {
   'use strict';
 
-  const SEQ   = ['ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','b'];
-  const PASS  = 'Hr332941369';
-  const HUB   = 'celestial-hub-112456LCD';
-  const SEC   = 'Hr332941369'; // signing secret for keys
+  const SEQ  = ['ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','b'];
+  const PASS = 'Hr332941369';
+  const HUB  = 'celestial-hub-112456LCD';
+  const SEC  = 'Hr332941369';
 
   let isAdmin    = localStorage.getItem('cst-admin') === '1';
   let buf        = [];
-  let hub        = null;          // admin-side PeerJS Peer
-  let cPeer      = null;          // client-side PeerJS Peer
-  let clients    = {};            // peerId → {conn, vp, url, name}
+  let hub        = null;
+  let cPeer      = null;
+  let clients    = {};
   let viewTarget = null;
   let admCX = 50, admCY = 50;
-  let panelEl = null;
+  let panelEl    = null;
 
-  // ─── tiny hash for key signing ────────────────────────────────
+  // cross-tab approval sync
+  const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('cst-auth') : null;
+  if (bc) bc.onmessage = e => {
+    if (e.data === 'approved') document.getElementById('cst-gate')?.remove();
+    if (e.data === 'revoked')  { clearApproval(); if (!document.getElementById('cst-gate')) showGate(); }
+  };
+
+  // ─── key crypto ──────────────────────────────────────────────
   function H(s) {
     let h = 5381;
     for (let i = 0; i < s.length; i++) h = (Math.imul(h, 33) ^ s.charCodeAt(i)) >>> 0;
     return h.toString(36).toUpperCase().padStart(7, '0');
   }
-
   function makeKey(name, days) {
     const e = Date.now() + days * 86400000;
     const p = btoa(JSON.stringify({ n: name, e }));
     return p + '.' + H(p + SEC);
   }
-
   function checkKey(raw) {
     if (!raw) return null;
     try {
@@ -43,11 +49,24 @@
     } catch { return null; }
   }
 
-  // ─── auth gate ────────────────────────────────────────────────
-  function needsAuth() {
-    return !isAdmin && !checkKey(localStorage.getItem('cst-key'));
+  // ─── approval state ──────────────────────────────────────────
+  function isApproved() {
+    if (isAdmin) return true;
+    try {
+      const a = JSON.parse(localStorage.getItem('cst-approved'));
+      return a && Date.now() < a.expires;
+    } catch { return false; }
+  }
+  function setApproved(name, expires) {
+    localStorage.setItem('cst-approved', JSON.stringify({ name, expires }));
+    bc?.postMessage('approved');
+  }
+  function clearApproval() {
+    localStorage.removeItem('cst-approved');
+    localStorage.removeItem('cst-key');
   }
 
+  // ─── auth gate ───────────────────────────────────────────────
   function showGate() {
     if (document.getElementById('cst-gate')) return;
     const d = document.createElement('div');
@@ -58,8 +77,8 @@
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   font-family:system-ui,sans-serif;}
 #cst-gate *{box-sizing:border-box;}
-#cst-gate h2{color:#fff;margin:0 0 6px;font-size:1.6rem;letter-spacing:-.03em;}
-#cst-gate p{color:#444;font-size:.83rem;margin:0 0 24px;}
+#cg-h{color:#fff;margin:0 0 6px;font-size:1.6rem;letter-spacing:-.03em;}
+#cg-sub{color:#444;font-size:.83rem;margin:0 0 24px;}
 #cg-inp{background:#0d0d0d;border:1px solid #1e1e1e;color:#fff;
   padding:11px 16px;border-radius:7px;font-size:.95rem;width:290px;outline:none;
   font-family:monospace;letter-spacing:.05em;margin-bottom:10px;}
@@ -67,42 +86,85 @@
 #cg-btn{width:290px;padding:11px;background:#111;color:#bbb;
   border:1px solid #222;border-radius:7px;cursor:pointer;font-size:.88rem;}
 #cg-btn:hover{background:#181818;}
+#cg-btn:disabled{opacity:.45;cursor:default;}
 #cg-err{font-size:.75rem;color:#ff4444;margin-top:8px;min-height:18px;}
+#cg-info{font-size:.75rem;color:#555;margin-top:8px;display:none;}
 </style>
-<h2>celestial.</h2>
-<p>access key required to continue</p>
+<h2 id="cg-h">celestial.</h2>
+<p id="cg-sub">access key required</p>
 <input id="cg-inp" placeholder="paste your access key" autocomplete="off"/>
 <button id="cg-btn">continue</button>
-<div id="cg-err"></div>`;
+<div id="cg-err"></div>
+<div id="cg-info"></div>`;
     document.body.appendChild(d);
-    const inp = d.querySelector('#cg-inp');
-    const err = d.querySelector('#cg-err');
-    const go  = () => {
-      const k = inp.value.trim();
-      if (checkKey(k)) {
-        localStorage.setItem('cst-key', k);
-        d.remove();
-        window.__cstBeaconHello?.();
-      } else {
-        err.textContent = k ? 'invalid or expired key.' : 'enter a key first.';
+
+    const inp  = d.querySelector('#cg-inp');
+    const btn  = d.querySelector('#cg-btn');
+    const err  = d.querySelector('#cg-err');
+    const info = d.querySelector('#cg-info');
+
+    const setInfo  = t => { info.textContent = t; info.style.display = t ? 'block' : 'none'; };
+    const setError = t => { err.textContent = t; setTimeout(() => err.textContent = '', 3000); };
+    const lock     = () => { btn.disabled = true; inp.disabled = true; };
+    const unlock   = () => { btn.disabled = false; inp.disabled = false; };
+
+    const go = () => {
+      const k  = inp.value.trim();
+      const kv = checkKey(k);
+      if (!kv) {
         inp.style.borderColor = '#ff3333';
-        setTimeout(() => { inp.style.borderColor = ''; err.textContent = ''; }, 2500);
+        setTimeout(() => inp.style.borderColor = '', 2500);
+        setError(k ? 'invalid or expired key.' : 'enter a key first.');
+        return;
       }
+      lock();
+      err.textContent = '';
+      setInfo('contacting admin…');
+      localStorage.setItem('cst-key', k);
+      window.__cstPendingKey = k;
+      window.__cstBeaconRegister?.();
     };
-    d.querySelector('#cg-btn').onclick = go;
+
+    btn.onclick = go;
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
     inp.focus();
+
+    window.__cstGateApproved = (name, expires) => {
+      setApproved(name, expires);
+      d.remove();
+      delete window.__cstGateApproved;
+      delete window.__cstGateRejected;
+      delete window.__cstGateOffline;
+      delete window.__cstPendingKey;
+    };
+    window.__cstGateRejected = reason => {
+      unlock(); setInfo('');
+      localStorage.removeItem('cst-key');
+      delete window.__cstPendingKey;
+      setError(
+        reason === 'used'    ? 'key already in use by someone else.' :
+        reason === 'unknown' ? 'key not recognized by admin.' :
+        reason === 'expired' ? 'key has expired.' :
+        'key rejected by admin.'
+      );
+      inp.style.borderColor = '#ff3333';
+      setTimeout(() => inp.style.borderColor = '', 3000);
+    };
+    window.__cstGateOffline = () => {
+      unlock();
+      localStorage.removeItem('cst-key');
+      delete window.__cstPendingKey;
+      setInfo('admin is offline — keys require admin to be connected. try again later.');
+      setTimeout(() => setInfo(''), 5000);
+    };
   }
 
-  // ─── konami listener ──────────────────────────────────────────
+  // ─── konami ──────────────────────────────────────────────────
   document.addEventListener('keydown', e => {
     if (document.activeElement.matches('input,textarea,select,[contenteditable]')) return;
     buf.push(e.key);
     if (buf.length > SEQ.length) buf.shift();
-    if (JSON.stringify(buf) === JSON.stringify(SEQ)) {
-      buf = [];
-      doLogin();
-    }
+    if (JSON.stringify(buf) === JSON.stringify(SEQ)) { buf = []; doLogin(); }
   }, true);
 
   function doLogin() {
@@ -113,16 +175,13 @@
       localStorage.setItem('cst-admin', '1');
       document.getElementById('cst-gate')?.remove();
       openPanel();
-    } else if (pw !== null) {
-      alert('incorrect passcode.');
-    }
+    } else if (pw !== null) { alert('incorrect passcode.'); }
   }
 
-  // ─── admin panel ──────────────────────────────────────────────
+  // ─── admin panel ─────────────────────────────────────────────
   function openPanel() {
     if (panelEl) { panelEl.style.display = 'flex'; return; }
-    buildPanel();
-    startHub();
+    buildPanel(); startHub();
   }
 
   function buildPanel() {
@@ -153,8 +212,7 @@
 .cn.on{color:#fff;background:#0c0c0c;border-left-color:#cc2222;}
 .cn.red{color:#cc3333;}
 #cp-main{flex:1;overflow-y:auto;padding:20px;}
-.cs{display:none;}
-.cs.on{display:block;}
+.cs{display:none;} .cs.on{display:block;}
 .cb{background:#0c0c0c;border:1px solid #191919;border-radius:8px;padding:16px;margin-bottom:14px;}
 .cb h3{margin:0 0 12px;font-size:.88rem;color:#fff;}
 .ci{background:#0d0d0d;border:1px solid #222;color:#fff;
@@ -168,7 +226,6 @@
 .cbtn.r{background:#120000;color:#ff5555;border-color:#300000;}
 .cbtn.r:hover{background:#1a0000;}
 .crow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
-/* keys */
 .ck{background:#0d0d0d;border:1px solid #191919;border-radius:5px;
   padding:10px;margin:3px 0;display:flex;gap:10px;align-items:flex-start;}
 .ck-code{font-family:monospace;font-size:.66rem;color:#666;word-break:break-all;flex:1;}
@@ -176,14 +233,12 @@
 .kw{background:#1a1200;color:#ffaa44;border:1px solid #3d2900;}
 .ka{background:#001200;color:#44ff77;border:1px solid #003300;}
 .ke{background:#120000;color:#ff5555;border:1px solid #300000;}
-/* clients */
 .ccl{background:#0c0c0c;border:1px solid #191919;border-radius:6px;
-  padding:12px;margin:3px 0;cursor:pointer;}
-.ccl:hover{border-color:#2a2a2a;}
+  padding:12px;margin:3px 0;display:flex;align-items:center;gap:10px;}
 .ccl.sel{border-color:#cc2222;}
+.ccl-info{flex:1;cursor:pointer;}
 .cn2{font-size:.86rem;color:#fff;font-weight:600;}
 .cm{font-size:.72rem;color:#444;margin-top:3px;}
-/* viewer */
 #cp-viewer{display:none;background:#030303;border:1px solid #191919;
   border-radius:8px;overflow:hidden;margin-top:12px;}
 #cp-vc{display:block;width:100%;background:#000;cursor:crosshair;}
@@ -204,8 +259,6 @@
     <button class="cn red" id="cp-logout" style="margin-top:auto;">Log Out</button>
   </div>
   <div id="cp-main">
-
-    <!-- KEYS -->
     <div class="cs on" id="cs-keys">
       <div class="cb">
         <h3>Create Key</h3>
@@ -220,7 +273,7 @@
             padding:10px;font-family:monospace;font-size:.7rem;word-break:break-all;color:#77ffaa;"></div>
           <div class="crow" style="margin-top:8px;">
             <button class="cbtn g" id="ck-copy">copy</button>
-            <span id="ck-wait" style="font-size:.73rem;color:#ffaa44;">waiting for use...</span>
+            <span id="ck-wait" style="font-size:.73rem;color:#ffaa44;">waiting for use…</span>
           </div>
         </div>
       </div>
@@ -229,13 +282,12 @@
         <div id="ck-list"></div>
       </div>
     </div>
-
-    <!-- CLIENTS -->
     <div class="cs" id="cs-clients">
       <div class="cb">
         <h3>Connected Clients</h3>
         <p style="font-size:.76rem;color:#444;margin:0 0 10px;">
-          clients auto-connect to hub <code style="color:#666">112456LCD</code> every second. click one to view their screen.
+          clients auto-connect to hub <code style="color:#666">112456LCD</code> every second.
+          click a client to view their screen. remove disconnects and revokes their access.
         </p>
         <div id="cp-clist"><p style="color:#333;font-size:.82rem;">no clients connected.</p></div>
       </div>
@@ -251,22 +303,19 @@
         </div>
       </div>
     </div>
-
-    <!-- INFO -->
     <div class="cs" id="cs-info">
       <div class="cb">
         <h3>System</h3>
-        <p style="font-size:.82rem;">hub peer ID: <code id="cp-pid" style="color:#777;">connecting...</code></p>
+        <p style="font-size:.82rem;">hub peer ID: <code id="cp-pid" style="color:#777;">connecting…</code></p>
         <p style="font-size:.82rem;">hub channel: <code style="color:#777;">112456LCD</code></p>
         <p style="font-size:.82rem;color:#444;">code: ← → ← → ↑ ↓ A B, then passcode</p>
+        <p style="font-size:.82rem;color:#444;">keys are single-use and require admin online to activate.</p>
       </div>
     </div>
-
   </div>
 </div>`;
     document.body.appendChild(panelEl);
 
-    // nav tabs
     panelEl.querySelectorAll('.cn[data-s]').forEach(b => b.onclick = () => {
       panelEl.querySelectorAll('.cn').forEach(x => x.classList.remove('on'));
       panelEl.querySelectorAll('.cs').forEach(x => x.classList.remove('on'));
@@ -274,14 +323,15 @@
       document.getElementById('cs-' + b.dataset.s)?.classList.add('on');
     });
 
-    panelEl.querySelector('#cp-close').onclick   = () => panelEl.style.display = 'none';
-    panelEl.querySelector('#cp-logout').onclick  = doLogout;
-    panelEl.querySelector('#ck-make').onclick    = doMakeKey;
-    panelEl.querySelector('#ck-copy').onclick    = () => navigator.clipboard?.writeText(document.getElementById('ck-val').textContent).catch(() => {});
+    panelEl.querySelector('#cp-close').onclick  = () => panelEl.style.display = 'none';
+    panelEl.querySelector('#cp-logout').onclick = doLogout;
+    panelEl.querySelector('#ck-make').onclick   = doMakeKey;
+    panelEl.querySelector('#ck-copy').onclick   = () =>
+      navigator.clipboard?.writeText(document.getElementById('ck-val').textContent).catch(() => {});
 
     const vc = panelEl.querySelector('#cp-vc');
     vc.addEventListener('mousemove', e => {
-      const r  = vc.getBoundingClientRect();
+      const r = vc.getBoundingClientRect();
       admCX = (e.clientX - r.left) / r.width  * 100;
       admCY = (e.clientY - r.top)  / r.height * 100;
       sendTarget({ type: 'cursor', x: admCX, y: admCY });
@@ -289,7 +339,9 @@
 
     panelEl.querySelector('#cp-stopview').onclick = stopView;
     panelEl.querySelector('#cp-send').onclick     = doSendMsg;
-    panelEl.querySelector('#cp-msginp').addEventListener('keydown', e => { if (e.key === 'Enter') doSendMsg(); });
+    panelEl.querySelector('#cp-msginp').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doSendMsg();
+    });
 
     renderKeys();
   }
@@ -311,13 +363,12 @@
     const days = Math.max(1, parseInt(document.getElementById('ck-days').value) || 7);
     const key  = makeKey(name, days);
     const ks   = loadKeys();
-    ks.push({ key, name, days, created: Date.now(), used: false });
+    ks.push({ key, name, days, created: Date.now(), used: false, usedBy: null });
     saveKeys(ks);
-    document.getElementById('ck-new').style.display = 'block';
-    document.getElementById('ck-val').textContent   = key;
+    document.getElementById('ck-new').style.display  = 'block';
+    document.getElementById('ck-val').textContent    = key;
     document.getElementById('ck-wait').style.display = 'inline';
     renderKeys();
-    bcast({ type: 'key-ping' });
   }
 
   function renderKeys() {
@@ -332,7 +383,7 @@
       const dLeft = Math.ceil((k.created + k.days * 86400000 - Date.now()) / 86400000);
       const exp   = dLeft <= 0;
       const cls   = exp ? 'ke' : (k.used ? 'ka' : 'kw');
-      const lbl   = exp ? 'expired' : (k.used ? 'in use' : 'waiting');
+      const lbl   = exp ? 'expired' : (k.used ? `in use${k.usedBy ? ' ('+k.usedBy+')' : ''}` : 'waiting');
       return `<div class="ck">
         <div style="flex:1;min-width:0;">
           <div style="font-size:.8rem;color:#aaa;margin-bottom:3px;">${k.name}</div>
@@ -340,7 +391,7 @@
         </div>
         <div style="text-align:right;flex-shrink:0;">
           <span class="kb ${cls}">${lbl}</span>
-          <div style="font-size:.68rem;color:#333;margin-top:3px;">${exp ? 'exp' : dLeft + 'd'}</div>
+          <div style="font-size:.68rem;color:#333;margin-top:3px;">${exp?'exp':dLeft+'d'}</div>
           <button onclick="__cstRevoke(${i})" style="background:none;border:none;color:#2a2a2a;cursor:pointer;font-size:.66rem;margin-top:2px;padding:0;">revoke</button>
         </div>
       </div>`;
@@ -352,11 +403,7 @@
   };
 
   // ─── hub (admin WebRTC) ──────────────────────────────────────
-  function startHub() {
-    loadPeerJS(() => {
-      tryCreateHub(HUB);
-    });
-  }
+  function startHub() { loadPeerJS(() => tryCreateHub(HUB)); }
 
   function tryCreateHub(id) {
     hub = new Peer(id, { debug: 0 });
@@ -369,7 +416,7 @@
     hub.on('connection', conn => {
       conn.on('open', () => {
         const cid = conn.peer;
-        clients[cid] = { conn, vp: null, url: '—', name: cid.slice(-6) };
+        clients[cid] = { conn, vp: null, url: '—', name: cid.slice(-6), approved: false };
         conn.on('data',  d => onClientData(cid, d));
         conn.on('close', () => { delete clients[cid]; renderClients(); if (viewTarget === cid) stopView(); });
         renderClients();
@@ -387,20 +434,44 @@
     if (!d || typeof d !== 'object') return;
     const c = clients[cid];
     if (!c) return;
+
     if (d.type === 'hello') {
-      c.vp  = d.vp;
-      c.url = d.url || '—';
-      if (d.keyName) {
-        c.name = d.keyName;
-        const ks  = loadKeys();
-        const idx = ks.findIndex(k => { const v = checkKey(k.key); return v && v.name === d.keyName && !k.used; });
-        if (idx >= 0) {
-          ks[idx].used = true; saveKeys(ks); renderKeys();
-          document.getElementById('ck-wait').style.display = 'none';
-        }
-      }
+      c.vp      = d.vp;
+      c.url     = d.url || '—';
+      c.name    = d.name || cid.slice(-6);
+      c.approved = d.approved || false;
       renderClients();
     }
+
+    // Single-use key registration — admin must be online (we are, since this runs on admin side)
+    if (d.type === 'register-key') {
+      const kv = checkKey(d.key);
+      if (!kv) {
+        sendTo(cid, { type: 'key-rejected', reason: 'invalid' });
+        return;
+      }
+      const ks  = loadKeys();
+      const idx = ks.findIndex(k => k.key === d.key);
+      if (idx < 0) {
+        sendTo(cid, { type: 'key-rejected', reason: 'unknown' });
+        return;
+      }
+      if (ks[idx].used) {
+        sendTo(cid, { type: 'key-rejected', reason: 'used' });
+        return;
+      }
+      // Approve — mark single-use immediately
+      ks[idx].used   = true;
+      ks[idx].usedBy = kv.name;
+      saveKeys(ks);
+      c.name     = kv.name;
+      c.approved = true;
+      sendTo(cid, { type: 'key-approved', name: kv.name, expires: kv.expires });
+      document.getElementById('ck-wait').style.display = 'none';
+      renderKeys();
+      renderClients();
+    }
+
     if (d.type === 'frame' && viewTarget === cid) {
       const cv = document.getElementById('cp-vc');
       if (!cv) return;
@@ -418,9 +489,12 @@
     list.innerHTML = ids.map(id => {
       const c  = clients[id];
       const vp = c.vp ? `${c.vp.w}×${c.vp.h}` : '?';
-      return `<div class="ccl${viewTarget === id ? ' sel' : ''}" onclick="__cstView('${id}')">
-        <div class="cn2">${c.name}</div>
-        <div class="cm">${vp} · ${c.url}</div>
+      return `<div class="ccl${viewTarget === id ? ' sel' : ''}">
+        <div class="ccl-info" onclick="__cstView('${id}')">
+          <div class="cn2">${c.name}${c.approved ? '' : ' <span style="color:#ffaa44;font-size:.7rem;">(pending)</span>'}</div>
+          <div class="cm">${vp} · ${c.url}</div>
+        </div>
+        <button class="cbtn r" onclick="__cstRemove('${id}')" style="flex-shrink:0;">remove</button>
       </div>`;
     }).join('');
   }
@@ -433,6 +507,14 @@
     renderClients();
   };
 
+  window.__cstRemove = id => {
+    sendTo(id, { type: 'revoke' });
+    if (clients[id]?.conn) try { clients[id].conn.close(); } catch {}
+    delete clients[id];
+    renderClients();
+    if (viewTarget === id) stopView();
+  };
+
   function stopView() {
     if (viewTarget) sendTarget({ type: 'stop-cap' });
     viewTarget = null;
@@ -441,14 +523,12 @@
     renderClients();
   }
 
-  function sendTarget(msg) {
-    if (!viewTarget || !clients[viewTarget]) return;
-    try { clients[viewTarget].conn.send(msg); } catch {}
+  function sendTo(id, msg) {
+    if (!clients[id]) return;
+    try { clients[id].conn.send(msg); } catch {}
   }
-
-  function bcast(msg) {
-    Object.values(clients).forEach(c => { try { c.conn.send(msg); } catch {} });
-  }
+  function sendTarget(msg) { if (viewTarget) sendTo(viewTarget, msg); }
+  function bcast(msg)      { Object.keys(clients).forEach(id => sendTo(id, msg)); }
 
   function doSendMsg() {
     const inp  = document.getElementById('cp-msginp');
@@ -458,7 +538,7 @@
     inp.value = '';
   }
 
-  // ─── client beacon (user-side) ───────────────────────────────
+  // ─── client beacon ───────────────────────────────────────────
   function startBeacon() {
     loadPeerJS(() => {
       cPeer = new Peer(undefined, { debug: 0 });
@@ -468,36 +548,55 @@
       let virCur     = null;
       let msgLayer   = null;
       let lastMsg    = null;
-      let styleInjected = false;
+      let stylesDone = false;
 
       cPeer.on('open', () => {
         tryConnect();
-        setInterval(tryConnect, 1000); // check every 1 second silently
+        setInterval(tryConnect, 1000);
       });
 
       function tryConnect() {
-        if (adminConn && adminConn.open) return;
+        if (adminConn && adminConn.open) {
+          // If there's a pending key and we're connected, register it
+          if (window.__cstPendingKey) {
+            adminConn.send({ type: 'register-key', key: window.__cstPendingKey });
+          }
+          return;
+        }
         try {
           adminConn = cPeer.connect(HUB, { reliable: true });
-          adminConn.on('open', sendHello);
+          adminConn.on('open', () => {
+            const approved = isApproved();
+            const appr     = approved ? JSON.parse(localStorage.getItem('cst-approved')) : null;
+            adminConn.send({
+              type: 'hello',
+              vp:       { w: innerWidth, h: innerHeight },
+              url:      location.hostname,
+              name:     appr?.name || null,
+              approved: !!approved
+            });
+            // If gate is waiting for admin, send register request now
+            if (window.__cstPendingKey) {
+              adminConn.send({ type: 'register-key', key: window.__cstPendingKey });
+            }
+          });
           adminConn.on('data',  onAdminMsg);
           adminConn.on('close', () => { adminConn = null; stopCap(); hideCur(); });
           adminConn.on('error', () => { adminConn = null; });
         } catch {}
       }
 
-      function sendHello() {
-        const kd = localStorage.getItem('cst-key');
-        const kv = checkKey(kd);
-        if (adminConn?.open) adminConn.send({
-          type: 'hello',
-          vp:   { w: innerWidth, h: innerHeight },
-          url:  location.hostname,
-          keyName: kv?.name || null
-        });
-      }
-
-      window.__cstBeaconHello = sendHello;
+      window.__cstBeaconRegister = () => {
+        if (adminConn && adminConn.open && window.__cstPendingKey) {
+          adminConn.send({ type: 'register-key', key: window.__cstPendingKey });
+        } else {
+          // Not connected yet — tryConnect will send it once connected
+          // But if we can't connect after 5s, call offline
+          setTimeout(() => {
+            if (window.__cstPendingKey) window.__cstGateOffline?.();
+          }, 5000);
+        }
+      };
 
       // virtual cursor
       function getCur() {
@@ -510,18 +609,17 @@
         }
         return virCur;
       }
-      function showCur(x, y) { const c = getCur(); c.style.display = 'block'; c.style.left = x + 'vw'; c.style.top = y + 'vh'; }
+      function showCur(x, y) { const c = getCur(); c.style.display='block'; c.style.left=x+'vw'; c.style.top=y+'vh'; }
       function hideCur() { if (virCur) virCur.style.display = 'none'; }
 
-      // message overlay
       function getLayer() {
         if (!msgLayer) {
           msgLayer = document.createElement('div');
           msgLayer.style.cssText = 'position:fixed;inset:0;z-index:2147483643;pointer-events:none;';
           document.body.appendChild(msgLayer);
         }
-        if (!styleInjected) {
-          styleInjected = true;
+        if (!stylesDone) {
+          stylesDone = true;
           const st = document.createElement('style');
           st.textContent = `
 @keyframes cst-pop{from{transform:translateX(-50%) scale(.55);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
@@ -533,17 +631,14 @@
       }
 
       function showMsg(text, xp, yp) {
-        // push existing message down
         if (lastMsg && lastMsg.parentNode) {
-          const t = parseFloat(lastMsg.style.top) + 6;
-          lastMsg.style.top = t + '%';
+          lastMsg.style.top = (parseFloat(lastMsg.style.top) + 6) + '%';
         }
         const el = document.createElement('div');
         el.style.cssText = `position:absolute;left:${xp}%;top:${yp}%;transform:translateX(-50%);
           background:rgba(6,6,6,.92);color:#fff;font-family:system-ui,sans-serif;
           font-size:.84rem;padding:8px 14px;border-radius:7px;border:1px solid rgba(255,50,50,.3);
-          max-width:250px;word-break:break-word;white-space:normal;
-          animation:cst-pop .22s ease-out;`;
+          max-width:250px;word-break:break-word;animation:cst-pop .22s ease-out;`;
         el.textContent = text;
         getLayer().appendChild(el);
         lastMsg = el;
@@ -557,10 +652,7 @@
         [...txt].forEach((ch, i) => {
           const sp = document.createElement('span');
           sp.className = 'cst-ch';
-          const r  = (Math.random() * 680 - 340).toFixed(0) + 'deg';
-          const d  = (.35 + Math.random() * .55).toFixed(2) + 's';
-          const dl = (i * 22) + 'ms';
-          sp.style.cssText = `--r:${r};--d:${d};--dl:${dl};`;
+          sp.style.cssText = `--r:${(Math.random()*680-340).toFixed(0)}deg;--d:${(.35+Math.random()*.55).toFixed(2)}s;--dl:${i*22}ms;`;
           sp.textContent = ch === ' ' ? ' ' : ch;
           el.appendChild(sp);
         });
@@ -569,10 +661,18 @@
 
       function onAdminMsg(d) {
         if (!d || typeof d !== 'object') return;
-        if (d.type === 'start-cap') { capturing = true; startCap(); showCur(50, 50); }
+        if (d.type === 'key-approved') { window.__cstGateApproved?.(d.name, d.expires); }
+        if (d.type === 'key-rejected') { window.__cstGateRejected?.(d.reason); }
+        if (d.type === 'revoke')       {
+          clearApproval();
+          bc?.postMessage('revoked');
+          // Show gate again on this page
+          if (!document.getElementById('cst-gate')) showGate();
+        }
+        if (d.type === 'start-cap') { capturing = true; startCap(); showCur(50,50); }
         if (d.type === 'stop-cap')  { stopCap(); hideCur(); }
         if (d.type === 'cursor')    { showCur(d.x, d.y); }
-        if (d.type === 'msg')       { showMsg(d.text, d.x || 50, d.y || 30); }
+        if (d.type === 'msg')       { showMsg(d.text, d.x||50, d.y||30); }
       }
 
       function startCap() {
@@ -583,23 +683,18 @@
           if (data && adminConn?.open) adminConn.send({ type: 'frame', data });
         }, 2000);
       }
-
-      function stopCap() {
-        capturing = false;
-        if (capTimer) { clearInterval(capTimer); capTimer = null; }
-      }
+      function stopCap() { capturing = false; if (capTimer) { clearInterval(capTimer); capTimer = null; } }
 
       async function grab() {
         if (!window.html2canvas) {
           await new Promise(res => {
             const s = document.createElement('script');
             s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-            s.onload = res; s.onerror = res;
-            document.head.appendChild(s);
+            s.onload = res; s.onerror = res; document.head.appendChild(s);
           });
         }
         try {
-          const c = await html2canvas(document.body, { scale: .35, logging: false, useCORS: false, allowTaint: true });
+          const c = await html2canvas(document.body, { scale:.35, logging:false, useCORS:false, allowTaint:true });
           return c.toDataURL('image/jpeg', .45);
         } catch { return null; }
       }
@@ -610,9 +705,8 @@
   function loadPeerJS(cb) {
     if (window.Peer) { cb(); return; }
     const s = document.createElement('script');
-    s.src    = 'https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js';
-    s.onload = cb;
-    s.onerror = () => {};
+    s.src = 'https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js';
+    s.onload = cb; s.onerror = () => {};
     document.head.appendChild(s);
   }
 
@@ -620,9 +714,7 @@
   function addAdminBtn() {
     if (document.getElementById('cst-adminbtn')) return;
     const b = document.createElement('button');
-    b.id = 'cst-adminbtn';
-    b.title   = 'admin panel';
-    b.textContent = '⚙';
+    b.id = 'cst-adminbtn'; b.title = 'admin panel'; b.textContent = '⚙';
     b.style.cssText = 'position:fixed;bottom:14px;right:14px;z-index:2147483645;' +
       'width:30px;height:30px;background:#0c0000;color:#cc3333;border:1px solid #280000;' +
       'border-radius:50%;cursor:pointer;font-size:.85rem;opacity:.5;' +
@@ -639,7 +731,7 @@
       addAdminBtn();
     } else {
       startBeacon();
-      if (needsAuth()) {
+      if (!isApproved()) {
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showGate);
         else showGate();
       }
