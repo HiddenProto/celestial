@@ -176,10 +176,10 @@ async function ensureBRC() {
 
 			brcController = new Controller({ serviceworker: sw, transport });
 
-			// Wait for WASM to load and SW handshake to complete (with 10s timeout)
+			// Wait for WASM to load and SW handshake to complete (with 30s timeout)
 			await Promise.race([
 				brcController.wait(),
-				new Promise((_, reject) => setTimeout(() => reject(new Error("BRC ready timeout")), 10000)),
+				new Promise((_, reject) => setTimeout(() => reject(new Error("BRC ready timeout")), 30000)),
 			]);
 
 			// Wire up any existing tabs

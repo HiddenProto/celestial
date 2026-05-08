@@ -507,9 +507,6 @@ function cookieStorage() {
       testBtn.disabled = locked;
       testBtn.classList.toggle('cf-locked', locked);
     }
-    // Show/hide the lock note
-    const note = document.getElementById('cfmode-note');
-    if (note) note.style.display = locked ? 'block' : 'none';
   }
 
   function applyCFMode(enabled) {
