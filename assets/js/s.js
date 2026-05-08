@@ -431,6 +431,138 @@ function cookieStorage() {
   });
 }
 
+// ============================================================
+// Browsing settings — init selects from localStorage + save on change
+// ============================================================
+(function initBrowsingSettings() {
+  const tselect = document.getElementById('tselect');
+  const pr0xySelect = document.getElementById('pr0xySelect');
+  const wispSelect = document.getElementById('wispSelect');
+  const wispCustom = document.getElementById('wispCustom');
+  if (!tselect || !pr0xySelect || !wispSelect) return;
+
+  // Restore saved values into selects
+  tselect.value = localStorage.getItem('transportz') || 'libcurl';
+  pr0xySelect.value = localStorage.getItem('pr0xy') || 'scram';
+  const savedWisp = localStorage.getItem('location') || 'wss://celestial-wisp.onrender.com/';
+  if ([...wispSelect.options].some(o => o.value === savedWisp)) {
+    wispSelect.value = savedWisp;
+  } else if (savedWisp) {
+    wispSelect.value = 'custom';
+    if (wispCustom) { wispCustom.style.display = 'block'; wispCustom.value = savedWisp; }
+  }
+
+  // Save on change (blocked when CF mode is active)
+  tselect.addEventListener('change', () => {
+    if (localStorage.getItem('cfmode') === '1') return;
+    localStorage.setItem('transportz', tselect.value);
+    location.reload();
+  });
+
+  pr0xySelect.addEventListener('change', () => {
+    if (localStorage.getItem('cfmode') === '1') return;
+    localStorage.setItem('pr0xy', pr0xySelect.value);
+    location.reload();
+  });
+
+  wispSelect.addEventListener('change', () => {
+    if (localStorage.getItem('cfmode') === '1') return;
+    if (wispSelect.value === 'custom') {
+      if (wispCustom) wispCustom.style.display = 'block';
+    } else {
+      if (wispCustom) wispCustom.style.display = 'none';
+      localStorage.setItem('location', wispSelect.value);
+      location.reload();
+    }
+  });
+
+  if (wispCustom) {
+    wispCustom.addEventListener('change', () => {
+      if (localStorage.getItem('cfmode') === '1') return;
+      const val = wispCustom.value.trim();
+      if (val) { localStorage.setItem('location', val); location.reload(); }
+    });
+  }
+})();
+
+// ============================================================
+// Cloudflare Mode
+// ============================================================
+(function initCFMode() {
+  const cfModeTog = document.getElementById('cfModeTog');
+  if (!cfModeTog) return;
+
+  const LOCK_IDS = ['tselect', 'pr0xySelect', 'wispSelect', 'wispCustom'];
+
+  function setLocked(locked) {
+    LOCK_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.disabled = locked;
+      el.classList.toggle('cf-locked', locked);
+    });
+    // Lock the test & auto-pick button
+    const testBtn = document.querySelector('button[onclick="__testWisp()"]');
+    if (testBtn) {
+      testBtn.disabled = locked;
+      testBtn.classList.toggle('cf-locked', locked);
+    }
+    // Show/hide the lock note
+    const note = document.getElementById('cfmode-note');
+    if (note) note.style.display = locked ? 'block' : 'none';
+  }
+
+  function applyCFMode(enabled) {
+    if (enabled) {
+      // Backup current settings (only if not already backed up)
+      if (!localStorage.getItem('cfmode_prev_transport'))
+        localStorage.setItem('cfmode_prev_transport', localStorage.getItem('transportz') || 'libcurl');
+      if (!localStorage.getItem('cfmode_prev_proxy'))
+        localStorage.setItem('cfmode_prev_proxy', localStorage.getItem('pr0xy') || 'scram');
+
+      // Force CF-optimal settings
+      localStorage.setItem('cfmode', '1');
+      localStorage.setItem('transportz', 'epoxy');
+      localStorage.setItem('pr0xy', 'scram');
+
+      // Update selects to show locked values
+      const t = document.getElementById('tselect');
+      const p = document.getElementById('pr0xySelect');
+      if (t) t.value = 'epoxy';
+      if (p) p.value = 'scram';
+
+      setLocked(true);
+    } else {
+      // Restore previous settings
+      const prevTransport = localStorage.getItem('cfmode_prev_transport') || 'libcurl';
+      const prevProxy    = localStorage.getItem('cfmode_prev_proxy')     || 'scram';
+
+      localStorage.setItem('transportz', prevTransport);
+      localStorage.setItem('pr0xy', prevProxy);
+      localStorage.removeItem('cfmode');
+      localStorage.removeItem('cfmode_prev_transport');
+      localStorage.removeItem('cfmode_prev_proxy');
+
+      // Restore selects
+      const t = document.getElementById('tselect');
+      const p = document.getElementById('pr0xySelect');
+      if (t) t.value = prevTransport;
+      if (p) p.value = prevProxy;
+
+      setLocked(false);
+    }
+    // Reload so transport/proxy changes take effect immediately
+    location.reload();
+  }
+
+  // On load — restore locked state if CF mode was previously on
+  const isCFMode = localStorage.getItem('cfmode') === '1';
+  cfModeTog.checked = isCFMode;
+  if (isCFMode) setLocked(true);
+
+  cfModeTog.onchange = () => applyCFMode(cfModeTog.checked);
+})();
+
 function restoreCookies(cookies) {
   if (!Array.isArray(cookies)) return;
   cookies.forEach((c) => {

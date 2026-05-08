@@ -388,7 +388,17 @@
               }
               .info-icon:hover .tip { display: block; }
               #wispCustom { margin-top: 6px; width: 100%; box-sizing: border-box; }
+              .cf-locked { opacity: 0.4 !important; pointer-events: none !important; cursor: not-allowed !important; }
             </style>
+            <div class="box">
+              <h3>☁️ Cloudflare Mode <span class="info-icon"><span class="tip">Optimizes the pr<span>o</span>xy to better handle Cloudflare-protected sites.<br><br>Automatically switches transport to <b>epoxy</b> and pr<span>o</span>xy to <b>scramjet</b>.<br><br>Transport, pr<span>o</span>xy, and wisp settings are <b>locked</b> while enabled to prevent incompatible combinations.</span></span></h3>
+              <p class="desc">better compatibility with cloudflare-protected sites — locks transport &amp; pr<span>o</span>xy to optimal settings</p>
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:4px;">
+                <input type="checkbox" id="cfModeTog" />
+                <span>enable cloudflare bypass mode</span>
+              </label>
+              <p id="cfmode-note" style="display:none;font-size:.73rem;margin-top:8px;opacity:.55;line-height:1.4;">🔒 transport &amp; pr<span>o</span>xy locked — using <b>epoxy</b> + <b>scramjet</b> for best cloudflare compatibility</p>
+            </div>
             <div class="box">
               <h3>Transport <span class="info-icon"><span class="tip">Controls how proxied requests are sent through the network.<br><br><b>epoxy</b> — WebAssembly-based, better site compatibility. Slower. Type: <b>client-side</b>.<br><br><b>libcurl</b> — C-based, faster and more stable. Recommended. Type: <b>client-side</b>.</span></span></h3>
               <p class="desc">
