@@ -104,3 +104,21 @@ async function handleRequest(event) {
 self.addEventListener("fetch", (event) => {
   event.respondWith(handleRequest(event))
 })
+
+// Debug handler — responds to {type:"brc_debug"} messages from the main page
+// with the current state of $brcController in the SW context.
+self.addEventListener("message", (event) => {
+  if (!event.data || event.data.type !== "brc_debug") return;
+  const port = event.ports[0];
+  if (!port) return;
+  const defined = typeof $brcController !== "undefined";
+  const hasShouldRoute = defined && typeof $brcController.shouldRoute === "function";
+  const testUrl = event.data.testUrl || "";
+  let shouldRoute = false;
+  try {
+    if (hasShouldRoute && testUrl) {
+      shouldRoute = $brcController.shouldRoute({ request: new Request(testUrl) });
+    }
+  } catch(e) {}
+  port.postMessage({ defined, hasShouldRoute, shouldRoute, testUrl });
+});
