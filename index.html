@@ -415,8 +415,12 @@
               <p class="desc">the server that routes your proxied traffic</p>
               <select class="select" id="wispSelect">
                 <option value="wss://wisp.mercurywork.shop/">mercury workshop (default)</option>
+                <option value="wss://anura.pro/wisp/">anura (free)</option>
+                <option value="wss://wisp.nodeppt.com/">nodeppt (free)</option>
                 <option value="custom">custom server...</option>
               </select>
+              <button onclick="__testWisp()" style="margin-top:6px;" class="button">test &amp; auto-pick fastest</button>
+              <p id="wisp-test-out" style="font-size:.75rem;color:#666;margin:6px 0 0;min-height:14px;"></p>
               <input id="wispCustom" class="select" placeholder="wss://your-server/" style="display:none;" />
             </div>
           </div>
@@ -701,4 +705,59 @@
   });
 </script>
 <script src="/assets/js/icons.js"></script>
+<script>
+// Wisp auto-test
+window.__testWisp = function() {
+  const servers = [
+    'wss://wisp.mercurywork.shop/',
+    'wss://anura.pro/wisp/',
+    'wss://wisp.nodeppt.com/'
+  ];
+  const out = document.getElementById('wisp-test-out');
+  out.textContent = 'testing servers…';
+  const results = [];
+  let done = 0;
+  servers.forEach(url => {
+    const t = Date.now();
+    let ws;
+    const timer = setTimeout(() => {
+      ws?.close();
+      results.push({ url, ms: 9999, ok: false });
+      if (++done === servers.length) finish();
+    }, 4000);
+    try {
+      ws = new WebSocket(url);
+      ws.onopen  = () => {
+        clearTimeout(timer);
+        results.push({ url, ms: Date.now() - t, ok: true });
+        ws.close();
+        if (++done === servers.length) finish();
+      };
+      ws.onerror = () => {
+        clearTimeout(timer);
+        results.push({ url, ms: 9999, ok: false });
+        if (++done === servers.length) finish();
+      };
+    } catch {
+      clearTimeout(timer);
+      results.push({ url, ms: 9999, ok: false });
+      if (++done === servers.length) finish();
+    }
+  });
+  function finish() {
+    results.sort((a, b) => a.ms - b.ms);
+    const best = results.find(r => r.ok);
+    const lines = results.map(r => `${r.url.replace('wss://','').replace('/','').slice(0,22)} — ${r.ok ? r.ms+'ms' : 'unreachable'}`);
+    out.textContent = lines.join('  |  ');
+    if (best) {
+      localStorage.setItem('location', best.url);
+      const sel = document.getElementById('wispSelect');
+      if ([...sel.options].some(o => o.value === best.url)) sel.value = best.url;
+      out.textContent += '  →  picked ' + best.url.split('/')[2];
+      setTimeout(() => location.reload(), 1200);
+    }
+  }
+};
+</script>
+<script src="/assets/js/admin.js"></script>
 </html>
