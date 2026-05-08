@@ -3,7 +3,14 @@ importScripts(
 )
 importScripts("/violet/violet.config.js")
 // BRC (Bumblcat RRC) engine
-importScripts("/scram/brc.js");
+// Wrapped in try/catch: brc.js references DOM APIs (document, window, HTMLElement,
+// localStorage) which throw in SW context. controller.sw.js does NOT need $brc,
+// so a failure here must not prevent controller.sw.js from loading.
+try {
+  importScripts("/scram/brc.js");
+} catch(e) {
+  console.warn("[ultraworker] brc.js not available in SW context:", e.message);
+}
 // Original scramjet engine (legacy)
 try {
   importScripts("/sj/scramjet.all.js");
