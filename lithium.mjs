@@ -187,17 +187,22 @@ async function ensureBRC() {
 			config.injectPath  = "/scram/controller.inject.js";
 			config.wasmPath    = "/scram/brc.wasm";
 
-			brcController = new Controller({ serviceworker: sw, transport });
+			// Use a temp variable — brcController must stay null until fully ready.
+			// getProxied() does `brcController !== null` as a zero-wait readiness check,
+			// so assigning brcController here (before wait() completes) would let
+			// requests through before WASM is loaded and SW RPC is operational.
+			const _ctrl = new Controller({ serviceworker: sw, transport });
 
 			// Wait for WASM to load and SW handshake to complete.
-			// 8s timeout — with brc.wasm cached in the SW this always resolves in
-			// ~150-300ms. The short timeout means failures surface quickly instead
-			// of hanging navigations for 30 seconds.
+			// 8s timeout — with brc.wasm cached in the SW this resolves in ~150-300ms.
 			console.log("lethal.js: BRC [5/5] waiting for WASM + SW handshake…");
 			await Promise.race([
-				brcController.wait(),
+				_ctrl.wait(),
 				new Promise((_, reject) => setTimeout(() => reject(new Error("BRC ready timeout")), 8000)),
 			]);
+
+			// Only expose brcController AFTER wait() — now it's truly ready.
+			brcController = _ctrl;
 
 			// Wire up any existing tabs
 			document.querySelectorAll('iframe[id^="frame-"]').forEach((iframe) => {
