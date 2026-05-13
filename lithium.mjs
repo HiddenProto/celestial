@@ -98,7 +98,9 @@ async function ensureScramjet() {
 				naiiveRewriter: true,
 				scramitize: false,
 			});
-			_scramjetController.init();
+			// init() is async — must be awaited so the config channel is established
+			// before the SW calls loadConfig(). Not awaiting causes loadConfig() to hang.
+			await _scramjetController.init();
 			console.log("lethal.js: scramjet controller ready");
 		} catch (e) {
 			console.warn("lethal.js: scramjet init failed —", e.message);
@@ -205,6 +207,22 @@ async function ensureBRC() {
 				}
 			});
 
+			// Pre-register a BRC frame for embedded contexts (e.g. tab.html) where no
+			// frame-N iframes exist. We do this here — during BRC init — so the SW has
+			// time to receive and process the route-registration postMessage BEFORE the
+			// user navigates (avoiding the Vercel 404 that results from a race between
+			// createFrame() and the subsequent location.href assignment).
+			if (!document.querySelector('iframe[id^="frame-"]') && !brcFrameMap.has(0)) {
+				let hidden = document.getElementById('brc-hidden-frame');
+				if (!hidden) {
+					hidden = document.createElement('iframe');
+					hidden.id = 'brc-hidden-frame';
+					hidden.style.cssText = 'display:none;position:absolute;width:0;height:0;pointer-events:none;';
+					document.body.appendChild(hidden);
+				}
+				try { brcFrameMap.set(0, brcController.createFrame(hidden)); } catch(e) {}
+			}
+
 			console.log("lethal.js: BRC controller ready ✦");
 			document.dispatchEvent(new CustomEvent("brc-ready"));
 			// Only forward events to the top frame when running inside a subframe
@@ -243,12 +261,15 @@ async function ensureBRC() {
 registerSW()
 	.then(async () => {
 		console.log("lethal.js: SW registered");
-		// Eagerly init BRC if it's the selected proxy.
-		// Also pre-warm scramjet as the fallback so it's ready instantly if BRC
-		// isn't done loading yet when the user first navigates.
+		// Always pre-warm scramjet — it's the instant fallback for every proxy mode.
+		// Scramjet init only loads a JS file + sets up a SW config channel; no wisp
+		// connection needed, so this finishes in < 1 second even on cold page load.
+		ensureScramjet().catch(() => {});
+		// Also kick off BRC init in the background if the user has it selected.
+		// BRC will take 30-60 s on a cold Render.com wisp server, but that's fine
+		// because getProxied() falls back to scramjet instantly while BRC warms up.
 		if (localStorage.getItem("pr0xy") === "scram") {
 			ensureBRC().catch(() => {});
-			ensureScramjet().catch(() => {});
 		}
 	})
 	.catch((err) =>
@@ -358,26 +379,40 @@ export function getProxy() {
 export async function getProxied(input) {
 	const url = makeURL(input);
 	if (proxyOption === "scram") {
-		// Wait for BRC with a 1.5s timeout before falling back to scramjet.
-		// With brc.wasm cached in the SW, BRC is ready in ~150-300ms so this
-		// race almost always resolves immediately. The 1.5s cap only fires on the
-		// very first-ever page load (cold cache) so the user still gets a response
-		// quickly rather than hanging.
-		const brcReady = await Promise.race([
-			ensureBRC().then(() => !!brcController),
-			new Promise(resolve => setTimeout(() => resolve(false), 1500)),
-		]);
+		// Non-blocking BRC check: if BRC is already initialised (warm), use it.
+		// If it's still loading (cold wisp server, first-ever WASM compile, etc.)
+		// fall through immediately to scramjet so the user doesn't wait.
+		// BRC continues initialising in the background via ensureBRC() called at
+		// SW registration time; subsequent navigations will use BRC once it's ready.
+		const brcReady = brcController !== null;
 
 		if (brcReady && brcController) {
 			let frame = brcFrameMap.get(currentTab);
 			// Frame might be missing due to a race between tab creation and BRC
 			// init completing — create it on the fly if so.
 			if (!frame) {
-				const iframe = document.getElementById(`frame-${currentTab}`);
+				let iframe = document.getElementById(`frame-${currentTab}`);
+				// In embedded contexts (e.g. tab.html inside an iframe) there is no
+				// frame-N element. Create a hidden iframe so we can still get a BRC
+				// prefix and build the proxied URL correctly.
+				if (!iframe) {
+					iframe = document.getElementById('brc-hidden-frame');
+					if (!iframe) {
+						iframe = document.createElement('iframe');
+						iframe.id = 'brc-hidden-frame';
+						iframe.style.cssText = 'display:none;position:absolute;width:0;height:0;pointer-events:none;';
+						document.body.appendChild(iframe);
+					}
+				}
 				if (iframe) {
 					try {
 						frame = brcController.createFrame(iframe);
 						brcFrameMap.set(currentTab, frame);
+						// Give the SW 150 ms to receive and process the route-registration
+						// postMessage from createFrame() before we return the prefix URL.
+						// Without this delay the SW's shouldRoute() check fires before the
+						// route is registered, falls through to Vercel, and returns 404.
+						await new Promise(r => setTimeout(r, 150));
 					} catch(e) {}
 				}
 			}
@@ -489,10 +524,15 @@ export class Tab {
 	 */
 	handleLoad() {
 		this.statusObject = { isLoading: true, timesErrored: 0 };
-		let url = decodeURIComponent(
-			this.frame?.contentWindow?.location.href.split("/").pop()
-		);
-		let title = this.frame?.contentWindow?.document.title;
+		// After the iframe navigates to a proxied (cross-origin) page, reading
+		// location.href or document.title throws a SecurityError. Swallow it.
+		let url, title;
+		try {
+			url = decodeURIComponent(
+				this.frame?.contentWindow?.location.href.split("/").pop()
+			);
+			title = this.frame?.contentWindow?.document.title;
+		} catch(e) { url = ""; title = ""; }
 
 		let history = localStorage.getItem("history")
 			? JSON.parse(localStorage.getItem("history"))
