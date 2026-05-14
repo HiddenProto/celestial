@@ -131,13 +131,41 @@ async function _createBRCTransport() {
 	if (useEpoxy) {
 		try {
 			const { default: EpoxyTransport } = await import("/epoxy/index.mjs");
-			return new EpoxyTransport({ wisp });
+			return _wrapTransportHeaders(new EpoxyTransport({ wisp }));
 		} catch (e) {
 			console.warn("lethal.js: epoxy transport failed, trying libcurl:", e.message);
 		}
 	}
 	const { default: LibcurlClient } = await import("/curl/index.mjs");
-	return new LibcurlClient({ wisp });
+	return _wrapTransportHeaders(new LibcurlClient({ wisp }));
+}
+
+/**
+ * Wraps a ProxyTransport so that response headers are always returned as a
+ * flat [[name, value], ...] array, regardless of what the underlying transport
+ * returns.  LibcurlClient (and some epoxy versions) return headers as a plain
+ * dict  { name: [values] }  which is NOT iterable as [name, value] pairs.
+ * brc.js's cookie processor (function m) does  `for (let [t,s] of rawHeaders)`
+ * without a fallback, so a non-iterable object throws "TypeError: i is not
+ * iterable".  This shim fixes that at the transport boundary.
+ */
+function _wrapTransportHeaders(transport) {
+	const origRequest = transport.request.bind(transport);
+	transport.request = async function(remote, method, body, headers, signal) {
+		const resp = await origRequest(remote, method, body, headers, signal);
+		if (resp && resp.headers && !Array.isArray(resp.headers)) {
+			const flat = [];
+			for (const [name, values] of Object.entries(resp.headers)) {
+				const arr = Array.isArray(values) ? values : [values];
+				for (const value of arr) {
+					flat.push([name, value]);
+				}
+			}
+			resp.headers = flat;
+		}
+		return resp;
+	};
+	return transport;
 }
 
 /** Injects a script tag and waits for it to load (needed for IIFE scripts). */

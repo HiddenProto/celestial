@@ -90,12 +90,19 @@ async function handleRequest(event) {
     try {
       const { pathname } = new URL(event.request.url);
       if (pathname.startsWith(SCRAMJET_PREFIX)) {
-        await scramjet.loadConfig();
+        // loadConfig() blocks waiting for the main page to respond with scramjet config.
+        // Guard with a 4s timeout so a dead/reloading tab doesn't hang the fetch forever.
+        await Promise.race([
+          scramjet.loadConfig(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("loadConfig timeout")), 4000)),
+        ]);
         if (scramjet.route(event)) {
           return scramjet.fetch(event);
         }
       }
-    } catch(e) {}
+    } catch(e) {
+      console.warn("[ultraworker] scramjet fetch failed:", e.message);
+    }
   }
   // Non-proxied resources pass through normally
   return fetch(event.request)
