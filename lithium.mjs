@@ -21,17 +21,9 @@ export const addressInput = document.getElementById("address");
 
 
 
-// NOTE: "bou-ksn" maps to libcurl here because this map is used by BareMux
-// (bareworker.js — a CLASSIC service worker) via importScripts().  importScripts
-// cannot load ES modules, so sending /bou-ksn.mjs to the bareworker causes a
-// JSON parse crash and the "Cannot read properties of undefined (reading 'fetch')"
-// SW error.  BOU-KSN is used as a page-context JS class for BRC transport only
-// (see _createBRCTransport), where it's loaded via dynamic import() which does
-// support ES modules.  BareMux/UV transport stays on libcurl.
 const transportOptions = {
-	"bou-ksn": "/curl/index.mjs",  // bareworker compat — BOU-KSN class used separately for BRC
-	epoxy:     "/epoxy/index.mjs",
-	libcurl:   "/curl/index.mjs",
+	epoxy:   "/epoxy/index.mjs",
+	libcurl: "/curl/index.mjs",
 };
 
 //////////////////////////////
@@ -136,14 +128,10 @@ async function _createBRCTransport() {
 			: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + savedWisp
 	);
 
-	// Transport preference — BOU-KSN, epoxy, or libcurl
+	// Transport preference — epoxy or libcurl
 	const cfMode = localStorage.getItem("cfmode") === "1";
 	const veMode = cfMode || localStorage.getItem("ve-mode") === "1";
 	const savedTransport = localStorage.getItem("transportz") || "libcurl";
-
-	// BOU-KSN: disabled — causes "Cannot read properties of undefined (reading 'fetch')"
-	// inside BRC's fetch handler. Re-enable once the transport API incompatibility is fixed.
-	// if (savedTransport === "bou-ksn" || cfMode) { ... }
 
 	const useEpoxy = savedTransport === "epoxy";
 	let transport;
