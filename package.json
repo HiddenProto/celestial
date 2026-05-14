@@ -1,0 +1,28 @@
+{
+  "name": "creditrepair911",
+  "version": "1.0.0",
+  "description": "no more slop gwah :3\r (it may of taken very long so thanks claude)",
+  "main": "bareworker.js",
+  "scripts": {
+    "build": "node --input-type=module < build.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HiddenProto/celestial.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/HiddenProto/celestial/issues"
+  },
+  "homepage": "https://github.com/HiddenProto/celestial#readme",
+  "dependencies": {
+    "@mercuryworkshop/bare-mux": "^2.1.9",
+    "@mercuryworkshop/epoxy-tls": "^2.1.19-1",
+    "@mercuryworkshop/scramjet": "^1.1.0",
+    "@titaniumnetwork-dev/ultraviolet": "^3.2.10"
+  }
+}

@@ -737,14 +737,7 @@
         window.notify(message, type, duration);
       });
 
-      // BRC lifecycle notifications
-      document.addEventListener("brc-ready", () => {
-        window.notify("Bumblcat RRC proxy active ✦", "success", 4000);
-      });
-      document.addEventListener("brc-failed", (e) => {
-        const reason = e.detail?.error ? ` (${e.detail.error})` : "";
-        window.notify(`BRC unavailable${reason} — using scramjet fallback`, "warning", 10000);
-      });
+      // BRC lifecycle — silent, no toasts for fallback
     })();
   </script>
 

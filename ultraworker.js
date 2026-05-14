@@ -1,7 +1,11 @@
-importScripts(
-  "/violet/violet.bundle.js",
-)
-importScripts("/violet/violet.config.js")
+importScripts("/violet/violet.bundle.js");
+importScripts("/violet/violet.config.js");
+// UV service worker — handles /service/ultra/ routes
+try {
+  importScripts("/violet/violet.sw.js");
+} catch(e) {
+  console.warn("[ultraworker] UV SW not available:", e.message);
+}
 // BRC (Bumblcat RRC) engine
 // Wrapped in try/catch: brc.js references DOM APIs (document, window, HTMLElement,
 // localStorage) which throw in SW context. controller.sw.js does NOT need $brc,

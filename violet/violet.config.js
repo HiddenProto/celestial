@@ -14,6 +14,6 @@ self.__uv$config = {
     "/violet/violet.client.js",
   bundle:
     "/violet/violet.bundle.js",
-  config: "/uv.config.js",
+  config: "/violet/violet.config.js",
   sw: "/violet/violet.sw.js",
 }
