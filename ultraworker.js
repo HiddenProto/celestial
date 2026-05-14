@@ -1,43 +1,30 @@
-importScripts("/violet/violet.bundle.js");
-importScripts("/violet/violet.config.js");
-// UV service worker — handles /service/ultra/ routes
-try {
-  importScripts("/violet/violet.sw.js");
-} catch(e) {
-  console.warn("[ultraworker] UV SW not available:", e.message);
-}
-// BRC (Bumblcat RRC) engine
-// Wrapped in try/catch: brc.js references DOM APIs (document, window, HTMLElement,
-// localStorage) which throw in SW context. controller.sw.js does NOT need $brc,
-// so a failure here must not prevent controller.sw.js from loading.
-try {
-  importScripts("/scram/brc.js");
-} catch(e) {
-  console.warn("[ultraworker] brc.js not available in SW context:", e.message);
-}
-// Original scramjet engine (legacy)
-try {
-  importScripts("/sj/scramjet.all.js");
-} catch(e) {
-  console.warn("[ultraworker] scramjet engine not available:", e.message);
-}
-
-// BRC controller SW module
+// BRC controller SW module — the ONLY thing needed for BRC routing in the SW.
+// controller.sw.js is tiny (4.4 KB) and self-contained; it does NOT need $brc
+// from brc.js, and it does NOT need UV's violet.bundle.js.
 try {
   importScripts("/scram/controller.sw.js");
 } catch(e) {
   console.warn("[ultraworker] BRC controller SW not available:", e.message);
 }
 
-// Setup original scramjet SW handler
+// Scramjet engine — loaded lazily on first /scramjet/ request (177 KB).
+// Eagerly loading it added ~150–300 ms to every SW cold start, which delayed
+// BRC's WASM handshake and made BRC appear slow.
 let scramjet = null;
-try {
-  if (typeof $scramjetLoadWorker === "function") {
-    const { ScramjetServiceWorker } = $scramjetLoadWorker();
-    scramjet = new ScramjetServiceWorker();
+let _scramjetLoaded = false;
+
+function _ensureScramjetSW() {
+  if (_scramjetLoaded) return;
+  _scramjetLoaded = true;
+  try {
+    importScripts("/sj/scramjet.all.js");
+    if (typeof $scramjetLoadWorker === "function") {
+      const { ScramjetServiceWorker } = $scramjetLoadWorker();
+      scramjet = new ScramjetServiceWorker();
+    }
+  } catch(e) {
+    console.warn("[ultraworker] scramjet SW init failed:", e.message);
   }
-} catch(e) {
-  console.warn("[ultraworker] scramjet SW init failed:", e.message);
 }
 
 if (navigator.userAgent.includes("Firefox")) {
@@ -87,13 +74,13 @@ async function handleRequest(event) {
   if (typeof $brcController !== "undefined" && $brcController.shouldRoute(event)) {
     return $brcController.route(event)
   }
+
   // Scramjet routes — only for URLs that actually start with /scramjet/
-  // IMPORTANT: do NOT call loadConfig() for any other URL; it blocks until the
-  // main page responds, which hangs BRC WASM fetches and causes the ready timeout.
-  if (scramjet) {
-    try {
-      const { pathname } = new URL(event.request.url);
-      if (pathname.startsWith(SCRAMJET_PREFIX)) {
+  // Scramjet is lazy-loaded on first hit so it doesn't slow down SW cold starts.
+  if (pathname.startsWith(SCRAMJET_PREFIX)) {
+    _ensureScramjetSW();
+    if (scramjet) {
+      try {
         // loadConfig() blocks waiting for the main page to respond with scramjet config.
         // Guard with a 4s timeout so a dead/reloading tab doesn't hang the fetch forever.
         await Promise.race([
@@ -104,11 +91,12 @@ async function handleRequest(event) {
         if (scramjet.config && scramjet.route(event)) {
           return scramjet.fetch(event);
         }
+      } catch(e) {
+        console.warn("[ultraworker] scramjet fetch failed:", e.message);
       }
-    } catch(e) {
-      console.warn("[ultraworker] scramjet fetch failed:", e.message);
     }
   }
+
   // Non-proxied resources pass through normally
   return fetch(event.request)
 }
