@@ -124,10 +124,16 @@
         if (params.has('mbed') && gameUrl.includes('/ngg/')) {
           window.location.replace(gameUrl);
         } else if (url.startsWith('/assets/src/')) {
-          fetch(url, { method: 'HEAD' }).then(r => {
-            if (r.status === 404) showUnavailable();
-            else iframe.src = gameUrl;
-          }).catch(() => { iframe.src = gameUrl; }); // network error → just try loading
+          // Load immediately — no HEAD round-trip, all local assets are deployed.
+          // If the file is missing, the iframe load event fires with a 404 page;
+          // detect that and show the unavailable screen instead.
+          iframe.src = gameUrl;
+          iframe.addEventListener('load', () => {
+            try {
+              if (iframe.contentDocument && iframe.contentDocument.title === '404: Not Found')
+                showUnavailable();
+            } catch(e) {} // cross-origin guard (shouldn't happen for /assets/src/)
+          }, { once: true });
         } else {
           iframe.src = gameUrl;
           iframe.onerror = () => {
