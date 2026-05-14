@@ -428,7 +428,7 @@
         : (location.protocol === "https:" ? "wss://" : "ws://") + location.host + _wispLoc
     );
     setProxy(localStorage.getItem("pr0xy") || "scram");
-    setTransport(localStorage.getItem("transportz") || "bou-ksn");
+    setTransport((localStorage.getItem("transportz") || "libcurl").replace("bou-ksn", "libcurl"));
 
     let search =
       localStorage.getItem("search-engine") ||

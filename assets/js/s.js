@@ -442,7 +442,10 @@ function cookieStorage() {
   if (!tselect || !pr0xySelect || !wispSelect) return;
 
   // Restore saved values into selects
-  tselect.value = localStorage.getItem('transportz') || 'bou-ksn';
+  // BOU-KSN is disabled — migrate any saved 'bou-ksn' value to 'libcurl'
+  const _savedT = localStorage.getItem('transportz') || 'libcurl';
+  if (_savedT === 'bou-ksn') localStorage.setItem('transportz', 'libcurl');
+  tselect.value = (_savedT === 'bou-ksn') ? 'libcurl' : _savedT;
   pr0xySelect.value = localStorage.getItem('pr0xy') || 'scram';
   const savedWisp = localStorage.getItem('location') || 'wss://celestial-wisp.onrender.com/';
   if ([...wispSelect.options].some(o => o.value === savedWisp)) {
@@ -517,21 +520,22 @@ function cookieStorage() {
       if (!localStorage.getItem('cfmode_prev_proxy'))
         localStorage.setItem('cfmode_prev_proxy', localStorage.getItem('pr0xy') || 'scramjet');
 
-      // Force CF-optimal settings: BOU-KSN (smart routing + epoxy for Google) + BRC
+      // Force CF-optimal settings: libcurl + BRC (BOU-KSN disabled)
       localStorage.setItem('cfmode', '1');
-      localStorage.setItem('transportz', 'bou-ksn');
+      localStorage.setItem('transportz', 'libcurl');
       localStorage.setItem('pr0xy', 'scram');
 
       // Update selects to show locked values
       const t = document.getElementById('tselect');
       const p = document.getElementById('pr0xySelect');
-      if (t) t.value = 'bou-ksn';
+      if (t) t.value = 'libcurl';
       if (p) p.value = 'scram';
 
       setLocked(true);
     } else {
-      // Restore previous settings
-      const prevTransport = localStorage.getItem('cfmode_prev_transport') || 'bou-ksn';
+      // Restore previous settings (migrate bou-ksn → libcurl if it was saved before disable)
+      const _prevT = localStorage.getItem('cfmode_prev_transport') || 'libcurl';
+      const prevTransport = (_prevT === 'bou-ksn') ? 'libcurl' : _prevT;
       const prevProxy    = localStorage.getItem('cfmode_prev_proxy')     || 'scram';
 
       localStorage.setItem('transportz', prevTransport);
