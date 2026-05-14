@@ -330,11 +330,32 @@
       navigator.clipboard?.writeText(document.getElementById('ck-val').textContent).catch(() => {});
 
     const vc = panelEl.querySelector('#cp-vc');
+    let _curRafPending = false;
     vc.addEventListener('mousemove', e => {
       const r = vc.getBoundingClientRect();
       admCX = (e.clientX - r.left) / r.width  * 100;
       admCY = (e.clientY - r.top)  / r.height * 100;
-      sendTarget({ type: 'cursor', x: admCX, y: admCY });
+      // rAF gate: only send one cursor update per animation frame (~60fps).
+      // Raw mousemove fires 200–500×/sec; flooding the peer causes the CSS
+      // transition to restart on every event and makes movement jittery.
+      if (_curRafPending) return;
+      _curRafPending = true;
+      requestAnimationFrame(() => {
+        _curRafPending = false;
+        if (panelEl.querySelector('#cp-showcur')?.checked !== false) {
+          sendTarget({ type: 'cursor', x: admCX, y: admCY });
+        }
+      });
+    });
+
+    // Cursor visibility toggle
+    panelEl.querySelector('#cp-showcur').addEventListener('change', e => {
+      if (!e.target.checked) {
+        sendTarget({ type: 'hide-cursor' });
+      } else {
+        // Re-enable: send current position so cursor reappears immediately
+        sendTarget({ type: 'cursor', x: admCX, y: admCY });
+      }
     });
 
     panelEl.querySelector('#cp-stopview').onclick = stopView;
@@ -649,10 +670,12 @@
         c.style.display = 'block';
         c.style.left = x + 'vw';
         c.style.top  = y + 'vh';
-        // Keep active message bubble following the cursor
+        // Keep active message bubble anchored below the cursor.
+        // Use vw/vh so units match the cursor exactly (% inside the fixed
+        // layer is equivalent but can drift a pixel at certain screen sizes).
         if (lastMsg && lastMsg.parentNode) {
-          lastMsg.style.left = x + '%';
-          lastMsg.style.top  = Math.min(y + 7, 88) + '%';
+          lastMsg.style.left = x + 'vw';
+          lastMsg.style.top  = Math.min(y + 3.5, 90) + 'vh';
         }
       }
       function hideCur() { if (virCur) virCur.style.display = 'none'; }
@@ -681,9 +704,9 @@
           breakMsg(lastMsg);
         }
         const el = document.createElement('div');
-        // Offset bubble 7% below cursor so it doesn't hide the pointer
-        const ty = Math.min(yp + 7, 88);
-        el.style.cssText = `position:absolute;left:${xp}%;top:${ty}%;transform:translateX(-50%);
+        // Place bubble just below cursor tip using vw/vh to match cursor units exactly
+        const ty = Math.min(yp + 3.5, 90);
+        el.style.cssText = `position:absolute;left:${xp}vw;top:${ty}vh;transform:translateX(-50%);
           background:rgba(6,6,6,.92);color:#fff;font-family:system-ui,sans-serif;
           font-size:.84rem;padding:8px 14px;border-radius:7px;border:1px solid rgba(255,50,50,.3);
           max-width:260px;word-break:break-word;animation:cst-pop .22s ease-out;
@@ -718,10 +741,11 @@
           // Show gate again on this page
           if (!document.getElementById('cst-gate')) showGate();
         }
-        if (d.type === 'start-cap') { capturing = true; startCap(); showCur(50,50); }
-        if (d.type === 'stop-cap')  { stopCap(); hideCur(); }
-        if (d.type === 'cursor')    { showCur(d.x, d.y); }
-        if (d.type === 'msg')       { showMsg(d.text, d.x||50, d.y||30); }
+        if (d.type === 'start-cap')   { capturing = true; startCap(); showCur(50,50); }
+        if (d.type === 'stop-cap')    { stopCap(); hideCur(); }
+        if (d.type === 'cursor')      { showCur(d.x, d.y); }
+        if (d.type === 'hide-cursor') { hideCur(); }
+        if (d.type === 'msg')         { showMsg(d.text, d.x||50, d.y||30); }
       }
 
       function startCap() {
