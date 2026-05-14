@@ -321,6 +321,9 @@ registerSW()
  * @returns {string} Valid URL string.
  */
 export function makeURL(input, template = "http://duckduckgo.com/?q=%s") {
+	// Preserve internal celestial:// protocol and bare paths — don't rewrite them
+	if (input.startsWith("celestial://") || input.startsWith("/")) return input;
+
 	try {
 		return new URL(input).toString();
 	} catch (err) { }
@@ -411,6 +414,23 @@ export function getProxy() {
  */
 export async function getProxied(input) {
 	const url = makeURL(input);
+
+	// ── Internal / same-origin URLs — never proxy these ──────────────────────
+	// celestial:// is the internal protocol for built-in pages
+	if (url.startsWith("celestial://")) {
+		const path = url.slice("celestial://".length).replace(/^\/+/, "");
+		if (path === "newtab" || path === "") return "/tab.html";
+		return "/" + path; // best-effort: celestial://foo → /foo
+	}
+	// Same-origin URLs are already served by this Vercel deployment — no proxy needed
+	try {
+		const parsed = new URL(url);
+		if (parsed.origin === location.origin) return url;
+	} catch {}
+	// Bare relative paths (starting with /) are same-origin by definition
+	if (url.startsWith("/")) return url;
+	// ─────────────────────────────────────────────────────────────────────────
+
 	if (proxyOption === "scram") {
 		// Non-blocking BRC check: if BRC is already initialised (warm), use it.
 		// If it's still loading (cold wisp server, first-ever WASM compile, etc.)
