@@ -407,12 +407,13 @@
               </label>
             </div>
             <div class="box">
-              <h3>Transport <span class="info-icon"><span class="tip">Controls how proxied requests are sent through the network.<br><br><b>epoxy</b> — WebAssembly-based, better site compatibility. Required for multiplayer games with bumblcat rrc — epoxy forwards WebSocket headers (like Origin) to the server, which libcurl does not. Slower. Type: <b>client-side</b>.<br><br><b>libcurl</b> — C-based, faster and more stable. Recommended for most sites. Does not forward custom WebSocket headers — use epoxy for multiplayer games. Type: <b>client-side</b>.</span></span></h3>
+              <h3>Transport <span class="info-icon"><span class="tip">Controls how proxied requests are sent through the network.<br><br><b>BOU-KSN ✦</b> — Bumblcat Optimized Unified · Kernel Socket Network. Smart routing transport: automatically routes Google/YouTube traffic through a high-reputation server (bypasses suspicious-activity flags), benchmarks servers on startup and picks the fastest, includes LRU caching for static assets, in-flight request deduplication, and retry with fallback. Chrome 136 Virtual Entity headers always active. <b>Recommended.</b><br><br><b>epoxy</b> — WebAssembly-based, better site compatibility. Required for multiplayer games with bumblcat rrc — epoxy forwards WebSocket headers (like Origin) to the server, which libcurl does not. Slower. Type: <b>client-side</b>.<br><br><b>libcurl</b> — C-based, faster and more stable. Recommended for most sites. Does not forward custom WebSocket headers — use epoxy for multiplayer games. Type: <b>client-side</b>.</span></span></h3>
               <p class="desc">
                 change how the pr<span>o</span>xy is handled, can lead to sites
                 that were broken to work or lead to sites that were working to break
               </p>
               <select class="select" id="tselect">
+                <option value="bou-ksn">BOU-KSN ✦ (smart routing, recommended)</option>
                 <option value="epoxy">epoxy</option>
                 <option value="libcurl" selected>libcurl</option>
               </select>
@@ -483,6 +484,9 @@
                 </option>
                 <option value="breakaway" style="color: #ff3333; background: #070707">
                   breakaway
+                </option>
+                <option value="sovereign" style="color: #c9a84c; background: #02010a">
+                  👑 sovereign
                 </option>
               </select>
             </div>

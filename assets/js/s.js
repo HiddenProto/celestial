@@ -442,8 +442,8 @@ function cookieStorage() {
   if (!tselect || !pr0xySelect || !wispSelect) return;
 
   // Restore saved values into selects
-  tselect.value = localStorage.getItem('transportz') || 'libcurl';
-  pr0xySelect.value = localStorage.getItem('pr0xy') || 'scramjet';
+  tselect.value = localStorage.getItem('transportz') || 'bou-ksn';
+  pr0xySelect.value = localStorage.getItem('pr0xy') || 'scram';
   const savedWisp = localStorage.getItem('location') || 'wss://celestial-wisp.onrender.com/';
   if ([...wispSelect.options].some(o => o.value === savedWisp)) {
     wispSelect.value = savedWisp;
@@ -517,22 +517,22 @@ function cookieStorage() {
       if (!localStorage.getItem('cfmode_prev_proxy'))
         localStorage.setItem('cfmode_prev_proxy', localStorage.getItem('pr0xy') || 'scramjet');
 
-      // Force CF-optimal settings: epoxy transport + BRC (best Cloudflare bypass)
+      // Force CF-optimal settings: BOU-KSN (smart routing + epoxy for Google) + BRC
       localStorage.setItem('cfmode', '1');
-      localStorage.setItem('transportz', 'epoxy');
+      localStorage.setItem('transportz', 'bou-ksn');
       localStorage.setItem('pr0xy', 'scram');
 
       // Update selects to show locked values
       const t = document.getElementById('tselect');
       const p = document.getElementById('pr0xySelect');
-      if (t) t.value = 'epoxy';
+      if (t) t.value = 'bou-ksn';
       if (p) p.value = 'scram';
 
       setLocked(true);
     } else {
       // Restore previous settings
-      const prevTransport = localStorage.getItem('cfmode_prev_transport') || 'libcurl';
-      const prevProxy    = localStorage.getItem('cfmode_prev_proxy')     || 'scramjet';
+      const prevTransport = localStorage.getItem('cfmode_prev_transport') || 'bou-ksn';
+      const prevProxy    = localStorage.getItem('cfmode_prev_proxy')     || 'scram';
 
       localStorage.setItem('transportz', prevTransport);
       localStorage.setItem('pr0xy', prevProxy);

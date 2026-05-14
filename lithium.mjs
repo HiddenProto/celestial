@@ -22,8 +22,9 @@ export const addressInput = document.getElementById("address");
 
 
 const transportOptions = {
-	epoxy: "/epoxy/index.mjs",
-	libcurl: "/curl/index.mjs"
+	"bou-ksn": "/bou-ksn.mjs",
+	epoxy:     "/epoxy/index.mjs",
+	libcurl:   "/curl/index.mjs",
 };
 
 //////////////////////////////
@@ -128,12 +129,26 @@ async function _createBRCTransport() {
 			: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + savedWisp
 	);
 
-	// CF mode forces epoxy; otherwise use saved transport preference
+	// Transport preference — BOU-KSN, epoxy, or libcurl
 	const cfMode = localStorage.getItem("cfmode") === "1";
 	const veMode = cfMode || localStorage.getItem("ve-mode") === "1";
 	const savedTransport = localStorage.getItem("transportz") || "libcurl";
-	const useEpoxy = cfMode || savedTransport === "epoxy";
 
+	// BOU-KSN: smart routing transport — handles VE + Google bypass internally
+	// Use it when explicitly selected or when CF mode is on (best bypass mode)
+	if (savedTransport === "bou-ksn" || cfMode) {
+		try {
+			const { default: BouKSN } = await import("/bou-ksn.mjs");
+			const transport = new BouKSN({ wisp });
+			console.log("lethal.js: BOU-KSN transport active (smart routing, domain-aware, VE built-in)");
+			// BOU-KSN has VE baked in — still wrap for header normalization
+			return _wrapTransportHeaders(transport);
+		} catch (e) {
+			console.warn("lethal.js: BOU-KSN init failed, falling back:", e.message);
+		}
+	}
+
+	const useEpoxy = savedTransport === "epoxy";
 	let transport;
 	if (useEpoxy) {
 		try {
