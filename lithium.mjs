@@ -29,7 +29,7 @@ const transportOptions = {
 //////////////////////////////
 ///           SW           ///
 //////////////////////////////
-const stockSW = "./ultraworker.js";
+const stockSW = "/ultraworker.js";
 const swAllowedHostnames = ["localhost", "127.0.0.1"];
 
 /**
