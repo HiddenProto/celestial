@@ -13,6 +13,24 @@
 
   let isAdmin    = localStorage.getItem('cst-admin') === '1';
   let buf        = [];
+
+  // ─── sovereign theme (admin-exclusive) ───────────────────────
+  function _applySovereignTheme() {
+    const cur = document.body.getAttribute('theme');
+    if (cur && cur !== 'sovereign') {
+      localStorage.setItem('cst-prev-theme', cur);
+    }
+    localStorage.setItem('theme', 'sovereign');
+    document.body.setAttribute('theme', 'sovereign');
+    if (!document.querySelector('script[src="/assets/js/sovereign.js"]')) {
+      const s = document.createElement('script');
+      s.src = '/assets/js/sovereign.js';
+      document.body.appendChild(s);
+    }
+  }
+
+  // Auto-apply if already admin on this page
+  if (isAdmin) _applySovereignTheme();
   let hub        = null;
   let cPeer      = null;
   let clients    = {};
@@ -174,6 +192,7 @@
       isAdmin = true;
       localStorage.setItem('cst-admin', '1');
       document.getElementById('cst-gate')?.remove();
+      _applySovereignTheme();
       openPanel();
     } else if (pw !== null) { alert('incorrect passcode.'); }
   }

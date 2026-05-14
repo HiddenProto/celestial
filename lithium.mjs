@@ -130,19 +130,77 @@ async function _createBRCTransport() {
 
 	// CF mode forces epoxy; otherwise use saved transport preference
 	const cfMode = localStorage.getItem("cfmode") === "1";
+	const veMode = cfMode || localStorage.getItem("ve-mode") === "1";
 	const savedTransport = localStorage.getItem("transportz") || "libcurl";
 	const useEpoxy = cfMode || savedTransport === "epoxy";
 
+	let transport;
 	if (useEpoxy) {
 		try {
 			const { default: EpoxyTransport } = await import("/epoxy/index.mjs");
-			return _wrapTransportHeaders(new EpoxyTransport({ wisp }));
+			transport = new EpoxyTransport({ wisp });
 		} catch (e) {
 			console.warn("lethal.js: epoxy transport failed, trying libcurl:", e.message);
 		}
 	}
-	const { default: LibcurlClient } = await import("/curl/index.mjs");
-	return _wrapTransportHeaders(new LibcurlClient({ wisp }));
+	if (!transport) {
+		const { default: LibcurlClient } = await import("/curl/index.mjs");
+		transport = new LibcurlClient({ wisp });
+	}
+
+	// Apply Virtual Entity header injection when VE or CF mode is on
+	if (veMode) {
+		transport = _wrapVirtualEntity(transport);
+		console.log("lethal.js: Virtual Entity active — browser identity headers injected");
+	}
+
+	return _wrapTransportHeaders(transport);
+}
+
+// ── Virtual Entity header set ─────────────────────────────────────────────────
+// Mimics Chrome 136 on Windows — injected into every proxied request when
+// Virtual Entity mode is enabled (ve-mode=1) or CF mode is active (cfmode=1).
+// Makes BRC-routed traffic look indistinguishable from a real browser to
+// bot-detection systems (Cloudflare, Google, YouTube, etc.).
+const _VE_HEADERS = [
+	['User-Agent',               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'],
+	['Accept',                   'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7'],
+	['Accept-Language',          'en-US,en;q=0.9'],
+	['Accept-Encoding',          'gzip, deflate, br, zstd'],
+	['sec-ch-ua',                '"Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"'],
+	['sec-ch-ua-mobile',         '?0'],
+	['sec-ch-ua-platform',       '"Windows"'],
+	['Upgrade-Insecure-Requests','1'],
+	['Sec-Fetch-Site',           'none'],
+	['Sec-Fetch-Mode',           'navigate'],
+	['Sec-Fetch-User',           '?1'],
+	['Sec-Fetch-Dest',           'document'],
+	['Cache-Control',            'max-age=0'],
+];
+
+/**
+ * Wraps a transport to inject realistic Chrome browser headers (Virtual Entity).
+ * Headers already present in the outgoing request take priority — VE headers
+ * are only added for names that the request doesn't already include.
+ */
+function _wrapVirtualEntity(transport) {
+	const origRequest = transport.request.bind(transport);
+	transport.request = async function(remote, method, body, headers, signal) {
+		let merged;
+		if (Array.isArray(headers)) {
+			const existingLC = new Set(headers.map(([n]) => n.toLowerCase()));
+			const extra = _VE_HEADERS.filter(([n]) => !existingLC.has(n.toLowerCase()));
+			merged = [...extra, ...headers];
+		} else if (headers && typeof headers === 'object') {
+			const existingLC = new Set(Object.keys(headers).map(k => k.toLowerCase()));
+			const extra = _VE_HEADERS.filter(([n]) => !existingLC.has(n.toLowerCase()));
+			merged = [...extra, ...Object.entries(headers)];
+		} else {
+			merged = [..._VE_HEADERS];
+		}
+		return origRequest(remote, method, body, merged, signal);
+	};
+	return transport;
 }
 
 /**

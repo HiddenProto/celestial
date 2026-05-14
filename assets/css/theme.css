@@ -252,3 +252,130 @@ body[theme="breakaway"] select:focus {
   outline: none;
   box-shadow: 0 0 0 2px rgba(200,30,30,0.7), 0 0 8px rgba(255,0,0,0.4);
 }
+
+/* ═══════════════════════════════════════════════════════
+   SOVEREIGN — admin-exclusive animated cosmic gold
+   Applied automatically when admin is logged in.
+   ═══════════════════════════════════════════════════════ */
+body[theme="sovereign"] {
+  --background: #02010a;
+  --color: #c9a84c;
+  --pallet: #080518;
+  --pallet-hover: #120b28;
+  --button: #1a0f35;
+  --border: rgba(201, 168, 76, 0.38);
+  --input: rgba(201, 168, 76, 0.07);
+  --pallet2: #050310;
+  --settings: #0d0921;
+  animation: sv-bg 18s ease-in-out infinite alternate;
+}
+
+/* Animated nebula aurora — sweeps behind all content */
+body[theme="sovereign"]::before {
+  content: '';
+  position: fixed;
+  inset: -20%;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 75% 45% at 20% 55%, rgba(180,130,10,0.13) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 65% at 80% 28%, rgba(110,50,190,0.11) 0%, transparent 60%),
+    radial-gradient(ellipse 85% 35% at 50% 82%, rgba(160,110,15,0.09) 0%, transparent 60%);
+  animation: sv-aurora 14s ease-in-out infinite alternate;
+  filter: blur(45px);
+}
+
+/* Subtle scanline overlay */
+body[theme="sovereign"]::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99997;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 4px,
+    rgba(0, 0, 0, 0.04) 4px,
+    rgba(0, 0, 0, 0.04) 5px
+  );
+  opacity: 0.5;
+}
+
+@keyframes sv-bg {
+  0%   { background-color: #02010a; }
+  33%  { background-color: #040215; }
+  66%  { background-color: #030112; }
+  100% { background-color: #02010a; }
+}
+
+@keyframes sv-aurora {
+  0%   { transform: translate(0%,   0%)  scale(1.00); opacity: 0.90; }
+  25%  { transform: translate(4%,  -3%)  scale(1.08); opacity: 1.00; }
+  50%  { transform: translate(-3%,  5%)  scale(0.96); opacity: 0.82; }
+  75%  { transform: translate(6%,   2%)  scale(1.06); opacity: 1.00; }
+  100% { transform: translate(-2%, -4%)  scale(1.04); opacity: 0.90; }
+}
+
+/* Heading golden shimmer */
+body[theme="sovereign"] h1,
+body[theme="sovereign"] h2,
+body[theme="sovereign"] h3 {
+  display: inline-block;
+  animation: sv-text 9s ease-in-out infinite;
+}
+body[theme="sovereign"] h2 { animation-delay: -3s; }
+body[theme="sovereign"] h3 { animation-delay: -6s; }
+
+@keyframes sv-text {
+  0%,100% { text-shadow: 0 0 8px rgba(201,168,76,0.28), 0 0 20px rgba(201,168,76,0.08); }
+  50%     { text-shadow: 0 0 14px rgba(201,168,76,0.60), 0 0 35px rgba(201,168,76,0.22), 0 0 60px rgba(180,130,40,0.10); }
+}
+
+/* Card ambient golden pulse */
+body[theme="sovereign"] .card {
+  animation: sv-card 8s ease-in-out infinite;
+}
+body[theme="sovereign"] .card:nth-child(3n+1) { animation-delay: -2.2s; }
+body[theme="sovereign"] .card:nth-child(3n+2) { animation-delay: -4.8s; }
+body[theme="sovereign"] .card:nth-child(5n)   { animation-delay: -1.4s; }
+body[theme="sovereign"] .card:nth-child(7n)   { animation-delay: -6.1s; }
+
+@keyframes sv-card {
+  0%,100% { box-shadow: none; }
+  50%     { box-shadow: 0 0 14px rgba(201,168,76,0.16), 0 0 4px rgba(201,168,76,0.10); }
+}
+
+/* Card hover — strong golden glow */
+body[theme="sovereign"] .card:hover {
+  box-shadow: 0 0 20px rgba(201,168,76,0.35), 0 0 6px rgba(201,168,76,0.55) !important;
+  border-color: rgba(201,168,76,0.75) !important;
+}
+
+/* Panel/select border shimmer */
+body[theme="sovereign"] .fakebox,
+body[theme="sovereign"] select,
+body[theme="sovereign"] .select {
+  animation: sv-border 10s ease-in-out infinite;
+}
+
+@keyframes sv-border {
+  0%,100% { box-shadow: none; }
+  50%     { box-shadow: 0 0 8px rgba(201,168,76,0.18); }
+}
+
+/* Input focus — gold glow ring */
+body[theme="sovereign"] input:focus,
+body[theme="sovereign"] select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(201,168,76,0.55), 0 0 14px rgba(201,168,76,0.22);
+}
+
+/* gradientthing background */
+body[theme="sovereign"] .gradientthing {
+  background: linear-gradient(360deg,
+    #02010a 0%,
+    #060322 40%,
+    #0d0630 70%,
+    #150940 100%);
+}

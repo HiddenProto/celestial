@@ -517,10 +517,10 @@ function cookieStorage() {
       if (!localStorage.getItem('cfmode_prev_proxy'))
         localStorage.setItem('cfmode_prev_proxy', localStorage.getItem('pr0xy') || 'scramjet');
 
-      // Force CF-optimal settings
+      // Force CF-optimal settings: epoxy transport + BRC (best Cloudflare bypass)
       localStorage.setItem('cfmode', '1');
       localStorage.setItem('transportz', 'epoxy');
-      localStorage.setItem('pr0xy', 'scramjet');
+      localStorage.setItem('pr0xy', 'scram');
 
       // Update selects to show locked values
       const t = document.getElementById('tselect');
@@ -558,6 +558,29 @@ function cookieStorage() {
   if (isCFMode) setLocked(true);
 
   cfModeTog.onchange = () => applyCFMode(cfModeTog.checked);
+})();
+
+// ============================================================
+// Virtual Entity Mode
+// ============================================================
+(function initVEMode() {
+  const veTog = document.getElementById('veTog');
+  if (!veTog) return;
+
+  // VE is implicitly on when CF mode is active (CF mode implies VE)
+  const isVE = localStorage.getItem('ve-mode') === '1' || localStorage.getItem('cfmode') === '1';
+  veTog.checked = isVE;
+
+  // If CF mode is on, disable the toggle (VE is forced)
+  if (localStorage.getItem('cfmode') === '1') {
+    veTog.disabled = true;
+    veTog.parentElement.title = 'Automatically enabled by Cloudflare bypass mode';
+  }
+
+  veTog.onchange = () => {
+    localStorage.setItem('ve-mode', veTog.checked ? '1' : '0');
+    location.reload();
+  };
 })();
 
 function restoreCookies(cookies) {

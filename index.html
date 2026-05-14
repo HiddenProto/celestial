@@ -391,11 +391,19 @@
               .cf-locked { opacity: 0.4 !important; pointer-events: none !important; cursor: not-allowed !important; }
             </style>
             <div class="box">
-              <h3>☁️ Cloudflare Mode <span class="info-icon"><span class="tip">Optimizes the pr<span>o</span>xy to better handle Cloudflare-protected sites.<br><br>Automatically switches transport to <b>epoxy</b> and pr<span>o</span>xy to <b>scramjet</b> for best compatibility.</span></span></h3>
+              <h3>☁️ Cloudflare Mode <span class="info-icon"><span class="tip">Optimizes the pr<span>o</span>xy to better handle Cloudflare-protected sites.<br><br>Automatically switches transport to <b>epoxy</b> and pr<span>o</span>xy to <b>bumblcat rrc</b> for best compatibility. Also enables Virtual Entity automatically.</span></span></h3>
               <p class="desc">better compatibility with cloudflare-protected sites</p>
               <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:4px;">
                 <input type="checkbox" id="cfModeTog" />
                 <span>enable cloudflare bypass mode</span>
+              </label>
+            </div>
+            <div class="box">
+              <h3>🛡️ Virtual Entity <span class="info-icon"><span class="tip">Gives the pr<span>o</span>xy a real browser identity to prevent bot detection.<br><br>Injects authentic Chrome 136 browser headers into all pr<span>o</span>xied requests — User-Agent, Sec-Fetch, client hints, Accept headers — making traffic look indistinguishable from a real browser.<br><br>Helps bypass bot checks on Google, YouTube, and Cloudflare-protected sites. Automatically enabled by Cloudflare bypass mode.</span></span></h3>
+              <p class="desc">makes proxied traffic look like a real chrome browser — bypasses bot detection</p>
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:4px;">
+                <input type="checkbox" id="veTog" />
+                <span>enable virtual entity</span>
               </label>
             </div>
             <div class="box">
@@ -410,7 +418,7 @@
               </select>
             </div>
             <div class="box">
-              <h3>Pr<span>o</span>xy <span class="info-icon"><span class="tip">Controls how page content is rewritten for proxying.<br><br><b>scramjet (incompatible)</b> — currently broken, do not use. Falls back to ultraviolet automatically. Type: <b>client-side</b>.<br><br><b>bumblcat rrc (WIP)</b> — private scramjet fork. Best for multiplayer games: spoofs WebSocket Origin and User-Agent headers so game servers see the correct site origin. Requires <b>epoxy</b> transport to take effect. Work in progress — may not render all sites correctly yet. Type: <b>client-side</b>.<br><br><b>ultraviolet</b> — older rewriter, works with some legacy sites. Type: <b>client-side</b>.<br><br>⚠️ Note: sites like Google may flag pr<span>o</span>xied traffic as suspicious — use the address bar search (DuckDuckGo) instead of navigating to google.com through the pr<span>o</span>xy.</span></span></h3>
+              <h3>Pr<span>o</span>xy <span class="info-icon"><span class="tip">Controls how page content is rewritten for proxying.<br><br><b>scramjet (incompatible)</b> — currently broken, do not use. Falls back to ultraviolet automatically. Type: <b>client-side</b>.<br><br><b>bumblcat rrc (WIP)</b> — private scramjet fork. Best for multiplayer games: spoofs WebSocket Origin and User-Agent headers so game servers see the correct site origin. Requires <b>epoxy</b> transport to take effect. Work in progress — may not render all sites correctly yet. Type: <b>client-side</b>.<br><br><b>ultraviolet</b> — older rewriter, works with some legacy sites. Type: <b>client-side</b>.<br><br>💡 Tip: enable <b>Virtual Entity</b> mode to give the pr<span>o</span>xy a real browser identity — improves access to Google, YouTube, and other sites that detect pr<span>o</span>xies.</span></span></h3>
               <p class="desc">
                 change which rewriter engine handles pr<span>o</span>xied pages
               </p>
