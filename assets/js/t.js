@@ -4,8 +4,8 @@ var grid = document.querySelector(".gs");
 var search = document.querySelector(".textbook");
 var cat = document.querySelector("select");
 
-const _fetchTools = (urls) => fetch(urls[0]).then(r => { if (!r.ok) throw 0; return r.json(); }).catch(() => urls.length > 1 ? _fetchTools(urls.slice(1)) : Promise.reject());
-_fetchTools(["https://creditrepair911.us/assets/json/tools.json", "/assets/json/tools.json"])
+// Load apps from local JSON — no external fetch needed, file is on this server
+fetch("/assets/json/tools.json").then(r => r.json())
   .then(games => {
     function showGames(list) {
       grid.innerHTML = "";

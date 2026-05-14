@@ -96,9 +96,8 @@ function toggleFavorite(gameName) {
   storage.set(FAVORITES_KEY, favorites);
 }
 
-// main game func — try live source first, fall back to local
-const _fetchGames = (urls) => fetch(urls[0]).then(r => { if (!r.ok) throw 0; return r.json(); }).catch(() => urls.length > 1 ? _fetchGames(urls.slice(1)) : Promise.reject());
-_fetchGames(["https://creditrepair911.us/assets/json/books.json", "/assets/json/books.json"])
+// Load games from local JSON — no external fetch needed, file is on this server
+fetch("/assets/json/books.json").then(r => r.json())
   .then((games) => {
     const originalGames = [...games];
 
@@ -140,7 +139,7 @@ _fetchGames(["https://creditrepair911.us/assets/json/books.json", "/assets/json/
   });
 
 function rngGame() {
-  _fetchGames(["https://creditrepair911.us/assets/json/books.json", "/assets/json/books.json"])
+  fetch("/assets/json/books.json").then(r => r.json())
     .then((games) => {
       const available = games.filter(
         (g) =>
@@ -158,7 +157,7 @@ function rngGame() {
 }
 
 function gameCount() {
-  _fetchGames(["https://creditrepair911.us/assets/json/books.json", "/assets/json/books.json"])
+  fetch("/assets/json/books.json").then(r => r.json())
     .then((d) => {
       const input = document.querySelector(".textbook");
       input.placeholder = `search through ${(d.modules || d).length} games..`;

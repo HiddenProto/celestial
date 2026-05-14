@@ -432,9 +432,21 @@
 
     form?.addEventListener("submit", async (e) => {
       e.preventDefault();
+      const q = input.value.trim();
+      if (!q) return;
+      // Search within celestial — navigate to the top matching game/app
+      const items = await acLoad();
+      const ql = q.toLowerCase();
+      const top = items.find(it => it.name && it.name.toLowerCase().includes(ql));
       acClose();
-      const proxiedUrl = await getProxied(makeURL(input.value, search));
-      location.href = proxiedUrl;
+      if (top) {
+        if (top.source === "local") {
+          location.href = top.url;
+        } else {
+          location.href = await getProxied(makeURL(top.url, search));
+        }
+      }
+      // If nothing matches, do nothing — this bar is for celestial content, not web search
     });
 
     // ── Autocomplete ──────────────────────────────────────────────
@@ -457,17 +469,14 @@
              (after   ? `<span class="ac-dim">${after}</span>`   : "");
     }
 
-    // Fetch and cache games + apps
+    // Fetch and cache games + apps — local JSON only, no external dependency
     let _acItems = null;
     async function acLoad() {
       if (_acItems) return _acItems;
-      const tryFetch = (urls) =>
-        fetch(urls[0]).then(r => r.ok ? r.json() : Promise.reject())
-          .catch(() => urls.length > 1 ? tryFetch(urls.slice(1)) : []);
       const [games, apps] = await Promise.all([
-        tryFetch(["https://creditrepair911.us/assets/json/books.json", "/assets/json/books.json"]),
-        tryFetch(["https://creditrepair911.us/assets/json/tools.json", "/assets/json/tools.json"]),
-      ]).catch(() => [[], []]);
+        fetch("/assets/json/books.json").then(r => r.json()).catch(() => []),
+        fetch("/assets/json/tools.json").then(r => r.json()).catch(() => []),
+      ]);
       _acItems = [
         ...games.map(g => ({ name: g.name, url: g.url, source: g.source || "external", img: g.img, badge: "game" })),
         ...apps .map(a => ({ name: a.name, url: a.url, source: "external",             img: a.img, badge: "app"  })),
