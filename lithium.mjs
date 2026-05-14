@@ -95,8 +95,13 @@ async function ensureScramjet() {
 					all: "/sj/scramjet.all.js",
 					sync: "/sj/scramjet.sync.js",
 				},
-				naiiveRewriter: true,
-				scramitize: false,
+				flags: {
+					strictRewrites: false,  // relaxed mode — wider site compat
+					scramitize: false,
+					captureErrors: true,
+					allowInvalidJs: true,
+					allowFailedIntercepts: true,
+				},
 			});
 			// init() is async — must be awaited so the config channel is established
 			// before the SW calls loadConfig(). Not awaiting causes loadConfig() to hang.

@@ -100,7 +100,8 @@ async function handleRequest(event) {
           scramjet.loadConfig(),
           new Promise((_, reject) => setTimeout(() => reject(new Error("loadConfig timeout")), 4000)),
         ]);
-        if (scramjet.route(event)) {
+        // config must be set before calling route() — it accesses this.config.prefix directly
+        if (scramjet.config && scramjet.route(event)) {
           return scramjet.fetch(event);
         }
       }
