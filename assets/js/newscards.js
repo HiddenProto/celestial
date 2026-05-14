@@ -44,8 +44,9 @@ function showGames(list) {
       if (g.source === "dice") {
         rngGame();
       } else if (g.source === "local") {
-        // Local games are hosted on this site — load directly, no proxy or wrapper iframe
-        location.href = g.url;
+        // Local games load via frame.html which handles 404 gracefully (shows "unavailable" screen)
+        // Assets are served from /assets/src/ → Vercel rewrites to creditrepair911.us
+        location.href = "/news/frame.html?mbed=" + encodeURIComponent(g.url);
       } else {
         location.href = `/tab.html?autofill=${encodeURIComponent(g.url)}`;
       }

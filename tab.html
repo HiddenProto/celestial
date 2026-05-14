@@ -441,7 +441,7 @@
       acClose();
       if (top) {
         if (top.source === "local") {
-          location.href = top.url;
+          location.href = "/news/frame.html?mbed=" + encodeURIComponent(top.url);
         } else {
           location.href = await getProxied(makeURL(top.url, search));
         }
@@ -512,7 +512,7 @@
           e.preventDefault(); // prevent input blur before click fires
           acClose();
           if (it.source === "local") {
-            location.href = it.url;
+            location.href = "/news/frame.html?mbed=" + encodeURIComponent(it.url);
           } else {
             location.href = await getProxied(makeURL(it.url, search));
           }
