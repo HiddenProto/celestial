@@ -570,6 +570,27 @@ export class Tab {
 	 * Handles iframe load event: updates history and address input.
 	 */
 	handleLoad() {
+		// Safety net: if the frame landed on a broken /scramjet/ URL (SW doesn't
+		// handle scramjet routes when scramjet is incompatible), extract the
+		// original URL and re-proxy it through the current proxy settings.
+		try {
+			const href = this.frame?.contentWindow?.location?.href || '';
+			const SCRAMJET_ORIGIN_PREFIX = location.origin + '/scramjet/';
+			if (href.startsWith(SCRAMJET_ORIGIN_PREFIX)) {
+				const encoded = href.slice(SCRAMJET_ORIGIN_PREFIX.length);
+				const originalUrl = decodeURIComponent(encoded);
+				if (originalUrl.startsWith('http')) {
+					getProxied(originalUrl).then(proxied => {
+						// Only reroute when we got a real proxy URL back (not another scramjet path)
+						if (!proxied.includes('/scramjet/') && this.frame?.contentWindow) {
+							this.frame.contentWindow.location.href = proxied;
+						}
+					}).catch(() => {});
+					return; // skip the rest of handleLoad — another load event will follow
+				}
+			}
+		} catch(e) {} // cross-origin guard
+
 		this.statusObject = { isLoading: true, timesErrored: 0 };
 		// After the iframe navigates to a proxied (cross-origin) page, reading
 		// location.href or document.title throws a SecurityError. Swallow it.
