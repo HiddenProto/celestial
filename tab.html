@@ -202,6 +202,9 @@
         <p>- added bumblcat's server (now default — due to new restrictions on moving site)</p>
         <p>- cross origin apps fixed — local games now proxy through original host</p>
         <p>- bumblcat's server now has full cross-origin support (slightly slower on first load)</p>
+        <p>- search bar repurposed as instant celestial content finder — searches all games &amp; apps as you type, highlighted match shown in full brightness</p>
+        <p>- games and apps load cards instantly from local data (no external fetch delay)</p>
+        <p>- same-origin pages (games hosted on this site) no longer go through the proxy</p>
       </details>
 
       <details open>
@@ -559,5 +562,31 @@
         localStorage.setItem("updlogview11", "1");
       }
     });
+  </script>
+  <script>
+    // Outage notice — show once per session
+    (function () {
+      if (sessionStorage.getItem("outage-notice-shown")) return;
+      sessionStorage.setItem("outage-notice-shown", "1");
+      const msg =
+        "⚠ underlying issue: the original site went down around 10 am — " +
+        "fetches to it won't work. url search has been fixed.";
+      function fireNotif() {
+        const ev = new CustomEvent("notify", {
+          detail: { message: msg, type: "warning", duration: 12000 },
+        });
+        try {
+          // fire in parent celestial frame if we're embedded, else fire locally
+          (window !== window.top ? window.top.document : document).dispatchEvent(ev);
+        } catch {
+          document.dispatchEvent(ev);
+        }
+      }
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", fireNotif);
+      } else {
+        fireNotif();
+      }
+    })();
   </script>
 </html>

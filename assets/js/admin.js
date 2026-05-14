@@ -768,6 +768,10 @@
     if (isAdmin) {
       // Admin: panel opens via Konami code (← → ← → ↑ ↓ A B) + passcode
       // No visible button — keep it hidden
+      // Unlock secret/hidden themes for admin
+      document.querySelectorAll('#themepicker option[disabled]').forEach(opt => {
+        opt.disabled = false;
+      });
     } else {
       startBeacon();
       if (!isApproved()) {
