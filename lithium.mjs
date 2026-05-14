@@ -21,8 +21,15 @@ export const addressInput = document.getElementById("address");
 
 
 
+// NOTE: "bou-ksn" maps to libcurl here because this map is used by BareMux
+// (bareworker.js — a CLASSIC service worker) via importScripts().  importScripts
+// cannot load ES modules, so sending /bou-ksn.mjs to the bareworker causes a
+// JSON parse crash and the "Cannot read properties of undefined (reading 'fetch')"
+// SW error.  BOU-KSN is used as a page-context JS class for BRC transport only
+// (see _createBRCTransport), where it's loaded via dynamic import() which does
+// support ES modules.  BareMux/UV transport stays on libcurl.
 const transportOptions = {
-	"bou-ksn": "/bou-ksn.mjs",
+	"bou-ksn": "/curl/index.mjs",  // bareworker compat — BOU-KSN class used separately for BRC
 	epoxy:     "/epoxy/index.mjs",
 	libcurl:   "/curl/index.mjs",
 };
