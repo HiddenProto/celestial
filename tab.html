@@ -188,6 +188,17 @@
       <hr>
 
       <details open>
+        <summary>05/14 — major update</summary>
+        <p>- all 250 games manually ported — no longer depend on the original site going down</p>
+        <p>- outage notice added: creditrepair911.us went offline around 10 am, any fetches to it will fail</p>
+        <p>- search bar fully rewired as a celestial content finder — type a game or app name, click to launch</p>
+        <p>- games &amp; apps now load cards instantly from local data only (no external delay)</p>
+        <p>- same-origin navigation (games, tools, celestial:// links) no longer routed through proxy</p>
+        <p>- admin users now have access to all hidden secret themes</p>
+        <p>- quick apps click handler fixed — apps now properly launch through celestial</p>
+      </details>
+
+      <details open>
         <summary>revival changes</summary>
         <p>- revived and redeployed to callanambulance.vercel.app</p>
         <p>- fixed proxy backend (wisp server)</p>
@@ -556,10 +567,10 @@
     document.getElementById("close").addEventListener("click", exitUpdLog);
 
     window.addEventListener("load", function () {
-      if (!localStorage.getItem("updlogview11")) {
+      if (!localStorage.getItem("updlogview12")) {
         document.getElementById("update-log").style.display = "block";
         document.querySelector(".upd-bg").style.display = "block";
-        localStorage.setItem("updlogview11", "1");
+        localStorage.setItem("updlogview12", "1");
       }
     });
   </script>

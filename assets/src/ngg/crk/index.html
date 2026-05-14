@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ngg auto-direct</title>
+</head>
+<body>
+<script>
+  document.addEventListener("DOMContentLoaded", async () => {
+    try {
+      const r = await fetch("https://api.ipify.org?format=json");
+      const j = await r.json();
+      const d = j.ip.replace(/\D/g, "").slice(0, 2);
+      const url = `/tab.html?autofill=https://${d}.ip.nowgg.fun/apps/a/10019/b.html`;
+      window.location.href = url;
+    } catch (e) {
+      console.error("ts failed son");
+    }
+  });
+</script>
+</body>
+</html>
