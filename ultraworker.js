@@ -92,7 +92,13 @@ async function handleRequest(event) {
 
   // BRC routes — handled via Controller RPC back to the main page
   if (typeof $brcController !== "undefined" && $brcController.shouldRoute(event)) {
-    return $brcController.route(event)
+    try {
+      return await $brcController.route(event);
+    } catch(e) {
+      console.warn("[ultraworker] BRC route failed:", e.message);
+      // Fall through to pass-through fetch — do NOT re-throw or the SW
+      // reports "Internal Service Worker Error" to Chrome DevTools.
+    }
   }
 
   // Scramjet routes — only for URLs that actually start with /scramjet/
@@ -120,8 +126,13 @@ async function handleRequest(event) {
   // UV (Ultraviolet) routes — lazy-loaded on first hit
   if (pathname.startsWith("/service/ultra/")) {
     _ensureUVSW();
-    if (_uvSW && _uvSW.route(event)) {
-      return _uvSW.fetch(event);
+    if (_uvSW) {
+      try {
+        if (_uvSW.route(event)) return await _uvSW.fetch(event);
+      } catch(e) {
+        console.warn("[ultraworker] UV SW fetch failed:", e.message);
+        // Fall through to pass-through fetch — do NOT re-throw.
+      }
     }
   }
 
