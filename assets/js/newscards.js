@@ -44,7 +44,8 @@ function showGames(list) {
       if (g.source === "dice") {
         rngGame();
       } else if (g.source === "local") {
-        location.href = "/news/frame.html?mbed=" + g.url;
+        // Local games are hosted on this site — load directly, no proxy or wrapper iframe
+        location.href = g.url;
       } else {
         location.href = `/tab.html?autofill=${encodeURIComponent(g.url)}`;
       }

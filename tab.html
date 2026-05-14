@@ -29,6 +29,65 @@
         width: 40px;
       }
 
+      /* ── Autocomplete dropdown ── */
+      .search-wrap {
+        position: relative;
+        display: inline-block;
+        width: 450px;
+      }
+      .search-wrap input.url {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      #ac-dropdown {
+        display: none;
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        right: 0;
+        background: var(--pallet2);
+        border: 1px solid var(--border, rgba(255,255,255,0.15));
+        border-radius: 10px;
+        overflow: hidden;
+        z-index: 2000;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      .ac-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        cursor: pointer;
+        font-size: 14px;
+        color: var(--color);
+        transition: background 0.12s;
+        user-select: none;
+      }
+      .ac-item:hover {
+        background: rgba(255,255,255,0.08);
+      }
+      .ac-item img {
+        width: 26px;
+        height: 26px;
+        object-fit: contain;
+        border-radius: 4px;
+        flex-shrink: 0;
+        background: rgba(255,255,255,0.05);
+      }
+      .ac-name { font-size: 14px; }
+      .ac-match { opacity: 1; }
+      .ac-dim   { opacity: 0.38; }
+      .ac-badge {
+        margin-left: auto;
+        font-size: 10px;
+        opacity: 0.35;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        flex-shrink: 0;
+      }
+
       body[theme="light"] .updlog img {
         filter: invert(1);
       }
@@ -247,11 +306,15 @@
         <div class="bg-match">
           <h1 id="main">Drew's Learning Academy</h1>
           <form id="form">
-            <input
-              class="url"
-              id="address"
-              placeholder="search for online lessons"
-            />
+            <div class="search-wrap">
+              <input
+                class="url"
+                id="address"
+                placeholder="search for online lessons"
+                autocomplete="off"
+              />
+              <div id="ac-dropdown"></div>
+            </div>
           </form>
           <div class="row-thing">
             <div
@@ -369,8 +432,93 @@
 
     form?.addEventListener("submit", async (e) => {
       e.preventDefault();
+      acClose();
       const proxiedUrl = await getProxied(makeURL(input.value, search));
       location.href = proxiedUrl;
+    });
+
+    // ── Autocomplete ──────────────────────────────────────────────
+    const acDrop = document.getElementById("ac-dropdown");
+
+    function acClose() {
+      acDrop.style.display = "none";
+      acDrop.innerHTML = "";
+    }
+
+    // Highlight matched portion: bright for the match, dim for surrounding text
+    function acHighlight(name, query) {
+      const i = name.toLowerCase().indexOf(query.toLowerCase());
+      if (i === -1) return `<span class="ac-match">${name}</span>`;
+      const before  = name.slice(0, i);
+      const matched = name.slice(i, i + query.length);
+      const after   = name.slice(i + query.length);
+      return (before  ? `<span class="ac-dim">${before}</span>`  : "") +
+             `<span class="ac-match">${matched}</span>` +
+             (after   ? `<span class="ac-dim">${after}</span>`   : "");
+    }
+
+    // Fetch and cache games + apps
+    let _acItems = null;
+    async function acLoad() {
+      if (_acItems) return _acItems;
+      const tryFetch = (urls) =>
+        fetch(urls[0]).then(r => r.ok ? r.json() : Promise.reject())
+          .catch(() => urls.length > 1 ? tryFetch(urls.slice(1)) : []);
+      const [games, apps] = await Promise.all([
+        tryFetch(["https://creditrepair911.us/assets/json/books.json", "/assets/json/books.json"]),
+        tryFetch(["https://creditrepair911.us/assets/json/tools.json", "/assets/json/tools.json"]),
+      ]).catch(() => [[], []]);
+      _acItems = [
+        ...games.map(g => ({ name: g.name, url: g.url, source: g.source || "external", img: g.img, badge: "game" })),
+        ...apps .map(a => ({ name: a.name, url: a.url, source: "external",             img: a.img, badge: "app"  })),
+      ];
+      return _acItems;
+    }
+    // Preload silently so first keypress is instant
+    acLoad().catch(() => {});
+
+    input?.addEventListener("input", async () => {
+      const q = input.value.trim();
+      if (!q) { acClose(); return; }
+
+      const items = await acLoad();
+      const ql = q.toLowerCase();
+      const matches = items
+        .filter(it => it.name && it.name.toLowerCase().includes(ql))
+        .slice(0, 9);
+
+      if (!matches.length) { acClose(); return; }
+
+      acDrop.innerHTML = matches.map((it, idx) => `
+        <div class="ac-item" data-idx="${idx}">
+          <img src="${it.img || '/assets/img/logo-blackbg.png'}" alt="" />
+          <span class="ac-name">${acHighlight(it.name, q)}</span>
+          <span class="ac-badge">${it.badge}</span>
+        </div>`).join("");
+
+      // Wire up click handlers
+      acDrop.querySelectorAll(".ac-item").forEach((el, i) => {
+        const it = matches[i];
+        el.addEventListener("mousedown", async (e) => {
+          e.preventDefault(); // prevent input blur before click fires
+          acClose();
+          if (it.source === "local") {
+            location.href = it.url;
+          } else {
+            location.href = await getProxied(makeURL(it.url, search));
+          }
+        });
+      });
+
+      acDrop.style.display = "block";
+    });
+
+    input?.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") acClose();
+    });
+    input?.addEventListener("blur", () => {
+      // Small delay so mousedown on an item fires before blur hides it
+      setTimeout(acClose, 150);
     });
   </script>
   <script>
