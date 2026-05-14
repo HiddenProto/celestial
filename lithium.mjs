@@ -432,11 +432,16 @@ export async function getProxied(input) {
 	// ─────────────────────────────────────────────────────────────────────────
 
 	if (proxyOption === "scram") {
-		// Non-blocking BRC check: if BRC is already initialised (warm), use it.
-		// If it's still loading (cold wisp server, first-ever WASM compile, etc.)
-		// fall through immediately to scramjet so the user doesn't wait.
-		// BRC continues initialising in the background via ensureBRC() called at
-		// SW registration time; subsequent navigations will use BRC once it's ready.
+		// If BRC init is in flight, wait for it (up to 5 s) before falling back.
+		// In fresh document contexts (e.g. cog.js quick-apps via document.write)
+		// BRC starts from scratch but resolves in ~150–300 ms once WASM is cached.
+		// Without this wait the very first click always misses BRC and falls through.
+		if (!brcController && _brcInitPromise) {
+			await Promise.race([
+				_brcInitPromise,
+				new Promise(r => setTimeout(r, 5000)),
+			]);
+		}
 		const brcReady = brcController !== null;
 
 		if (brcReady && brcController) {

@@ -194,7 +194,8 @@
         <p>- search bar fully rewired as a celestial content finder — type a game or app name, click to launch</p>
         <p>- games &amp; apps now load cards instantly from local data only (no external delay)</p>
         <p>- same-origin navigation (games, tools, celestial:// links) no longer routed through proxy</p>
-<p>- quick apps click handler fixed — apps now properly launch through celestial</p>
+        <p>- quick apps / media fix: proxy engine now waits for BRC to finish warming up before falling back — clicking an app immediately after opening the page now works correctly</p>
+        <p>- UV (ultraviolet) proxy restored in service worker — works again as BRC fallback if BRC fails</p>
         <p>- proxy engine upgraded (scramjet, UV, bare-mux, epoxy-tls all updated to latest)</p>
         <p>- BRC (bumblcat) speed fix: removed 585 KB of dead imports from service worker startup — BRC handshake now resolves in &lt;150 ms instead of 300–500 ms+</p>
       </details>
@@ -568,10 +569,10 @@
     document.getElementById("close").addEventListener("click", exitUpdLog);
 
     window.addEventListener("load", function () {
-      if (!localStorage.getItem("updlogview13")) {
+      if (!localStorage.getItem("updlogview14")) {
         document.getElementById("update-log").style.display = "block";
         document.querySelector(".upd-bg").style.display = "block";
-        localStorage.setItem("updlogview13", "1");
+        localStorage.setItem("updlogview14", "1");
       }
     });
   </script>

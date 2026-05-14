@@ -7,6 +7,26 @@ try {
   console.warn("[ultraworker] BRC controller SW not available:", e.message);
 }
 
+// UV (Ultraviolet) engine — loaded lazily on first /service/ultra/ request.
+// violet.config.js is ~1 KB; violet.sw.js is ~7 KB — cheap enough to lazy-load
+// synchronously via importScripts() on the first UV hit.
+let _uvSW = null;
+let _uvLoaded = false;
+
+function _ensureUVSW() {
+  if (_uvLoaded) return;
+  _uvLoaded = true;
+  try {
+    importScripts("/violet/violet.config.js"); // sets self.__uv$config
+    importScripts("/violet/violet.sw.js");     // sets self.UVServiceWorker
+    if (typeof self.UVServiceWorker === "function" && self.__uv$config) {
+      _uvSW = new self.UVServiceWorker(self.__uv$config);
+    }
+  } catch(e) {
+    console.warn("[ultraworker] UV SW init failed:", e.message);
+  }
+}
+
 // Scramjet engine — loaded lazily on first /scramjet/ request (177 KB).
 // Eagerly loading it added ~150–300 ms to every SW cold start, which delayed
 // BRC's WASM handshake and made BRC appear slow.
@@ -94,6 +114,14 @@ async function handleRequest(event) {
       } catch(e) {
         console.warn("[ultraworker] scramjet fetch failed:", e.message);
       }
+    }
+  }
+
+  // UV (Ultraviolet) routes — lazy-loaded on first hit
+  if (pathname.startsWith("/service/ultra/")) {
+    _ensureUVSW();
+    if (_uvSW && _uvSW.route(event)) {
+      return _uvSW.fetch(event);
     }
   }
 
