@@ -299,13 +299,8 @@ async function ensureBRC() {
 registerSW()
 	.then(async () => {
 		console.log("lethal.js: SW registered");
-		// Always pre-warm scramjet — it's the instant fallback for every proxy mode.
-		// Scramjet init only loads a JS file + sets up a SW config channel; no wisp
-		// connection needed, so this finishes in < 1 second even on cold page load.
-		ensureScramjet().catch(() => {});
-		// Also kick off BRC init in the background if the user has it selected.
-		// BRC will take 30-60 s on a cold Render.com wisp server, but that's fine
-		// because getProxied() falls back to scramjet instantly while BRC warms up.
+		// Kick off BRC init in the background if the user has it selected.
+		// Scramjet is currently incompatible — no longer pre-warmed.
 		if (localStorage.getItem("pr0xy") === "scram") {
 			ensureBRC().catch(() => {});
 		}
@@ -476,21 +471,10 @@ export async function getProxied(input) {
 			}
 			if (frame) return frame.prefix + encodeURIComponent(url);
 		}
-		// BRC timed out or failed — use scramjet (already pre-warmed alongside BRC).
-		await ensureScramjet();
-		if (_scramjetController) {
-			try { return _scramjetController.encodeUrl(url); } catch(e) {}
-		}
-		// Final fallback: UV
+		// BRC not ready — skip scramjet (currently incompatible), fall through to UV.
 	} else if (proxyOption === "scramjet") {
-		await ensureScramjet();
-		if (_scramjetController) {
-			try {
-				return _scramjetController.encodeUrl(url);
-			} catch (e) {
-				console.warn("lethal.js: scramjet encodeUrl failed —", e.message);
-			}
-		}
+		// Scramjet is currently marked incompatible — fall straight through to UV.
+		console.warn("lethal.js: scramjet selected but incompatible, falling back to UV");
 	}
 	return window.__uv$config.prefix + window.__uv$config.encodeUrl(url);
 }

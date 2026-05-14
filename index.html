@@ -410,13 +410,13 @@
               </select>
             </div>
             <div class="box">
-              <h3>Pr<span>o</span>xy <span class="info-icon"><span class="tip">Controls how page content is rewritten for proxying.<br><br><b>scramjet</b> — original scramjet engine. Recommended for most sites. Type: <b>client-side</b>.<br><br><b>bumblcat rrc (WIP)</b> — private scramjet fork. Best for multiplayer games: spoofs WebSocket Origin and User-Agent headers so game servers see the correct site origin. Requires <b>epoxy</b> transport to take effect. Work in progress — may not render all sites correctly yet. Type: <b>client-side</b>.<br><br><b>ultraviolet</b> — older rewriter, works with some legacy sites. Type: <b>client-side</b>.<br><br>⚠️ Note: sites like Google may flag pr<span>o</span>xied traffic as suspicious — use the address bar search (DuckDuckGo) instead of navigating to google.com through the pr<span>o</span>xy.</span></span></h3>
+              <h3>Pr<span>o</span>xy <span class="info-icon"><span class="tip">Controls how page content is rewritten for proxying.<br><br><b>scramjet (incompatible)</b> — currently broken, do not use. Falls back to ultraviolet automatically. Type: <b>client-side</b>.<br><br><b>bumblcat rrc (WIP)</b> — private scramjet fork. Best for multiplayer games: spoofs WebSocket Origin and User-Agent headers so game servers see the correct site origin. Requires <b>epoxy</b> transport to take effect. Work in progress — may not render all sites correctly yet. Type: <b>client-side</b>.<br><br><b>ultraviolet</b> — older rewriter, works with some legacy sites. Type: <b>client-side</b>.<br><br>⚠️ Note: sites like Google may flag pr<span>o</span>xied traffic as suspicious — use the address bar search (DuckDuckGo) instead of navigating to google.com through the pr<span>o</span>xy.</span></span></h3>
               <p class="desc">
                 change which rewriter engine handles pr<span>o</span>xied pages
               </p>
               <select class="select" id="pr0xySelect">
                 <option value="scram">bumblcat rrc (WIP)</option>
-                <option value="scramjet" selected>sc<span>ram</span>jet</option>
+                <option value="scramjet" selected>sc<span>ram</span>jet (incompatible)</option>
                 <option value="violet">ul<span>tr</span>av<span>io</span>l<span>e</span>t</option>
               </select>
             </div>
