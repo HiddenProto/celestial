@@ -1,41 +1,41 @@
+// Uses Invidious public API to get a proxied audio stream URL for a YouTube video.
+// Falls through multiple instances so one going down doesn't break playback.
+const INSTANCES = [
+  'https://inv.nadeko.net',
+  'https://invidious.privacydev.net',
+  'https://invidious.fdn.fr',
+  'https://yewtu.be',
+];
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).end();
-  }
+  const { id } = req.query;
+  if (!id) return res.status(400).json({ error: 'missing ?id=VIDEO_ID' });
 
-  // Vercel auto-parses JSON bodies, but fall back to manual read if not
-  let body = req.body;
-  if (typeof body === 'undefined' || body === null) {
+  for (const host of INSTANCES) {
     try {
-      const chunks = [];
-      for await (const chunk of req) chunks.push(chunk);
-      body = JSON.parse(Buffer.concat(chunks).toString());
-    } catch (e) {
-      return res.status(400).json({ error: 'bad request body: ' + e.message });
-    }
-  }
+      const r = await fetch(
+        `${host}/api/v1/videos/${encodeURIComponent(id)}?fields=adaptiveFormats`,
+        {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(8000),
+        }
+      );
+      if (!r.ok) continue;
 
-  try {
-    const upstream = await fetch('https://api.cobalt.tools/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
+      const data = await r.json();
+      const audios = (data.adaptiveFormats || []).filter(
+        f => f.type && f.type.startsWith('audio/')
+      );
+      if (!audios.length) continue;
 
-    const text = await upstream.text();
-    let data;
-    try {
-      data = JSON.parse(text);
+      // Pick highest bitrate
+      audios.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+      const url = audios[0].proxyUrl || audios[0].url;
+      if (url) return res.status(200).json({ url });
     } catch (_) {
-      return res.status(502).json({ error: 'cobalt non-json: ' + text.slice(0, 300) });
+      continue;
     }
-
-    // Forward cobalt's response (including error details) to the client
-    res.status(upstream.status).json(data);
-  } catch (e) {
-    res.status(502).json({ error: e.message });
   }
+
+  res.status(502).json({ error: 'all invidious instances failed' });
 }
