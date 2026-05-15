@@ -635,7 +635,6 @@
   <div id="bfs-player">
     <div id="bfs-cover-wrap" style="position:relative;">
       <img id="bfs-cover" src="https://images.unsplash.com/photo-1619213579094-6dcaa7fa5d54?w=400&auto=format&fit=crop&q=80" alt="cover" />
-      <div id="bfs-eye-glow"></div>
     </div>
     <div class="bfs-info">
       <div class="bfs-title" id="bfs-title">Egy</div>
@@ -737,17 +736,6 @@
     .bfs-playpause:hover { background: #d0d0d0 !important; }
     #bfs-cover-wrap { position: relative; }
     #bfs-cover-wrap #bfs-cover { display: block; width: 100%; height: 130px; object-fit: cover; filter: brightness(0.8) grayscale(0.2); }
-    #bfs-eye-glow {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none; opacity: 1; transition: opacity 0.4s ease;
-      background: radial-gradient(ellipse 20px 15px at 57% 46%, rgba(255,210,0,0.92) 0%, rgba(255,150,0,0.55) 38%, transparent 72%);
-      mix-blend-mode: screen;
-      animation: bfs-eye-pulse 2s ease-in-out infinite;
-    }
-    @keyframes bfs-eye-pulse {
-      0%, 100% { filter: blur(1.5px) brightness(1); opacity: 0.85; }
-      50%       { filter: blur(0.6px) brightness(1.4); opacity: 1; }
-    }
   </style>
   <script>
     (function () {
@@ -795,8 +783,6 @@
         document.getElementById('bfs-duration').textContent = '0:00';
         bfsSetBar(0);
         if (bfsYT && bfsApiReady) bfsYT.loadVideoById(s.id);
-        var eyeGlow = document.getElementById('bfs-eye-glow');
-        if (eyeGlow) eyeGlow.style.opacity = idx === 0 ? '1' : '0';
       }
 
       function bfsInitYT() {
