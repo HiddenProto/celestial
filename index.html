@@ -747,22 +747,12 @@
         { title: 'Fallen Sky',   id: 'dZpD74pJkNE', cover: 'https://images.unsplash.com/photo-1750167000423-d448265fd79e?w=400&auto=format&fit=crop&q=80' },
         { title: '/: ',          id: '1d96oRR-fE4', cover: 'https://images.unsplash.com/photo-1762081512133-30202f928bb9?w=400&auto=format&fit=crop&q=80' },
         { title: 'i am going to kill your family', id: '_6IxchAed3o', unplayable: true },
-        { title: 'Further Away', id: 'NrLkTZrPZA4' }
+        { title: 'Further Away', id: 'NrLkTZrPZA4', cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&auto=format&fit=crop&q=80' }
       ];
 
       var bfsIdx = 0, bfsDragging = false, bfsPlaying = false;
       var bfsYT = null;
       var bfsDur = 0, bfsCur = 0;
-      var _brcReady = false;
-
-      document.addEventListener('brc-ready', function() {
-        _brcReady = true;
-        var p = document.getElementById('bfs-player');
-        if (bfsYT && p && p.style.display !== 'none' &&
-            bfsYT.getAttribute('src') === 'about:blank') {
-          bfsLoad(bfsIdx);
-        }
-      });
 
       function bfsThumb(id) { return 'https://img.youtube.com/vi/' + id + '/hqdefault.jpg'; }
       function bfsFmt(s) {
@@ -821,22 +811,17 @@
         bfsSetBar(0);
         bfsSetPlaying(false);
         bfsCur = 0; bfsDur = 0;
-        if (!bfsYT || !_brcReady) return;
+        if (!bfsYT) return;
         if (s.unplayable) { bfsYT.src = 'about:blank'; return; }
-        Promise.resolve(window.getProxied(
-          'https://www.youtube.com/embed/' + s.id +
-          '?enablejsapi=1&autoplay=1&rel=0&iv_load_policy=3'
-        )).then(function(proxiedUrl) {
-          bfsYT.src = proxiedUrl;
-          bfsYT.onload = function() {
-            // Ask the embed to start sending infoDelivery events
-            setTimeout(function() {
-              if (bfsYT && bfsYT.contentWindow) {
-                bfsYT.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*');
-              }
-            }, 800);
-          };
-        });
+        bfsYT.src = 'https://www.youtube.com/embed/' + s.id +
+          '?enablejsapi=1&autoplay=1&rel=0&iv_load_policy=3';
+        bfsYT.onload = function() {
+          setTimeout(function() {
+            if (bfsYT && bfsYT.contentWindow) {
+              bfsYT.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*');
+            }
+          }, 800);
+        };
       }
 
       function bfsShow() {
@@ -847,7 +832,7 @@
         var s = BFS_SONGS[0]; bfsIdx = 0;
         document.getElementById('bfs-cover').src = s.cover || bfsThumb(s.id);
         document.getElementById('bfs-title').textContent = s.title;
-        if (_brcReady) bfsLoad(0);
+        bfsLoad(0);
       }
 
       function bfsHide() {
