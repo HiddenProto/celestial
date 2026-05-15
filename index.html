@@ -799,7 +799,11 @@
           <div class="notif-options">${btnsHTML}</div>
           <div class="notif-bar" style="animation-duration:300000ms"></div>`;
 
+        // Collect body-hoisted tooltips so dismiss can clean them up
+        var _tooltips = [];
+
         const dismiss = function () {
+          _tooltips.forEach(function (t) { t.remove(); });
           el.classList.add("notif-out");
           setTimeout(function () { el.remove(); }, 320);
         };
@@ -809,31 +813,32 @@
         // Wire up each option button
         el.querySelectorAll(".notif-opt-btn").forEach(function (btn) {
           btn.addEventListener("click", function (e) {
-            // Prevent info-btn click from triggering the outer button
             if (e.target.closest(".notif-opt-info-btn")) return;
             const idx = parseInt(btn.getAttribute("data-opt-idx"), 10);
             dismiss();
             options[idx].onClick();
           });
-          // Stop info-btn clicks bubbling to the option button
           const infoBtn = btn.querySelector(".notif-opt-info-btn");
           if (infoBtn) {
-            infoBtn.addEventListener("click", function (e) {
-              e.stopPropagation();
-            });
+            infoBtn.addEventListener("click", function (e) { e.stopPropagation(); });
           }
         });
 
         // Very long timeout (5 min) — effectively manual dismiss only
         setTimeout(dismiss, 300000);
 
-        // Viewport-aware tooltip positioning (escapes overflow:hidden + clamps to screen)
+        // Hoist each tooltip to <body> so it escapes overflow:hidden + transforms,
+        // then position it with viewport clamping on hover.
         el.querySelectorAll(".notif-opt-info-wrap").forEach(function (wrap) {
           var infoBtn = wrap.querySelector(".notif-opt-info-btn");
           var tooltip = wrap.querySelector(".notif-opt-tooltip");
 
+          // Move to body immediately — fully outside the .notif stacking context
+          document.body.appendChild(tooltip);
+          _tooltips.push(tooltip);
+
           infoBtn.addEventListener("mouseenter", function () {
-            // Measure tooltip size while invisible
+            // Measure while invisible to get real dimensions
             tooltip.style.visibility = "hidden";
             tooltip.style.display = "block";
             var ttW = tooltip.offsetWidth;
@@ -842,10 +847,10 @@
             tooltip.style.display = "none";
 
             var rect = infoBtn.getBoundingClientRect();
-            // Prefer above, flip below if it would go off the top
+            // Prefer above the button, flip below if it clips the top
             var topAbove = rect.top - ttH - 7;
             var top = topAbove >= 10 ? topAbove : rect.bottom + 7;
-            // Center horizontally over button, clamped inside viewport
+            // Center over the button, clamp within viewport
             var left = rect.left + rect.width / 2 - ttW / 2;
             left = Math.max(10, Math.min(left, window.innerWidth - ttW - 10));
 
