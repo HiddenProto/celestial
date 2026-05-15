@@ -1,7 +1,6 @@
 import { Innertube } from 'youtubei.js';
 
-// Try each client type in order — ANDROID/IOS use InnerTube and bypass web bot-detection.
-const CLIENTS = ['ANDROID', 'IOS', 'TV'];
+const CLIENTS = ['ANDROID', 'IOS', 'TV', 'WEB'];
 
 export default async function handler(req, res) {
   const id = req.query.id || (req.body && (req.body.id || req.body.videoId));
@@ -9,22 +8,28 @@ export default async function handler(req, res) {
 
   let yt;
   try {
-    yt = await Innertube.create({ cache: null, generate_session_locally: true });
+    yt = await Innertube.create({ cache: null });
   } catch (e) {
     return res.status(502).json({ error: 'innertube init failed: ' + e.message });
   }
 
+  const errors = [];
   for (const client of CLIENTS) {
     try {
-      const info = await yt.getBasicInfo(id, client);
+      const info = await Promise.race([
+        yt.getBasicInfo(id, client),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
+      ]);
       const format = info.chooseFormat({ type: 'audio', quality: 'best' });
-      if (!format) continue;
-      const url = format.url ?? format.decipher(yt.session.player);
+      if (!format) { errors.push(client + ': no format'); continue; }
+      let url = format.url;
+      if (!url && yt.session.player) url = format.decipher(yt.session.player);
       if (url) return res.status(200).json({ url });
-    } catch (_) {
-      // try next client
+      errors.push(client + ': url null');
+    } catch (e) {
+      errors.push(client + ': ' + e.message);
     }
   }
 
-  res.status(502).json({ error: 'all clients failed' });
+  res.status(502).json({ error: 'all clients failed', details: errors });
 }
