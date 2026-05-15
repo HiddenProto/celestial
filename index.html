@@ -775,38 +775,28 @@
         document.getElementById('bfs-thumb').style.left = pct + '%';
       }
 
-      // POST to Cobalt API routed through BRC — school only sees callanambulance.vercel.app
+      // Call /api/cobalt (same-origin Vercel function) — Vercel proxies to api.cobalt.tools
+      // server-side, so the school never sees any domain other than callanambulance.vercel.app.
+      // The returned stream URL is then routed through BRC to keep it hidden too.
       function bfsGetCobaltSrc(videoId, cb) {
         var ytUrl = 'https://www.youtube.com/watch?v=' + videoId;
-        var cobaltApi = 'https://api.cobalt.tools/';
-
-        function doFetch(apiUrl) {
-          fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ url: ytUrl, downloadMode: 'audio', audioFormat: 'mp3' })
-          })
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
-            if (!data.url) throw new Error('no url in cobalt response');
-            if (typeof window.getProxied === 'function') {
-              return Promise.resolve(window.getProxied(data.url)).then(cb);
-            }
-            cb(data.url);
-          })
-          .catch(function(e) {
-            console.warn('[BFS] Cobalt failed:', e.message);
-            cb(null);
-          });
-        }
-
-        if (typeof window.getProxied === 'function') {
-          Promise.resolve(window.getProxied(cobaltApi))
-            .then(doFetch)
-            .catch(function() { doFetch(cobaltApi); });
-        } else {
-          doFetch(cobaltApi);
-        }
+        fetch('/api/cobalt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ url: ytUrl, downloadMode: 'audio', audioFormat: 'mp3' })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.url) throw new Error('no url in cobalt response');
+          if (typeof window.getProxied === 'function') {
+            return Promise.resolve(window.getProxied(data.url)).then(cb);
+          }
+          cb(data.url);
+        })
+        .catch(function(e) {
+          console.warn('[BFS] Cobalt failed:', e.message);
+          cb(null);
+        });
       }
 
       function bfsLoad(idx) {
