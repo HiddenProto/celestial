@@ -5,6 +5,7 @@
   "main": "bareworker.js",
   "scripts": {
     "build": "node --input-type=module < build.js",
+    "sync": "node scripts/sync-genizy.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
