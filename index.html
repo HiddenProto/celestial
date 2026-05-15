@@ -661,7 +661,7 @@
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
       </button>
     </div>
-    <div id="bfs-yt" style="position:absolute;width:1px;height:1px;top:-9999px;left:-9999px;overflow:hidden;pointer-events:none;"></div>
+    <iframe id="bfs-yt" src="about:blank" allow="autoplay; encrypted-media" style="position:absolute;width:1px;height:1px;top:-9999px;left:-9999px;border:none;pointer-events:none;"></iframe>
   </div>
   <style>
     #bfs-player {
@@ -746,33 +746,40 @@
         { title: '/: ',          id: '1d96oRR-fE4', cover: 'https://images.unsplash.com/photo-1762081512133-30202f928bb9?w=400&auto=format&fit=crop&q=80' },
         { title: 'i am going to kill your family', id: '_6IxchAed3o' }
       ];
-      var bfsIdx = 0, bfsYT = null, bfsApiReady = false, bfsTick = null, bfsDragging = false;
+      // State
+      var bfsIdx = 0, bfsDragging = false, bfsPlaying = false, bfsDuration = 0;
+      var bfsYTFrame = null; // the hidden <iframe> element
 
       function bfsThumb(id) { return 'https://img.youtube.com/vi/' + id + '/hqdefault.jpg'; }
       function bfsFmt(s) {
         s = Math.floor(s || 0);
         return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
       }
-
       function bfsSetPlaying(on) {
+        bfsPlaying = on;
         document.getElementById('bfs-play-icon').style.display  = on ? 'none' : '';
         document.getElementById('bfs-pause-icon').style.display = on ? ''     : 'none';
       }
-
       function bfsSetBar(pct) {
         document.getElementById('bfs-fill').style.width = pct + '%';
         document.getElementById('bfs-thumb').style.left = pct + '%';
       }
 
-      function bfsUpdateBar() {
-        if (bfsDragging) return;
+      // Build the UV-proxied YouTube embed URL — all traffic routed through Wisp
+      function bfsProxiedSrc(videoId) {
+        var embedUrl = 'https://www.youtube.com/embed/' + videoId +
+          '?autoplay=1&controls=0&rel=0&modestbranding=1&enablejsapi=1';
+        return '/service/ultra/' + encodeURIComponent(embedUrl);
+      }
+
+      // Send a postMessage command to the YouTube embed (same-origin via UV proxy)
+      function bfsSendYT(cmd, args) {
+        if (!bfsYTFrame) return;
         try {
-          var cur = bfsYT.getCurrentTime() || 0;
-          var dur = bfsYT.getDuration()    || 0;
-          document.getElementById('bfs-current').textContent  = bfsFmt(cur);
-          document.getElementById('bfs-duration').textContent = bfsFmt(dur);
-          bfsSetBar(dur > 0 ? (cur / dur * 100) : 0);
-        } catch (e) {}
+          bfsYTFrame.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func: cmd, args: args || [] }), '*'
+          );
+        } catch(e) {}
       }
 
       function bfsLoad(idx) {
@@ -782,56 +789,51 @@
         document.getElementById('bfs-title').textContent = s.title;
         document.getElementById('bfs-current').textContent  = '0:00';
         document.getElementById('bfs-duration').textContent = '0:00';
+        bfsDuration = 0;
         bfsSetBar(0);
-        if (bfsYT && bfsApiReady) bfsYT.loadVideoById(s.id);
-      }
-
-      function bfsInitYT() {
-        if (bfsYT) return;
-        var prev = window.onYouTubeIframeAPIReady;
-        window.onYouTubeIframeAPIReady = function () {
-          if (typeof prev === 'function') prev();
-          bfsYT = new YT.Player('bfs-yt', {
-            videoId: BFS_SONGS[bfsIdx].id,
-            playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1 },
-            events: {
-              onReady: function () { bfsApiReady = true; bfsYT.playVideo(); },
-              onStateChange: function (e) {
-                var S = YT.PlayerState;
-                if (e.data === S.PLAYING) {
-                  bfsSetPlaying(true);
-                  if (!bfsTick) bfsTick = setInterval(bfsUpdateBar, 250);
-                } else if (e.data === S.PAUSED || e.data === S.BUFFERING) {
-                  bfsSetPlaying(false);
-                } else if (e.data === S.ENDED) {
-                  bfsLoad((bfsIdx + 1) % BFS_SONGS.length);
-                }
-              }
-            }
-          });
-        };
-        if (window.YT && window.YT.Player) {
-          window.onYouTubeIframeAPIReady();
-        } else if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
-          var tag = document.createElement('script');
-          tag.src = 'https://www.youtube.com/iframe_api';
-          document.head.appendChild(tag);
-        }
+        bfsSetPlaying(false);
+        if (bfsYTFrame) bfsYTFrame.src = bfsProxiedSrc(s.id);
       }
 
       function bfsShow() {
         var p = document.getElementById('bfs-player');
         p.style.display = 'block';
         p.style.animation = 'none'; p.offsetHeight; p.style.animation = '';
-        bfsLoad(0); bfsInitYT();
+        bfsYTFrame = document.getElementById('bfs-yt');
+        bfsLoad(0);
       }
 
       function bfsHide() {
         document.getElementById('bfs-player').style.display = 'none';
-        if (bfsYT && bfsApiReady) { try { bfsYT.stopVideo(); } catch(e){} }
-        if (bfsTick) { clearInterval(bfsTick); bfsTick = null; }
+        if (bfsYTFrame) bfsYTFrame.src = 'about:blank';
         bfsSetPlaying(false);
       }
+
+      // Listen for YouTube postMessage events relayed from the UV-proxied iframe.
+      // onStateChange: 1=playing, 2=paused, 3=buffering, 0=ended
+      // infoDelivery: carries currentTime + duration for the progress bar
+      window.addEventListener('message', function(e) {
+        if (!bfsYTFrame) return;
+        try {
+          var data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+          if (data.event === 'onStateChange') {
+            var st = data.info;
+            if      (st === 1) bfsSetPlaying(true);
+            else if (st === 2 || st === 3) bfsSetPlaying(false);
+            else if (st === 0) bfsLoad((bfsIdx + 1) % BFS_SONGS.length);
+          }
+          if (data.event === 'infoDelivery' && data.info) {
+            var info = data.info;
+            if (typeof info.currentTime === 'number') {
+              if (info.duration) bfsDuration = info.duration;
+              document.getElementById('bfs-current').textContent  = bfsFmt(info.currentTime);
+              document.getElementById('bfs-duration').textContent = bfsFmt(bfsDuration);
+              if (!bfsDragging && bfsDuration > 0)
+                bfsSetBar(info.currentTime / bfsDuration * 100);
+            }
+          }
+        } catch(e2) {}
+      });
 
       // Drag-to-seek on progress bar
       var barEl = document.getElementById('bfs-bar');
@@ -840,8 +842,9 @@
         var r = barEl.getBoundingClientRect();
         var pct = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
         bfsSetBar(pct * 100);
-        document.getElementById('bfs-current').textContent = bfsFmt(pct * ((bfsYT && bfsApiReady ? bfsYT.getDuration() : 0) || 0));
-        if (bfsYT && bfsApiReady) bfsYT.seekTo(pct * (bfsYT.getDuration() || 0), true);
+        var seekTime = pct * (bfsDuration || 0);
+        document.getElementById('bfs-current').textContent = bfsFmt(seekTime);
+        bfsSendYT('seekTo', [seekTime, true]);
       }
 
       barEl.addEventListener('mousedown', function (e) {
@@ -863,8 +866,7 @@
 
       // Controls
       document.getElementById('bfs-playpause').addEventListener('click', function () {
-        if (!bfsYT || !bfsApiReady) return;
-        bfsYT.getPlayerState() === 1 ? bfsYT.pauseVideo() : bfsYT.playVideo();
+        bfsPlaying ? bfsSendYT('pauseVideo') : bfsSendYT('playVideo');
       });
       document.getElementById('bfs-prev').addEventListener('click', function () {
         bfsLoad((bfsIdx - 1 + BFS_SONGS.length) % BFS_SONGS.length);
