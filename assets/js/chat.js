@@ -11,7 +11,7 @@
   const APPEAR_KEY = 'cst-appearance';
   const NOTIF_KEY  = 'cst-chat-notif-seen';
   const MAX_CHARS  = 400;
-  const COOLDOWN   = 3000;
+  const COOLDOWN   = 1000;
 
   // ── helpers ───────────────────────────────────────────────────
   function getAppear()  { try { return JSON.parse(localStorage.getItem(APPEAR_KEY) || '{}'); } catch { return {}; } }
@@ -61,7 +61,7 @@
         'padding:14px 16px;max-width:260px;font-family:system-ui,sans-serif;color:#ccc;' +
         'box-shadow:0 4px 20px rgba(0,0,0,.6);';
       el.innerHTML = `
-        <div style="font-size:.88rem;font-weight:600;margin-bottom:4px;">💬 Test Chat App?</div>
+        <div style="font-size:.88rem;font-weight:600;margin-bottom:4px;">✦ Test Chat App?</div>
         <div style="font-size:.73rem;color:#555;margin-bottom:12px;">
           Chat with other verified users in real time. Beta feature.
         </div>
@@ -102,10 +102,10 @@
         width:22px;height:22px;border:1px solid #333;border-radius:5px;font-size:.9rem;">⋮</span>
       <span style="color:#555;">→</span>
       <span style="display:inline-flex;align-items:center;gap:3px;border:1px solid #333;
-        border-radius:5px;padding:2px 7px;font-size:.72rem;">🎨 Appearance</span>
+        border-radius:5px;padding:2px 7px;font-size:.72rem;">◈ Appearance</span>
       <span style="color:#555;">→</span>
       <span style="display:inline-flex;align-items:center;gap:4px;border:1px solid #333;
-        border-radius:5px;padding:2px 7px;font-size:.72rem;">💬 Chat <span style="color:#bbb;">off</span></span>`;
+        border-radius:5px;padding:2px 7px;font-size:.72rem;">✦ Chat <span style="color:#bbb;">off</span></span>`;
     document.body.appendChild(t);
     setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 450); }, 6000);
   }
@@ -297,7 +297,7 @@
 #cst-chat-cool{font-size:.7rem;color:#cc4444;padding:2px 12px 6px;display:none;flex-shrink:0;}
 </style>
 <div id="cst-chat-bubble">
-  <span>💬</span>
+  <span>✦</span>
   <span id="cst-chat-online-cnt">0</span>
   <span style="color:#333;font-size:.7rem;">online</span>
   <span id="cst-chat-unread"></span>

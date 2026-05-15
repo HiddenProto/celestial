@@ -127,7 +127,7 @@
 
   // ─── badge system ────────────────────────────────────────────
   const BADGE_DEFS = {
-    'first-user': { label: 'First User', icon: '⭐', desc: 'Among the very first users of Celestial.' },
+    'first-user': { label: 'First User', icon: '★', desc: 'Among the very first users of Celestial.' },
   };
 
   function renderBadgeButton() {
@@ -141,7 +141,7 @@
       'background:#0d0d0d;border:1px solid #222;border-radius:50px;padding:7px 14px;' +
       'color:#888;font-family:system-ui,sans-serif;font-size:.75rem;cursor:pointer;' +
       'display:flex;align-items:center;gap:6px;transition:background .15s;';
-    btn.innerHTML = (hasBadges ? '<span style="font-size:.9rem">⭐</span>' : '') +
+    btn.innerHTML = (hasBadges ? '<span style="font-size:.9rem">★</span>' : '') +
       `<span>${appr.name || 'user'}</span>`;
     btn.onmouseenter = () => btn.style.background = '#181818';
     btn.onmouseleave = () => btn.style.background = '#0d0d0d';
