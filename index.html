@@ -388,24 +388,7 @@
               }
               .info-icon:hover .tip { display: block; }
               #wispCustom { margin-top: 6px; width: 100%; box-sizing: border-box; }
-              .cf-locked { opacity: 0.4 !important; pointer-events: none !important; cursor: not-allowed !important; }
             </style>
-            <div class="box">
-              <h3>☁️ Cloudflare Mode <span class="info-icon"><span class="tip">Optimizes the pr<span>o</span>xy to better handle Cloudflare-protected sites.<br><br>Automatically switches transport to <b>epoxy</b> and pr<span>o</span>xy to <b>bumblcat rrc</b> for best compatibility. Also enables Virtual Entity automatically.</span></span></h3>
-              <p class="desc">better compatibility with cloudflare-protected sites</p>
-              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:4px;">
-                <input type="checkbox" id="cfModeTog" />
-                <span>enable cloudflare bypass mode</span>
-              </label>
-            </div>
-            <div class="box">
-              <h3>🛡️ Virtual Entity <span class="info-icon"><span class="tip">Gives the pr<span>o</span>xy a real browser identity to prevent bot detection.<br><br>Injects authentic Chrome 136 browser headers into all pr<span>o</span>xied requests — User-Agent, Sec-Fetch, client hints, Accept headers — making traffic look indistinguishable from a real browser.<br><br>Helps bypass bot checks on Google, YouTube, and Cloudflare-protected sites. Automatically enabled by Cloudflare bypass mode.</span></span></h3>
-              <p class="desc">makes proxied traffic look like a real chrome browser — bypasses bot detection</p>
-              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:4px;">
-                <input type="checkbox" id="veTog" />
-                <span>enable virtual entity</span>
-              </label>
-            </div>
             <div class="box">
               <h3>Transport <span class="info-icon"><span class="tip">Controls how proxied requests are sent through the network.<br><br><b>epoxy</b> — WebAssembly-based, better site compatibility. Required for multiplayer games with bumblcat rrc — epoxy forwards WebSocket headers (like Origin) to the server, which libcurl does not. Slower. Type: <b>client-side</b>.<br><br><b>libcurl</b> — C-based, faster and more stable. Recommended for most sites. Does not forward custom WebSocket headers — use epoxy for multiplayer games. Type: <b>client-side</b>.</span></span></h3>
               <p class="desc">

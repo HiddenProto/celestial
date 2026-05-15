@@ -129,8 +129,6 @@ async function _createBRCTransport() {
 	);
 
 	// Transport preference — epoxy or libcurl
-	const cfMode = localStorage.getItem("cfmode") === "1";
-	const veMode = cfMode || localStorage.getItem("ve-mode") === "1";
 	const savedTransport = localStorage.getItem("transportz") || "libcurl";
 
 	const useEpoxy = savedTransport === "epoxy";
@@ -148,59 +146,7 @@ async function _createBRCTransport() {
 		transport = new LibcurlClient({ wisp });
 	}
 
-	// Apply Virtual Entity header injection when VE or CF mode is on
-	if (veMode) {
-		transport = _wrapVirtualEntity(transport);
-		console.log("lethal.js: Virtual Entity active — browser identity headers injected");
-	}
-
 	return _wrapTransportHeaders(transport);
-}
-
-// ── Virtual Entity header set ─────────────────────────────────────────────────
-// Mimics Chrome 136 on Windows — injected into every proxied request when
-// Virtual Entity mode is enabled (ve-mode=1) or CF mode is active (cfmode=1).
-// Makes BRC-routed traffic look indistinguishable from a real browser to
-// bot-detection systems (Cloudflare, Google, YouTube, etc.).
-const _VE_HEADERS = [
-	['User-Agent',               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'],
-	['Accept',                   'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7'],
-	['Accept-Language',          'en-US,en;q=0.9'],
-	['Accept-Encoding',          'gzip, deflate, br, zstd'],
-	['sec-ch-ua',                '"Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"'],
-	['sec-ch-ua-mobile',         '?0'],
-	['sec-ch-ua-platform',       '"Windows"'],
-	['Upgrade-Insecure-Requests','1'],
-	['Sec-Fetch-Site',           'none'],
-	['Sec-Fetch-Mode',           'navigate'],
-	['Sec-Fetch-User',           '?1'],
-	['Sec-Fetch-Dest',           'document'],
-	['Cache-Control',            'max-age=0'],
-];
-
-/**
- * Wraps a transport to inject realistic Chrome browser headers (Virtual Entity).
- * Headers already present in the outgoing request take priority — VE headers
- * are only added for names that the request doesn't already include.
- */
-function _wrapVirtualEntity(transport) {
-	const origRequest = transport.request.bind(transport);
-	transport.request = async function(remote, method, body, headers, signal) {
-		let merged;
-		if (Array.isArray(headers)) {
-			const existingLC = new Set(headers.map(([n]) => n.toLowerCase()));
-			const extra = _VE_HEADERS.filter(([n]) => !existingLC.has(n.toLowerCase()));
-			merged = [...extra, ...headers];
-		} else if (headers && typeof headers === 'object') {
-			const existingLC = new Set(Object.keys(headers).map(k => k.toLowerCase()));
-			const extra = _VE_HEADERS.filter(([n]) => !existingLC.has(n.toLowerCase()));
-			merged = [...extra, ...Object.entries(headers)];
-		} else {
-			merged = [..._VE_HEADERS];
-		}
-		return origRequest(remote, method, body, merged, signal);
-	};
-	return transport;
 }
 
 /**
@@ -277,7 +223,6 @@ async function ensureBRC() {
 			config.brcPath     = "/scram/brc.js";
 			config.injectPath  = "/scram/controller.inject.js";
 			config.wasmPath    = "/scram/brc.wasm";
-			config.vePath      = "/scram/ve-inject.js";  // fingerprint + sign-in + YouTube inject
 
 			// Use a temp variable — brcController must stay null until fully ready.
 			// getProxied() does `brcController !== null` as a zero-wait readiness check,
@@ -315,7 +260,6 @@ async function ensureBRC() {
 					hidden = document.createElement('iframe');
 					hidden.id = 'brc-hidden-frame';
 					hidden.style.cssText = 'display:none;position:absolute;width:0;height:0;pointer-events:none;';
-					hidden.allow = 'autoplay; fullscreen; encrypted-media; picture-in-picture; clipboard-write; web-share';
 					document.body.appendChild(hidden);
 				}
 				try { brcFrameMap.set(0, brcController.createFrame(hidden)); } catch(e) {}
@@ -519,7 +463,6 @@ export async function getProxied(input) {
 						iframe = document.createElement('iframe');
 						iframe.id = 'brc-hidden-frame';
 						iframe.style.cssText = 'display:none;position:absolute;width:0;height:0;pointer-events:none;';
-						iframe.allow = 'autoplay; fullscreen; encrypted-media; picture-in-picture; clipboard-write; web-share';
 						document.body.appendChild(iframe);
 					}
 				}
@@ -571,7 +514,6 @@ export class Tab {
 		this.frame.setAttribute("src", "/tab.html");
 		this.frame.setAttribute("loading", "lazy");
 		this.frame.setAttribute("id", `frame-${tabCounter}`);
-		this.frame.setAttribute("allow", "autoplay; fullscreen; encrypted-media; picture-in-picture; clipboard-write; web-share");
 		framesElement.appendChild(this.frame);
 
 		this.switch();
