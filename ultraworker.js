@@ -77,10 +77,17 @@ self.addEventListener("activate", (event) => {
 const SCRAMJET_PREFIX = "/scramjet/";
 
 async function handleRequest(event) {
+  const { pathname } = new URL(event.request.url);
+
+  // player.html must never be intercepted by BRC/Scramjet/UV — it needs a clean
+  // same-origin fetch so the browser renders it properly as an iframe document.
+  if (pathname === '/player.html') {
+    return fetch(new Request(event.request.url, { credentials: 'include' }));
+  }
+
   // Serve BRC WASM from the SW cache so controller init is instant on warm loads.
   // Cache-first: if the file is cached return it immediately; otherwise fetch,
   // cache the response, and return it (populates cache for next time).
-  const { pathname } = new URL(event.request.url);
   if (BRC_PRECACHE.includes(pathname)) {
     const cache = await caches.open(BRC_CACHE);
     const cached = await cache.match(event.request);

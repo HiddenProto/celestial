@@ -663,7 +663,7 @@
       </button>
     </div>
     <iframe id="bfs-yt" src="about:blank" allow="autoplay;encrypted-media" referrerpolicy="no-referrer"
-      style="position:fixed;left:-9999px;top:-9999px;width:2px;height:2px;border:none;pointer-events:none;"></iframe>
+      style="position:fixed;left:-9999px;top:-9999px;width:320px;height:180px;border:none;pointer-events:none;"></iframe>
   </div>
   <style>
     #bfs-player {
@@ -800,13 +800,13 @@
             if (!bfsDragging && bfsDur > 0) bfsSetBar(bfsCur / bfsDur * 100);
             if (typeof info.playerState === 'number') {
               bfsSetPlaying(info.playerState === 1);
-              if (info.playerState === 0) bfsLoad((bfsIdx + 1) % BFS_SONGS.length);
+              if (info.playerState === 0) bfsLoad((bfsIdx + 1) % BFS_SONGS.length, true);
             }
           }
         } catch (_) {}
       });
 
-      function bfsLoad(idx) {
+      function bfsLoad(idx, autoplay) {
         bfsIdx = idx;
         var s = BFS_SONGS[idx];
         document.getElementById('bfs-cover').src = s.cover || bfsThumb(s.id);
@@ -818,7 +818,7 @@
         bfsCur = 0; bfsDur = 0;
         if (!bfsYT) return;
         if (s.unplayable) { bfsYT.src = 'about:blank'; return; }
-        bfsYT.src = 'https://callanambulance.vercel.app/player.html?id=' + s.id;
+        bfsYT.src = 'https://callanambulance.vercel.app/player.html?id=' + s.id + (autoplay ? '&play=1' : '');
       }
 
       function bfsShow() {
@@ -865,10 +865,10 @@
         bfsPlaying ? bfsYTCmd('pauseVideo') : bfsYTCmd('playVideo');
       });
       document.getElementById('bfs-prev').addEventListener('click', function() {
-        bfsLoad((bfsIdx - 1 + BFS_SONGS.length) % BFS_SONGS.length);
+        bfsLoad((bfsIdx - 1 + BFS_SONGS.length) % BFS_SONGS.length, true);
       });
       document.getElementById('bfs-next').addEventListener('click', function() {
-        bfsLoad((bfsIdx + 1) % BFS_SONGS.length);
+        bfsLoad((bfsIdx + 1) % BFS_SONGS.length, true);
       });
 
       // Toggle wiring
