@@ -29,11 +29,10 @@
     }
   }
 
-  // Auto-apply if already admin on this page
-  if (isAdmin) _applySovereignTheme();
   let hub        = null;
   let cPeer      = null;
   let clients    = {};
+  let partnerConn = null;
   let viewTarget = null;
   let admCX = 50, admCY = 50;
   let panelEl    = null;
@@ -45,7 +44,7 @@
     if (e.data === 'revoked')  { clearApproval(); if (!document.getElementById('cst-gate')) showGate(); }
   };
 
-  // ─── key crypto ──────────────────────────────────────────────
+  // ─── key crypto + identity ───────────────────────────────────
   function H(s) {
     let h = 5381;
     for (let i = 0; i < s.length; i++) h = (Math.imul(h, 33) ^ s.charCodeAt(i)) >>> 0;
@@ -66,22 +65,128 @@
       return Date.now() > e ? null : { name: n, expires: e };
     } catch { return null; }
   }
+  function makeUID() {
+    const an  = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const sym = '!@#$%^&*-_+=';
+    const pos = new Set(); while (pos.size < 2) pos.add(Math.floor(Math.random() * 12));
+    return Array.from({ length: 12 }, (_, i) =>
+      pos.has(i) ? sym[Math.floor(Math.random() * sym.length)]
+                 : an[Math.floor(Math.random() * an.length)]
+    ).join('');
+  }
+  function getDeviceId() {
+    let id = localStorage.getItem('cst-devid');
+    if (id) return id;
+    const raw = [navigator.userAgent, screen.width, screen.height,
+      navigator.language, navigator.hardwareConcurrency || 0,
+      Intl.DateTimeFormat().resolvedOptions().timeZone].join('|');
+    id = (H(raw) + H(raw.split('').reverse().join('')) + H(Date.now().toString(36))).toLowerCase();
+    localStorage.setItem('cst-devid', id);
+    return id;
+  }
 
   // ─── approval state ──────────────────────────────────────────
+  function getApproval() {
+    try { return JSON.parse(localStorage.getItem('cst-approved')) || null; } catch { return null; }
+  }
   function isApproved() {
     if (isAdmin) return true;
-    try {
-      const a = JSON.parse(localStorage.getItem('cst-approved'));
-      return a && Date.now() < a.expires;
-    } catch { return false; }
+    const a = getApproval();
+    return !!(a && Date.now() < a.expires);
   }
-  function setApproved(name, expires) {
-    localStorage.setItem('cst-approved', JSON.stringify({ name, expires }));
+  function setApproved(name, expires, extra = {}) {
+    const prev = getApproval();
+    const data = {
+      name,
+      expires,
+      created: extra.created ?? prev?.created ?? Date.now(),
+      uid:     extra.uid     ?? prev?.uid     ?? makeUID(),
+      badges:  extra.badges  ?? prev?.badges  ?? [],
+    };
+    if (extra.isFirstUser && !data.badges.includes('first-user')) data.badges.push('first-user');
+    localStorage.setItem('cst-approved', JSON.stringify(data));
     bc?.postMessage('approved');
+    return { isLegacy: !!(prev && !prev.uid) };
   }
   function clearApproval() {
     localStorage.removeItem('cst-approved');
     localStorage.removeItem('cst-key');
+  }
+
+  // ─── toast ───────────────────────────────────────────────────
+  function showToast(msg, dur = 4500) {
+    const t = document.createElement('div');
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);' +
+      'background:#111;color:#eee;padding:10px 22px;border-radius:8px;border:1px solid #2a2a2a;' +
+      'font-family:system-ui,sans-serif;font-size:.83rem;z-index:2147483645;' +
+      'pointer-events:none;opacity:1;transition:opacity .4s;white-space:nowrap;';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, dur);
+  }
+
+  // ─── badge system ────────────────────────────────────────────
+  const BADGE_DEFS = {
+    'first-user': { label: 'First User', icon: '⭐', desc: 'Among the very first users of Celestial.' },
+  };
+
+  function renderBadgeButton() {
+    document.getElementById('cst-badge-btn')?.remove();
+    const appr = getApproval();
+    if (!appr || Date.now() >= appr.expires) return;
+    const btn = document.createElement('button');
+    btn.id = 'cst-badge-btn';
+    const hasBadges = appr.badges?.length > 0;
+    btn.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483644;' +
+      'background:#0d0d0d;border:1px solid #222;border-radius:50px;padding:7px 14px;' +
+      'color:#888;font-family:system-ui,sans-serif;font-size:.75rem;cursor:pointer;' +
+      'display:flex;align-items:center;gap:6px;transition:background .15s;';
+    btn.innerHTML = (hasBadges ? '<span style="font-size:.9rem">⭐</span>' : '') +
+      `<span>${appr.name || 'user'}</span>`;
+    btn.onmouseenter = () => btn.style.background = '#181818';
+    btn.onmouseleave = () => btn.style.background = '#0d0d0d';
+    btn.onclick = showBadgePanel;
+    document.body.appendChild(btn);
+  }
+
+  function showBadgePanel() {
+    document.getElementById('cst-badge-panel')?.remove();
+    const appr = getApproval();
+    if (!appr) return;
+    const p = document.createElement('div');
+    p.id = 'cst-badge-panel';
+    const dLeft = Math.max(0, Math.ceil((appr.expires - Date.now()) / 86400000));
+    const badges = (appr.badges || []).map(id => {
+      const b = BADGE_DEFS[id];
+      return b ? `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;
+        background:#0a0a0a;border:1px solid #1c1c1c;border-radius:6px;margin-bottom:6px;">
+        <span style="font-size:1.1rem">${b.icon}</span>
+        <div><div style="font-size:.8rem;color:#ccc;">${b.label}</div>
+        <div style="font-size:.7rem;color:#444;">${b.desc}</div></div></div>` : '';
+    }).join('');
+    p.style.cssText = 'position:fixed;bottom:54px;right:16px;z-index:2147483644;' +
+      'background:#080808;border:1px solid #1e1e1e;border-radius:10px;' +
+      'padding:16px;min-width:220px;font-family:system-ui,sans-serif;color:#ccc;';
+    p.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:.88rem;font-weight:600;">${appr.name || 'user'}</div>
+        <button onclick="document.getElementById('cst-badge-panel').remove()"
+          style="background:none;border:none;color:#444;cursor:pointer;font-size:1rem;padding:0;">✕</button>
+      </div>
+      <div style="font-size:.72rem;color:#444;margin-bottom:${badges ? '10px' : '0'};">
+        ${dLeft > 0 ? `access expires in ${dLeft} day${dLeft !== 1 ? 's' : ''}` : 'access expired'}
+      </div>
+      ${badges || '<div style="font-size:.77rem;color:#333;margin-top:8px;">no badges yet.</div>'}
+      <div style="font-size:.65rem;color:#1e1e1e;margin-top:10px;font-family:monospace;
+        word-break:break-all;">${appr.uid || ''}</div>`;
+    document.body.appendChild(p);
+    setTimeout(() => {
+      document.addEventListener('click', function away(e) {
+        if (!p.contains(e.target) && e.target.id !== 'cst-badge-btn') {
+          p.remove(); document.removeEventListener('click', away);
+        }
+      }, true);
+    }, 0);
   }
 
   // ─── auth gate ───────────────────────────────────────────────
@@ -147,8 +252,9 @@
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
     inp.focus();
 
-    window.__cstGateApproved = (name, expires) => {
-      setApproved(name, expires);
+    window.__cstGateApproved = (name, expires, extra = {}) => {
+      setApproved(name, expires, extra);
+      renderBadgeButton();
       d.remove();
       delete window.__cstGateApproved;
       delete window.__cstGateRejected;
@@ -192,7 +298,6 @@
       isAdmin = true;
       localStorage.setItem('cst-admin', '1');
       document.getElementById('cst-gate')?.remove();
-      _applySovereignTheme();
       openPanel();
     } else if (pw !== null) { alert('incorrect passcode.'); }
   }
@@ -401,8 +506,10 @@
     const name = document.getElementById('ck-name').value.trim() || 'user';
     const days = Math.max(1, parseInt(document.getElementById('ck-days').value) || 7);
     const key  = makeKey(name, days);
+    const uid  = makeUID();
     const ks   = loadKeys();
-    ks.push({ key, name, days, created: Date.now(), used: false, usedBy: null });
+    ks.push({ key, name, days, created: Date.now(), used: false, usedBy: null,
+              uid, expires: Date.now() + days * 86400000, deviceId: null, badges: [] });
     saveKeys(ks);
     document.getElementById('ck-new').style.display  = 'block';
     document.getElementById('ck-val').textContent    = key;
@@ -439,6 +546,7 @@
 
   window.__cstRevoke = i => {
     const ks = loadKeys(); ks.splice(i, 1); saveKeys(ks); renderKeys();
+    broadcastKeysToPartner();
   };
 
   // ─── hub (admin WebRTC) ──────────────────────────────────────
@@ -465,6 +573,8 @@
       if (err.type === 'unavailable-id') {
         hub.destroy();
         tryCreateHub(HUB + '-b');
+        // Primary is online — connect to it for key sync
+        if (id === HUB) connectToPartnerAdmin(HUB);
       }
     });
   }
@@ -474,11 +584,48 @@
     const c = clients[cid];
     if (!c) return;
 
+    if (d.type === 'admin-hello') {
+      if (d.sec !== SEC) { try { c.conn.close(); } catch {} delete clients[cid]; return; }
+      c.isAdminPeer = true;
+      mergeAdminKeys(d.keys || []);
+      sendTo(cid, { type: 'admin-keys', keys: loadKeys() });
+      return;
+    }
+
+    if (d.type === 'admin-key-update') {
+      if (c.isAdminPeer) mergeAdminKeys(d.keys || []);
+      return;
+    }
+
     if (d.type === 'hello') {
-      c.vp      = d.vp;
-      c.url     = d.url || '—';
-      c.name    = d.name || cid.slice(-6);
+      c.vp       = d.vp;
+      c.url      = d.url || '—';
+      c.name     = d.name || cid.slice(-6);
       c.approved = d.approved || false;
+
+      // Auto-sync: reconnecting user with uid or deviceId matching a valid key
+      if (d.uid || d.deviceId) {
+        const ks    = loadKeys();
+        const match = ks.find(k =>
+          k.used && Date.now() < (k.expires || 0) &&
+          ((d.uid && k.uid === d.uid) || (d.deviceId && k.deviceId === d.deviceId))
+        );
+        if (match && !c.approved) {
+          c.name     = match.usedBy || match.name;
+          c.approved = true;
+          sendTo(cid, {
+            type:       'key-approved',
+            name:       c.name,
+            expires:    match.expires,
+            created:    match.created,
+            uid:        match.uid,
+            badges:     match.badges || [],
+            autoLoaded: true,
+          });
+          // Notify admin panel that this user was auto-synced
+          showToast(`${c.name} — auto-synced`);
+        }
+      }
       renderClients();
     }
 
@@ -500,12 +647,27 @@
         return;
       }
       // Approve — mark single-use immediately
-      ks[idx].used   = true;
-      ks[idx].usedBy = kv.name;
+      const isFirstUser = ks.filter(k => k.used).length === 0;
+      ks[idx].used     = true;
+      ks[idx].usedBy   = kv.name;
+      ks[idx].deviceId = d.deviceId || null;
+      if (!ks[idx].uid)     ks[idx].uid     = makeUID();
+      if (!ks[idx].expires) ks[idx].expires = kv.expires;
+      if (!ks[idx].badges)  ks[idx].badges  = [];
+      if (isFirstUser && !ks[idx].badges.includes('first-user')) ks[idx].badges.push('first-user');
       saveKeys(ks);
       c.name     = kv.name;
       c.approved = true;
-      sendTo(cid, { type: 'key-approved', name: kv.name, expires: kv.expires });
+      sendTo(cid, {
+        type:        'key-approved',
+        name:        kv.name,
+        expires:     ks[idx].expires,
+        created:     ks[idx].created,
+        uid:         ks[idx].uid,
+        badges:      ks[idx].badges,
+        isFirstUser,
+      });
+      broadcastKeysToPartner();
       document.getElementById('ck-wait').style.display = 'none';
       renderKeys();
       renderClients();
@@ -529,7 +691,7 @@
   function renderClients() {
     const list = document.getElementById('cp-clist');
     if (!list) return;
-    const ids = Object.keys(clients);
+    const ids = Object.keys(clients).filter(id => !clients[id].isAdminPeer);
     if (!ids.length) { list.innerHTML = '<p style="color:#333;font-size:.82rem;">no clients connected.</p>'; return; }
     list.innerHTML = ids.map(id => {
       const c      = clients[id];
@@ -580,6 +742,50 @@
   function sendTarget(msg) { if (viewTarget) sendTo(viewTarget, msg); }
   function bcast(msg)      { Object.keys(clients).forEach(id => sendTo(id, msg)); }
 
+  // ─── admin-to-admin key sync ─────────────────────────────────
+  function mergeAdminKeys(theirKeys) {
+    if (!Array.isArray(theirKeys) || !theirKeys.length) return;
+    const ours = loadKeys();
+    const idx  = new Map(ours.map((k, i) => [k.key, i]));
+    let changed = false;
+    for (const k of theirKeys) {
+      if (!idx.has(k.key)) {
+        ours.push(k); changed = true;
+      } else {
+        const ex = ours[idx.get(k.key)];
+        if (!ex.used && k.used) { ex.used = true; ex.usedBy = k.usedBy; changed = true; }
+      }
+    }
+    if (changed) { saveKeys(ours); renderKeys(); }
+  }
+
+  function broadcastKeysToPartner() {
+    const keys = loadKeys();
+    // As primary: push to backup admin peer in clients map
+    Object.keys(clients)
+      .filter(id => clients[id].isAdminPeer)
+      .forEach(id => sendTo(id, { type: 'admin-key-update', keys }));
+    // As backup: push via direct partner connection
+    if (partnerConn && partnerConn.open) partnerConn.send({ type: 'admin-key-update', keys });
+  }
+
+  function connectToPartnerAdmin(targetId) {
+    loadPeerJS(() => {
+      const tmp = new Peer(undefined, { debug: 0 });
+      tmp.on('open', () => {
+        const conn = tmp.connect(targetId, { reliable: true });
+        partnerConn = conn;
+        conn.on('open', () => conn.send({ type: 'admin-hello', sec: SEC, keys: loadKeys() }));
+        conn.on('data', d => {
+          if (!d || typeof d !== 'object') return;
+          if (d.type === 'admin-keys' || d.type === 'admin-key-update') mergeAdminKeys(d.keys || []);
+        });
+        conn.on('close', () => { partnerConn = null; });
+        conn.on('error', () => { partnerConn = null; });
+      });
+    });
+  }
+
   function doSendMsg() {
     const inp  = document.getElementById('cp-msginp');
     const text = inp?.value?.trim();
@@ -623,18 +829,19 @@
           conn.on('open', () => {
             if (adminConn !== conn) { try { conn.close(); } catch {} return; }
             connecting = false;
-            const approved = isApproved();
-            const appr     = approved ? JSON.parse(localStorage.getItem('cst-approved')) : null;
+            const appr = getApproval();
             conn.send({
-              type: 'hello',
+              type:     'hello',
               vp:       { w: innerWidth, h: innerHeight },
               url:      location.hostname,
               name:     appr?.name || null,
-              approved: !!approved
+              approved: isApproved(),
+              uid:      appr?.uid     || null,
+              deviceId: getDeviceId(),
             });
             // If gate is waiting for admin, send register request now
             if (window.__cstPendingKey) {
-              conn.send({ type: 'register-key', key: window.__cstPendingKey });
+              conn.send({ type: 'register-key', key: window.__cstPendingKey, deviceId: getDeviceId() });
             }
           });
           conn.on('data',  onAdminMsg);
@@ -649,7 +856,7 @@
 
       window.__cstBeaconRegister = () => {
         if (adminConn && adminConn.open && window.__cstPendingKey) {
-          adminConn.send({ type: 'register-key', key: window.__cstPendingKey });
+          adminConn.send({ type: 'register-key', key: window.__cstPendingKey, deviceId: getDeviceId() });
         } else {
           // Not connected yet — tryConnect will send it once connected
           // But if we can't connect after 5s, call offline
@@ -752,7 +959,21 @@
 
       function onAdminMsg(d) {
         if (!d || typeof d !== 'object') return;
-        if (d.type === 'key-approved') { window.__cstGateApproved?.(d.name, d.expires); }
+        if (d.type === 'key-approved') {
+          const extra = { created: d.created, uid: d.uid, badges: d.badges, isFirstUser: d.isFirstUser };
+          if (d.autoLoaded) {
+            // Admin auto-synced this user — no gate open
+            const wasLegacy = !!(getApproval() && !getApproval()?.uid);
+            setApproved(d.name, d.expires, extra);
+            renderBadgeButton();
+            document.getElementById('cst-gate')?.remove();
+            showToast(wasLegacy
+              ? 'Your key has been updated and 20+ days have been added.'
+              : 'key automatically loaded.');
+          } else {
+            window.__cstGateApproved?.(d.name, d.expires, extra);
+          }
+        }
         if (d.type === 'key-rejected') { window.__cstGateRejected?.(d.reason); }
         if (d.type === 'revoke')       {
           clearApproval();
@@ -817,7 +1038,9 @@
       });
     } else {
       startBeacon();
-      if (!isApproved()) {
+      if (isApproved()) {
+        renderBadgeButton();
+      } else {
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showGate);
         else showGate();
       }
