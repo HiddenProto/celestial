@@ -633,9 +633,8 @@
 
   <!-- ===== BFS Music Player ===== -->
   <div id="bfs-player">
-    <img id="bfs-cover" src="" alt="cover" />
+    <img id="bfs-cover" src="https://images.unsplash.com/photo-1619213579094-6dcaa7fa5d54?w=400&auto=format&fit=crop&q=80" alt="cover" />
     <div class="bfs-info">
-      <div class="bfs-label">bumblcat's favorite songs</div>
       <div class="bfs-title" id="bfs-title">Egy</div>
     </div>
     <div class="bfs-progress-area">
@@ -650,94 +649,90 @@
     </div>
     <div class="bfs-controls">
       <button class="bfs-btn" id="bfs-prev" title="Previous">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
       </button>
       <button class="bfs-btn bfs-playpause" id="bfs-playpause" title="Play/Pause">
-        <svg id="bfs-play-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-        <svg id="bfs-pause-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        <svg id="bfs-play-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <svg id="bfs-pause-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
       </button>
       <button class="bfs-btn" id="bfs-next" title="Next">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
       </button>
     </div>
-    <!-- Hidden YouTube player -->
     <div id="bfs-yt" style="position:absolute;width:1px;height:1px;top:-9999px;left:-9999px;overflow:hidden;pointer-events:none;"></div>
   </div>
   <style>
     #bfs-player {
       display: none;
       position: fixed; bottom: 20px; left: 20px;
-      width: 252px;
-      background: rgba(10,10,16,0.96);
-      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-      border: 1px solid rgba(255,255,255,0.09);
-      border-radius: 18px; overflow: hidden;
+      width: 240px;
+      background: #0d0d0d;
+      border: 1px solid #2a2a2a;
+      border-radius: 0;
+      overflow: hidden;
       z-index: 99998;
-      box-shadow: 0 12px 48px rgba(0,0,0,0.75);
-      animation: bfs-in 0.32s cubic-bezier(.21,1.02,.73,1) both;
-      font-family: inherit; color: #e4e4e7;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.85);
+      animation: bfs-in 0.22s ease both;
+      font-family: inherit; color: #ccc;
     }
     @keyframes bfs-in {
-      from { opacity:0; transform:translateY(18px); }
+      from { opacity:0; transform:translateY(12px); }
       to   { opacity:1; transform:translateY(0); }
     }
     #bfs-cover {
-      width: 100%; height: 138px;
+      width: 100%; height: 130px;
       object-fit: cover; display: block;
-      filter: brightness(0.92);
+      filter: brightness(0.8) grayscale(0.2);
     }
-    .bfs-info {
-      padding: 11px 14px 4px;
-    }
-    .bfs-label {
-      font-size: 0.62rem; color: rgba(255,255,255,0.38);
-      text-transform: uppercase; letter-spacing: 0.07em;
-      margin-bottom: 3px;
-    }
+    .bfs-info { padding: 10px 12px 6px; border-bottom: 1px solid #1e1e1e; }
     .bfs-title {
-      font-size: 0.88rem; font-weight: 650; color: #f4f4f5;
+      font-size: 0.82rem; font-weight: 600; color: #fff;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      letter-spacing: 0.02em;
     }
-    .bfs-progress-area { padding: 10px 14px 0; }
+    .bfs-progress-area { padding: 10px 12px 2px; }
     .bfs-bar-wrap {
-      height: 3px; background: rgba(255,255,255,0.1);
-      border-radius: 99px; cursor: pointer; position: relative;
+      height: 2px; background: #2a2a2a;
+      cursor: pointer; position: relative;
+      transition: height 0.1s;
+      user-select: none;
     }
-    .bfs-bar-wrap:hover { height: 5px; margin-top: -1px; }
-    .bfs-bar-wrap, .bfs-bar-fill, .bfs-bar-thumb { transition: height 0.15s; }
+    .bfs-bar-wrap:hover { height: 3px; }
     .bfs-bar-fill {
       position: absolute; left:0; top:0; height:100%;
-      background: #8b5cf6; border-radius: 99px; width: 0%;
+      background: #fff; width: 0%;
       pointer-events: none;
     }
     .bfs-bar-thumb {
       position: absolute; top: 50%; transform: translate(-50%,-50%);
-      width: 10px; height: 10px; border-radius: 50%;
+      width: 7px; height: 7px;
       background: #fff; pointer-events: none;
-      opacity: 0; transition: opacity 0.15s;
+      opacity: 0; transition: opacity 0.12s;
     }
-    .bfs-bar-wrap:hover .bfs-bar-thumb { opacity: 1; }
+    .bfs-bar-wrap:hover .bfs-bar-thumb,
+    .bfs-bar-wrap.dragging .bfs-bar-thumb { opacity: 1; }
     .bfs-times {
       display: flex; justify-content: space-between;
-      font-size: 0.62rem; color: rgba(255,255,255,0.32);
-      margin-top: 5px;
+      font-size: 0.58rem; color: #444;
+      margin-top: 5px; letter-spacing: 0.03em;
     }
     .bfs-controls {
       display: flex; align-items: center; justify-content: center;
-      gap: 14px; padding: 10px 14px 14px;
+      gap: 10px; padding: 9px 12px 11px;
     }
     .bfs-btn {
       background: none; border: none; cursor: pointer;
-      color: rgba(255,255,255,0.65); padding: 6px; border-radius: 50%;
+      color: #555; padding: 5px;
       display: flex; align-items: center; justify-content: center;
-      transition: color 0.15s, background 0.15s;
+      transition: color 0.12s;
     }
-    .bfs-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
+    .bfs-btn:hover { color: #ccc; }
     .bfs-playpause {
-      background: #8b5cf6 !important; color: #fff !important;
-      width: 40px; height: 40px; font-size: 1.1rem;
+      background: #fff !important; color: #000 !important;
+      width: 32px; height: 32px; border-radius: 0 !important;
+      padding: 0 !important;
     }
-    .bfs-playpause:hover { background: #7c3aed !important; }
+    .bfs-playpause:hover { background: #d0d0d0 !important; }
   </style>
   <script>
     (function () {
@@ -747,7 +742,7 @@
         { title: 'Fallen Sky',   id: 'dZpD74pJkNE' },
         { title: '/: ',          id: '1d96oRR-fE4' }
       ];
-      var bfsIdx = 0, bfsYT = null, bfsApiReady = false, bfsTick = null;
+      var bfsIdx = 0, bfsYT = null, bfsApiReady = false, bfsTick = null, bfsDragging = false;
 
       function bfsThumb(id) { return 'https://img.youtube.com/vi/' + id + '/hqdefault.jpg'; }
       function bfsFmt(s) {
@@ -756,34 +751,35 @@
       }
 
       function bfsSetPlaying(on) {
-        document.getElementById('bfs-play-icon').style.display  = on ? 'none'  : '';
-        document.getElementById('bfs-pause-icon').style.display = on ? ''      : 'none';
+        document.getElementById('bfs-play-icon').style.display  = on ? 'none' : '';
+        document.getElementById('bfs-pause-icon').style.display = on ? ''     : 'none';
+      }
+
+      function bfsSetBar(pct) {
+        document.getElementById('bfs-fill').style.width = pct + '%';
+        document.getElementById('bfs-thumb').style.left = pct + '%';
       }
 
       function bfsUpdateBar() {
+        if (bfsDragging) return;
         try {
           var cur = bfsYT.getCurrentTime() || 0;
           var dur = bfsYT.getDuration()    || 0;
-          document.getElementById('bfs-current').textContent = bfsFmt(cur);
+          document.getElementById('bfs-current').textContent  = bfsFmt(cur);
           document.getElementById('bfs-duration').textContent = bfsFmt(dur);
-          var pct = dur > 0 ? (cur / dur * 100) : 0;
-          document.getElementById('bfs-fill').style.width = pct + '%';
-          document.getElementById('bfs-thumb').style.left = pct + '%';
+          bfsSetBar(dur > 0 ? (cur / dur * 100) : 0);
         } catch (e) {}
       }
 
-      function bfsLoad(idx, autoplay) {
+      function bfsLoad(idx) {
         bfsIdx = idx;
         var s = BFS_SONGS[idx];
-        document.getElementById('bfs-cover').src  = bfsThumb(s.id);
+        document.getElementById('bfs-cover').src = bfsThumb(s.id);
         document.getElementById('bfs-title').textContent = s.title;
         document.getElementById('bfs-current').textContent  = '0:00';
         document.getElementById('bfs-duration').textContent = '0:00';
-        document.getElementById('bfs-fill').style.width = '0%';
-        document.getElementById('bfs-thumb').style.left = '0%';
-        if (bfsYT && bfsApiReady) {
-          autoplay === false ? bfsYT.cueVideoById(s.id) : bfsYT.loadVideoById(s.id);
-        }
+        bfsSetBar(0);
+        if (bfsYT && bfsApiReady) bfsYT.loadVideoById(s.id);
       }
 
       function bfsInitYT() {
@@ -795,15 +791,12 @@
             videoId: BFS_SONGS[bfsIdx].id,
             playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1 },
             events: {
-              onReady: function () {
-                bfsApiReady = true;
-                bfsYT.playVideo();
-              },
+              onReady: function () { bfsApiReady = true; bfsYT.playVideo(); },
               onStateChange: function (e) {
                 var S = YT.PlayerState;
                 if (e.data === S.PLAYING) {
                   bfsSetPlaying(true);
-                  if (!bfsTick) bfsTick = setInterval(bfsUpdateBar, 500);
+                  if (!bfsTick) bfsTick = setInterval(bfsUpdateBar, 250);
                 } else if (e.data === S.PAUSED || e.data === S.BUFFERING) {
                   bfsSetPlaying(false);
                 } else if (e.data === S.ENDED) {
@@ -825,12 +818,8 @@
       function bfsShow() {
         var p = document.getElementById('bfs-player');
         p.style.display = 'block';
-        // Re-trigger animation
-        p.style.animation = 'none';
-        p.offsetHeight;
-        p.style.animation = '';
-        bfsLoad(0, true);
-        bfsInitYT();
+        p.style.animation = 'none'; p.offsetHeight; p.style.animation = '';
+        bfsLoad(0); bfsInitYT();
       }
 
       function bfsHide() {
@@ -839,6 +828,34 @@
         if (bfsTick) { clearInterval(bfsTick); bfsTick = null; }
         bfsSetPlaying(false);
       }
+
+      // Drag-to-seek on progress bar
+      var barEl = document.getElementById('bfs-bar');
+
+      function bfsSeekFromEvent(e) {
+        var r = barEl.getBoundingClientRect();
+        var pct = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+        bfsSetBar(pct * 100);
+        document.getElementById('bfs-current').textContent = bfsFmt(pct * ((bfsYT && bfsApiReady ? bfsYT.getDuration() : 0) || 0));
+        if (bfsYT && bfsApiReady) bfsYT.seekTo(pct * (bfsYT.getDuration() || 0), true);
+      }
+
+      barEl.addEventListener('mousedown', function (e) {
+        bfsDragging = true;
+        barEl.classList.add('dragging');
+        bfsSeekFromEvent(e);
+        e.preventDefault();
+      });
+      document.addEventListener('mousemove', function (e) {
+        if (!bfsDragging) return;
+        bfsSeekFromEvent(e);
+      });
+      document.addEventListener('mouseup', function (e) {
+        if (!bfsDragging) return;
+        bfsDragging = false;
+        barEl.classList.remove('dragging');
+        bfsSeekFromEvent(e);
+      });
 
       // Controls
       document.getElementById('bfs-playpause').addEventListener('click', function () {
@@ -852,15 +869,7 @@
         bfsLoad((bfsIdx + 1) % BFS_SONGS.length);
       });
 
-      // Seek on progress bar click
-      document.getElementById('bfs-bar').addEventListener('click', function (e) {
-        if (!bfsYT || !bfsApiReady) return;
-        var r = this.getBoundingClientRect();
-        var pct = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-        bfsYT.seekTo(pct * (bfsYT.getDuration() || 0), true);
-      });
-
-      // Toggle wiring (runs after DOM is ready)
+      // Toggle wiring
       window.addEventListener('DOMContentLoaded', function () {
         var tog = document.getElementById('bfsTog');
         if (!tog) return;
