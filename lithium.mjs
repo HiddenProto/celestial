@@ -277,6 +277,7 @@ async function ensureBRC() {
 			config.brcPath     = "/scram/brc.js";
 			config.injectPath  = "/scram/controller.inject.js";
 			config.wasmPath    = "/scram/brc.wasm";
+			config.vePath      = "/scram/ve-inject.js";  // fingerprint + sign-in + YouTube inject
 
 			// Use a temp variable — brcController must stay null until fully ready.
 			// getProxied() does `brcController !== null` as a zero-wait readiness check,
@@ -314,6 +315,7 @@ async function ensureBRC() {
 					hidden = document.createElement('iframe');
 					hidden.id = 'brc-hidden-frame';
 					hidden.style.cssText = 'display:none;position:absolute;width:0;height:0;pointer-events:none;';
+					hidden.allow = 'autoplay; fullscreen; encrypted-media; picture-in-picture; clipboard-write; web-share';
 					document.body.appendChild(hidden);
 				}
 				try { brcFrameMap.set(0, brcController.createFrame(hidden)); } catch(e) {}
@@ -517,6 +519,7 @@ export async function getProxied(input) {
 						iframe = document.createElement('iframe');
 						iframe.id = 'brc-hidden-frame';
 						iframe.style.cssText = 'display:none;position:absolute;width:0;height:0;pointer-events:none;';
+						iframe.allow = 'autoplay; fullscreen; encrypted-media; picture-in-picture; clipboard-write; web-share';
 						document.body.appendChild(iframe);
 					}
 				}
@@ -568,6 +571,7 @@ export class Tab {
 		this.frame.setAttribute("src", "/tab.html");
 		this.frame.setAttribute("loading", "lazy");
 		this.frame.setAttribute("id", `frame-${tabCounter}`);
+		this.frame.setAttribute("allow", "autoplay; fullscreen; encrypted-media; picture-in-picture; clipboard-write; web-share");
 		framesElement.appendChild(this.frame);
 
 		this.switch();
