@@ -668,8 +668,7 @@
         <span id="bfs-loop-one" style="display:none;position:absolute;top:1px;right:1px;font-size:7px;font-weight:700;line-height:1;color:inherit;">1</span>
       </button>
     </div>
-    <iframe id="bfs-yt" src="about:blank" allow="autoplay;encrypted-media" referrerpolicy="no-referrer"
-      style="position:fixed;left:-9999px;top:-9999px;width:320px;height:180px;border:none;pointer-events:none;"></iframe>
+    <div id="bfs-yt" style="position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;pointer-events:none;"></div>
   </div>
   <style>
     #bfs-player {
@@ -757,8 +756,7 @@
       ];
 
       var bfsIdx = 0, bfsDragging = false, bfsPlaying = false;
-      var bfsYT = null;
-      var bfsDur = 0, bfsCur = 0;
+      var bfsYT = null, bfsApiReady = false, bfsTick = null;
       var bfsLoop = 0; // 0=off 1=loop-all 2=loop-one
 
       function bfsThumb(id) { return 'https://img.youtube.com/vi/' + id + '/hqdefault.jpg'; }
@@ -776,47 +774,57 @@
         document.getElementById('bfs-thumb').style.left = pct + '%';
       }
 
-      function bfsYTCmd(func, args) {
-        if (!bfsYT || !bfsYT.contentWindow) return;
-        bfsYT.contentWindow.postMessage(JSON.stringify({
-          event: 'command', func: func, args: args !== undefined ? [args] : []
-        }), '*');
+      function bfsUpdateBar() {
+        if (bfsDragging) return;
+        try {
+          var cur = bfsYT.getCurrentTime() || 0;
+          var dur = bfsYT.getDuration() || 0;
+          document.getElementById('bfs-current').textContent = bfsFmt(cur);
+          document.getElementById('bfs-duration').textContent = bfsFmt(dur);
+          bfsSetBar(dur > 0 ? (cur / dur * 100) : 0);
+        } catch(e) {}
       }
 
-      window.addEventListener('message', function(e) {
-        if (!bfsYT) return;
-        try {
-          var data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-          if (!data || typeof data.event !== 'string') return;
-          if (data.event === 'onReady') {
-            bfsYT.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*');
-            return;
-          }
-          if (data.event === 'infoDelivery' && data.info) {
-            var info = data.info;
-            if (typeof info.currentTime === 'number') {
-              bfsCur = info.currentTime;
-              document.getElementById('bfs-current').textContent = bfsFmt(bfsCur);
-            }
-            if (typeof info.duration === 'number' && info.duration > 0) {
-              bfsDur = info.duration;
-              document.getElementById('bfs-duration').textContent = bfsFmt(bfsDur);
-            }
-            if (!bfsDragging && bfsDur > 0) bfsSetBar(bfsCur / bfsDur * 100);
-            if (typeof info.playerState === 'number') {
-              bfsSetPlaying(info.playerState === 1);
-              if (info.playerState === 0) {
-                if (bfsLoop === 2) {
-                  bfsLoad(bfsIdx, true);
-                } else {
-                  var next = (bfsIdx + 1) % BFS_SONGS.length;
-                  if (bfsIdx < BFS_SONGS.length - 1 || bfsLoop === 1) bfsLoad(next, true);
+      function bfsInitYT() {
+        if (bfsYT) return;
+        var prev = window.onYouTubeIframeAPIReady;
+        window.onYouTubeIframeAPIReady = function() {
+          if (typeof prev === 'function') prev();
+          bfsYT = new YT.Player('bfs-yt', {
+            videoId: BFS_SONGS[bfsIdx].id,
+            playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1 },
+            events: {
+              onReady: function() {
+                bfsApiReady = true;
+                if (!BFS_SONGS[bfsIdx].unplayable) bfsYT.playVideo();
+              },
+              onStateChange: function(e) {
+                var S = YT.PlayerState;
+                if (e.data === S.PLAYING) {
+                  bfsSetPlaying(true);
+                  if (!bfsTick) bfsTick = setInterval(bfsUpdateBar, 250);
+                } else if (e.data === S.PAUSED || e.data === S.BUFFERING) {
+                  bfsSetPlaying(false);
+                } else if (e.data === S.ENDED) {
+                  if (bfsLoop === 2) {
+                    bfsYT.playVideo();
+                  } else {
+                    var next = (bfsIdx + 1) % BFS_SONGS.length;
+                    if (bfsIdx < BFS_SONGS.length - 1 || bfsLoop === 1) bfsLoad(next, true);
+                  }
                 }
               }
             }
-          }
-        } catch (_) {}
-      });
+          });
+        };
+        if (window.YT && window.YT.Player) {
+          window.onYouTubeIframeAPIReady();
+        } else if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+          var tag = document.createElement('script');
+          tag.src = 'https://www.youtube.com/iframe_api';
+          document.head.appendChild(tag);
+        }
+      }
 
       function bfsLoad(idx, autoplay) {
         bfsIdx = idx;
@@ -827,27 +835,35 @@
         document.getElementById('bfs-duration').textContent = '0:00';
         bfsSetBar(0);
         bfsSetPlaying(false);
-        bfsCur = 0; bfsDur = 0;
-        if (!bfsYT) return;
-        if (s.unplayable) { bfsYT.src = 'about:blank'; return; }
-        bfsYT.src = 'https://callanambulance.vercel.app/player.html?id=' + s.id + (autoplay ? '&play=1' : '');
+        if (!bfsYT || !bfsApiReady) return;
+        try {
+          if (s.unplayable) { bfsYT.stopVideo(); return; }
+          if (autoplay) { bfsYT.loadVideoById(s.id); } else { bfsYT.cueVideoById(s.id); }
+        } catch(e) {}
       }
 
       function bfsShow() {
         var p = document.getElementById('bfs-player');
         p.style.display = 'block';
         p.style.animation = 'none'; p.offsetHeight; p.style.animation = '';
-        bfsYT = document.getElementById('bfs-yt');
-        var s = BFS_SONGS[0]; bfsIdx = 0;
+        var s = BFS_SONGS[bfsIdx];
         document.getElementById('bfs-cover').src = s.cover || bfsThumb(s.id);
         document.getElementById('bfs-title').textContent = s.title;
-        bfsLoad(0, true);
+        document.getElementById('bfs-current').textContent  = '0:00';
+        document.getElementById('bfs-duration').textContent = '0:00';
+        bfsSetBar(0);
+        if (!bfsYT) {
+          bfsInitYT();
+        } else if (bfsApiReady && !s.unplayable) {
+          try { bfsYT.loadVideoById(s.id); } catch(e) {}
+        }
       }
 
       function bfsHide() {
         document.getElementById('bfs-player').style.display = 'none';
-        if (bfsYT) bfsYT.src = 'about:blank';
         bfsSetPlaying(false);
+        if (bfsYT && bfsApiReady) try { bfsYT.stopVideo(); } catch(e) {}
+        clearInterval(bfsTick); bfsTick = null;
       }
 
       // Drag-to-seek
@@ -856,9 +872,12 @@
         var r = barEl.getBoundingClientRect();
         var pct = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
         bfsSetBar(pct * 100);
-        var seekTime = pct * bfsDur;
-        document.getElementById('bfs-current').textContent = bfsFmt(seekTime);
-        if (bfsDur) bfsYTCmd('seekTo', seekTime);
+        try {
+          var dur = (bfsYT && bfsApiReady) ? (bfsYT.getDuration() || 0) : 0;
+          var seekTime = pct * dur;
+          document.getElementById('bfs-current').textContent = bfsFmt(seekTime);
+          if (bfsApiReady && dur) bfsYT.seekTo(seekTime, true);
+        } catch(e) {}
       }
       barEl.addEventListener('mousedown', function(e) {
         bfsDragging = true; barEl.classList.add('dragging');
@@ -873,8 +892,8 @@
 
       // Controls
       document.getElementById('bfs-playpause').addEventListener('click', function() {
-        if (!bfsYT || BFS_SONGS[bfsIdx].unplayable) return;
-        bfsPlaying ? bfsYTCmd('pauseVideo') : bfsYTCmd('playVideo');
+        if (!bfsYT || !bfsApiReady || BFS_SONGS[bfsIdx].unplayable) return;
+        try { bfsPlaying ? bfsYT.pauseVideo() : bfsYT.playVideo(); } catch(e) {}
       });
       document.getElementById('bfs-prev').addEventListener('click', function() {
         bfsLoad((bfsIdx - 1 + BFS_SONGS.length) % BFS_SONGS.length, true);
