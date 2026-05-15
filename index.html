@@ -746,7 +746,8 @@
         { title: 'A Rough Time', id: 'D0WzeTJlFHA', cover: 'https://images.unsplash.com/photo-1755923040436-c932c873cacf?w=400&auto=format&fit=crop&q=80' },
         { title: 'Fallen Sky',   id: 'dZpD74pJkNE', cover: 'https://images.unsplash.com/photo-1750167000423-d448265fd79e?w=400&auto=format&fit=crop&q=80' },
         { title: '/: ',          id: '1d96oRR-fE4', cover: 'https://images.unsplash.com/photo-1762081512133-30202f928bb9?w=400&auto=format&fit=crop&q=80' },
-        { title: 'i am going to kill your family', id: '_6IxchAed3o' }
+        { title: 'i am going to kill your family', id: '_6IxchAed3o', unplayable: true },
+        { title: 'Further Away', id: 'NrLkTZrPZA4' }
       ];
 
       var bfsIdx = 0, bfsDragging = false, bfsPlaying = false;
@@ -821,8 +822,7 @@
         bfsSetPlaying(false);
         bfsCur = 0; bfsDur = 0;
         if (!bfsYT || !_brcReady) return;
-        // Load proxied YouTube embed; autoplay=1 plays on user-triggered load,
-        // enablejsapi=1 enables postMessage infoDelivery events.
+        if (s.unplayable) { bfsYT.src = 'about:blank'; return; }
         Promise.resolve(window.getProxied(
           'https://www.youtube.com/embed/' + s.id +
           '?enablejsapi=1&autoplay=1&rel=0&iv_load_policy=3'
@@ -879,7 +879,7 @@
 
       // Controls
       document.getElementById('bfs-playpause').addEventListener('click', function() {
-        if (!bfsYT) return;
+        if (!bfsYT || BFS_SONGS[bfsIdx].unplayable) return;
         bfsPlaying ? bfsYTCmd('pauseVideo') : bfsYTCmd('playVideo');
       });
       document.getElementById('bfs-prev').addEventListener('click', function() {
