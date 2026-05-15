@@ -782,6 +782,11 @@
         if (!bfsYT || e.source !== bfsYT.contentWindow) return;
         try {
           var data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+          if (data.event === 'onReady') {
+            // Player API is fully initialized — only now safe to send 'listening'
+            bfsYT.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*');
+            return;
+          }
           if (data.event === 'infoDelivery' && data.info) {
             var info = data.info;
             if (typeof info.currentTime === 'number') {
@@ -815,13 +820,6 @@
         if (s.unplayable) { bfsYT.src = 'about:blank'; return; }
         bfsYT.src = 'https://www.youtube.com/embed/' + s.id +
           '?enablejsapi=1&autoplay=1&rel=0&iv_load_policy=3';
-        bfsYT.onload = function() {
-          setTimeout(function() {
-            if (bfsYT && bfsYT.contentWindow) {
-              bfsYT.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*');
-            }
-          }, 800);
-        };
       }
 
       function bfsShow() {
