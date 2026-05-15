@@ -683,6 +683,41 @@
     .notif[data-t="warning"] .notif-bar { background: #f59e0b; }
     .notif[data-t="info"]    { border-left: 3px solid #3b82f6; }
     .notif[data-t="info"]    .notif-bar { background: #3b82f6; }
+    /* option type */
+    .notif[data-t="option"]  { border-left: 3px solid #8b5cf6; min-width: 290px; }
+    .notif[data-t="option"]  .notif-bar { background: #8b5cf6; }
+    .notif-options { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
+    .notif-opt-btn {
+      display: flex; align-items: center; gap: 7px;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.11);
+      border-radius: 6px; padding: 7px 10px; cursor: pointer; color: inherit;
+      font-size: 0.81rem; text-align: left; width: 100%;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .notif-opt-btn:hover { background: rgba(255,255,255,0.13); border-color: rgba(255,255,255,0.26); }
+    .notif-opt-btn.opt-skip { opacity: 0.5; font-size: 0.78rem; }
+    .notif-opt-btn.opt-skip:hover { opacity: 0.8; }
+    .notif-opt-label { flex: 1; }
+    .notif-opt-info-wrap {
+      position: relative; flex-shrink: 0;
+      width: 17px; height: 17px;
+    }
+    .notif-opt-info-btn {
+      width: 17px; height: 17px; border-radius: 50%;
+      background: rgba(255,255,255,0.13); border: none; cursor: pointer;
+      color: inherit; font-size: 0.62rem; display: flex; align-items: center;
+      justify-content: center; opacity: 0.55; transition: opacity 0.15s;
+      line-height: 1; padding: 0;
+    }
+    .notif-opt-info-btn:hover { opacity: 1; }
+    .notif-opt-tooltip {
+      display: none; position: absolute; right: 0; bottom: calc(100% + 7px);
+      background: #18181f; color: #ddd; border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 7px; padding: 8px 11px; font-size: 0.76rem;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5); z-index: 99999;
+      width: 210px; white-space: normal; text-align: left; pointer-events: none;
+    }
+    .notif-opt-info-wrap:hover .notif-opt-tooltip { display: block; }
   </style>
   <div id="notif-container" aria-live="polite"></div>
   <script>
@@ -730,6 +765,128 @@
         const { type = "info", message = "", duration = 6000 } = e.detail || {};
         window.notify(message, type, duration);
       });
+
+      /**
+       * Show a notification with option buttons.
+       * @param {string} title
+       * @param {string} message
+       * @param {Array<{label:string, info:string, className?:string, onClick:function}>} options
+       */
+      window.notifyOption = function (title, message, options) {
+        const el = document.createElement("div");
+        el.className = "notif";
+        el.setAttribute("data-t", "option");
+        el.setAttribute("role", "dialog");
+
+        // Build option buttons HTML
+        const btnsHTML = options.map(function (opt, i) {
+          const cls = "notif-opt-btn" + (opt.className ? " " + opt.className : "");
+          return `<button class="${cls}" data-opt-idx="${i}">
+            <span class="notif-opt-label">${opt.label.replace(/</g,"&lt;")}</span>
+            <span class="notif-opt-info-wrap">
+              <button class="notif-opt-info-btn" tabindex="-1" aria-label="info">ℹ</button>
+              <span class="notif-opt-tooltip">${opt.info.replace(/</g,"&lt;")}</span>
+            </span>
+          </button>`;
+        }).join("");
+
+        el.innerHTML = `
+          <div class="notif-top">
+            <span class="notif-icon">⚙</span>
+            <div class="notif-body">
+              <div class="notif-title">${title.replace(/</g,"&lt;")}</div>
+              <div class="notif-msg">${message.replace(/</g,"&lt;")}</div>
+            </div>
+            <button class="notif-close" aria-label="dismiss">✕</button>
+          </div>
+          <div class="notif-options">${btnsHTML}</div>
+          <div class="notif-bar" style="animation-duration:300000ms"></div>`;
+
+        const dismiss = function () {
+          el.classList.add("notif-out");
+          setTimeout(function () { el.remove(); }, 320);
+        };
+
+        el.querySelector(".notif-close").addEventListener("click", dismiss);
+
+        // Wire up each option button
+        el.querySelectorAll(".notif-opt-btn").forEach(function (btn) {
+          btn.addEventListener("click", function (e) {
+            // Prevent info-btn click from triggering the outer button
+            if (e.target.closest(".notif-opt-info-btn")) return;
+            const idx = parseInt(btn.getAttribute("data-opt-idx"), 10);
+            dismiss();
+            options[idx].onClick();
+          });
+          // Stop info-btn clicks bubbling to the option button
+          const infoBtn = btn.querySelector(".notif-opt-info-btn");
+          if (infoBtn) {
+            infoBtn.addEventListener("click", function (e) {
+              e.stopPropagation();
+            });
+          }
+        });
+
+        // Very long timeout (5 min) — effectively manual dismiss only
+        setTimeout(dismiss, 300000);
+
+        container.appendChild(el);
+      };
+
+      // Auto-show proxy config prompt (once only)
+      setTimeout(function () {
+        const currentProxy = localStorage.getItem("pr0xy") || "scramjet";
+
+        // Always warn about scramjet regardless of whether config was already seen
+        if (currentProxy === "scramjet") {
+          window.notify(
+            "The current proxy you have on, scramjet, is currently an unreliable configuration.",
+            "warning",
+            12000
+          );
+        }
+
+        if (localStorage.getItem("proxy-config-seen")) return;
+
+        window.notifyOption(
+          "Proxy Configuration",
+          "Choose how the proxy handles connections.",
+          [
+            {
+              label: "Wider Support",
+              info: "libcurl + bumblcat rrc + Mercury Workshop — best compatibility, bypasses Google anomaly checks",
+              onClick: function () {
+                localStorage.setItem("transportz", "libcurl");
+                localStorage.setItem("pr0xy", "scram");
+                localStorage.setItem("location", "wss://wisp.mercurywork.shop/");
+                localStorage.setItem("proxy-config-seen", "1");
+                window.notify("Wider Support enabled — reloading…", "success", 6000);
+                setTimeout(function () { location.reload(); }, 900);
+              }
+            },
+            {
+              label: "Limited but Fast",
+              info: "libcurl + bumblcat rrc + bumblcat's server — faster for most sites, Google may show anomaly checks",
+              onClick: function () {
+                localStorage.setItem("transportz", "libcurl");
+                localStorage.setItem("pr0xy", "scram");
+                localStorage.setItem("location", "wss://celestial-wisp.onrender.com/");
+                localStorage.setItem("proxy-config-seen", "1");
+                window.notify("Limited but Fast enabled — reloading…", "success", 6000);
+                setTimeout(function () { location.reload(); }, 900);
+              }
+            },
+            {
+              label: "Skip",
+              info: "Keep current settings unchanged",
+              className: "opt-skip",
+              onClick: function () {
+                localStorage.setItem("proxy-config-seen", "1");
+              }
+            }
+          ]
+        );
+      }, 0);
 
       // BRC lifecycle — silent, no toasts for fallback
     })();
