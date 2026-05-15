@@ -27,9 +27,10 @@
   <link rel="shortcut icon" type="image/png" href="/assets/img/logo-blackbg.png" />
   <script src="/assets/js/prox.js" type="module"></script>
   <script async defer type="module">
-    import { newTab, switchTab, closeTab } from "/lithium.mjs";
+    import { newTab, switchTab, closeTab, getProxied } from "/lithium.mjs";
 
     window.newTab = newTab;
+    window.getProxied = getProxied;
     let tabs = [];
     const tabsDiv = document.getElementById("tabs");
     const newTabBtn = document.getElementById("new-tab-btn");
@@ -765,14 +766,21 @@
         document.getElementById('bfs-thumb').style.left = pct + '%';
       }
 
-      // Build the UV-proxied YouTube embed URL — all traffic routed through Wisp
-      function bfsProxiedSrc(videoId) {
+      // Build a proxied YouTube embed URL via getProxied() (BRC/UV — whatever is active).
+      // Falls back to /service/ultra/ if the module export isn't ready yet.
+      function bfsGetSrc(videoId, cb) {
         var embedUrl = 'https://www.youtube.com/embed/' + videoId +
           '?autoplay=1&controls=0&rel=0&modestbranding=1&enablejsapi=1';
-        return '/service/ultra/' + encodeURIComponent(embedUrl);
+        if (typeof window.getProxied === 'function') {
+          Promise.resolve(window.getProxied(embedUrl)).then(cb).catch(function() {
+            cb('/service/ultra/' + encodeURIComponent(embedUrl));
+          });
+        } else {
+          cb('/service/ultra/' + encodeURIComponent(embedUrl));
+        }
       }
 
-      // Send a postMessage command to the YouTube embed (same-origin via UV proxy)
+      // Send a postMessage command to the YouTube embed (same-origin via proxy)
       function bfsSendYT(cmd, args) {
         if (!bfsYTFrame) return;
         try {
@@ -792,7 +800,9 @@
         bfsDuration = 0;
         bfsSetBar(0);
         bfsSetPlaying(false);
-        if (bfsYTFrame) bfsYTFrame.src = bfsProxiedSrc(s.id);
+        if (bfsYTFrame) {
+          bfsGetSrc(s.id, function(src) { bfsYTFrame.src = src; });
+        }
       }
 
       function bfsShow() {
