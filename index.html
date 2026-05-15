@@ -778,7 +778,7 @@
       // GET /api/cobalt?id=VIDEO_ID — Vercel function fetches from Invidious server-side.
       // School only ever sees callanambulance.vercel.app. Stream URL also proxied via BRC.
       function bfsGetCobaltSrc(videoId, cb) {
-        fetch('/api/cobalt?id=' + encodeURIComponent(videoId))
+        fetch('/api/cobalt?id=' + encodeURIComponent(videoId), { method: 'GET' })
         .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
         .then(function(r) {
           if (!r.data.url) {

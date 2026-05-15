@@ -1,5 +1,5 @@
-// Uses Invidious public API to get a proxied audio stream URL for a YouTube video.
-// Falls through multiple instances so one going down doesn't break playback.
+// Accepts:  GET /api/cobalt?id=VIDEO_ID
+//           POST /api/cobalt  { "id": "VIDEO_ID" }  (fallback for old cached clients)
 const INSTANCES = [
   'https://inv.nadeko.net',
   'https://invidious.privacydev.net',
@@ -8,8 +8,11 @@ const INSTANCES = [
 ];
 
 export default async function handler(req, res) {
-  const { id } = req.query;
-  if (!id) return res.status(400).json({ error: 'missing ?id=VIDEO_ID' });
+  const id =
+    req.query.id ||
+    (req.body && (req.body.id || req.body.videoId));
+
+  if (!id) return res.status(400).json({ error: 'missing id' });
 
   for (const host of INSTANCES) {
     try {
@@ -28,7 +31,6 @@ export default async function handler(req, res) {
       );
       if (!audios.length) continue;
 
-      // Pick highest bitrate
       audios.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
       const url = audios[0].proxyUrl || audios[0].url;
       if (url) return res.status(200).json({ url });
