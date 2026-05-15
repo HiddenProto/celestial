@@ -20,10 +20,10 @@
   },
   "homepage": "https://github.com/HiddenProto/celestial#readme",
   "dependencies": {
-    "@distube/ytdl-core": "^4.16.12",
     "@mercuryworkshop/bare-mux": "^2.1.9",
     "@mercuryworkshop/epoxy-tls": "^2.1.19-1",
     "@mercuryworkshop/scramjet": "^1.1.0",
-    "@titaniumnetwork-dev/ultraviolet": "^3.2.10"
+    "@titaniumnetwork-dev/ultraviolet": "^3.2.10",
+    "youtubei.js": "^17.0.1"
   }
 }
