@@ -661,6 +661,12 @@
       <button class="bfs-btn" id="bfs-next" title="Next">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
       </button>
+      <button class="bfs-btn" id="bfs-loop" title="Loop: Off" style="position:relative;opacity:0.35;">
+        <svg id="bfs-loop-svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+          <path id="bfs-loop-path" d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+        </svg>
+        <span id="bfs-loop-one" style="display:none;position:absolute;top:1px;right:1px;font-size:7px;font-weight:700;line-height:1;color:inherit;">1</span>
+      </button>
     </div>
     <iframe id="bfs-yt" src="about:blank" allow="autoplay;encrypted-media" referrerpolicy="no-referrer"
       style="position:fixed;left:-9999px;top:-9999px;width:320px;height:180px;border:none;pointer-events:none;"></iframe>
@@ -753,6 +759,7 @@
       var bfsIdx = 0, bfsDragging = false, bfsPlaying = false;
       var bfsYT = null;
       var bfsDur = 0, bfsCur = 0;
+      var bfsLoop = 0; // 0=off 1=loop-all 2=loop-one
 
       function bfsThumb(id) { return 'https://img.youtube.com/vi/' + id + '/hqdefault.jpg'; }
       function bfsFmt(s) {
@@ -777,9 +784,10 @@
       }
 
       window.addEventListener('message', function(e) {
-        if (!bfsYT || e.source !== bfsYT.contentWindow) return;
+        if (!bfsYT) return;
         try {
           var data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+          if (!data || typeof data.event !== 'string') return;
           if (data.event === 'onReady') {
             bfsYT.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*');
             return;
@@ -797,7 +805,14 @@
             if (!bfsDragging && bfsDur > 0) bfsSetBar(bfsCur / bfsDur * 100);
             if (typeof info.playerState === 'number') {
               bfsSetPlaying(info.playerState === 1);
-              if (info.playerState === 0) bfsLoad((bfsIdx + 1) % BFS_SONGS.length, true);
+              if (info.playerState === 0) {
+                if (bfsLoop === 2) {
+                  bfsLoad(bfsIdx, true);
+                } else {
+                  var next = (bfsIdx + 1) % BFS_SONGS.length;
+                  if (bfsIdx < BFS_SONGS.length - 1 || bfsLoop === 1) bfsLoad(next, true);
+                }
+              }
             }
           }
         } catch (_) {}
@@ -826,7 +841,7 @@
         var s = BFS_SONGS[0]; bfsIdx = 0;
         document.getElementById('bfs-cover').src = s.cover || bfsThumb(s.id);
         document.getElementById('bfs-title').textContent = s.title;
-        bfsLoad(0, false);
+        bfsLoad(0, true);
       }
 
       function bfsHide() {
@@ -867,6 +882,20 @@
       document.getElementById('bfs-next').addEventListener('click', function() {
         bfsLoad((bfsIdx + 1) % BFS_SONGS.length, true);
       });
+      (function() {
+        var btn = document.getElementById('bfs-loop');
+        var badge = document.getElementById('bfs-loop-one');
+        function updateLoop() {
+          btn.style.opacity = bfsLoop === 0 ? '0.35' : '1';
+          btn.style.color   = bfsLoop === 0 ? '' : '#fff';
+          badge.style.display = bfsLoop === 2 ? 'inline' : 'none';
+          btn.title = ['Loop: Off','Loop: All','Loop: One'][bfsLoop];
+        }
+        btn.addEventListener('click', function() {
+          bfsLoop = (bfsLoop + 1) % 3;
+          updateLoop();
+        });
+      })();
 
       // Toggle wiring
       function bfsWireTog() {
