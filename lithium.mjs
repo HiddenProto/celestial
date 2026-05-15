@@ -115,9 +115,34 @@ async function ensureScramjet() {
 	return _scramjetInitPromise;
 }
 
+// Google-family domains that must route through Mercury Workshop.
+// Mercury Workshop has high Google reputation — datacenter IPs (Render, etc.)
+// trigger Google's anomaly check immediately regardless of any other settings.
+const _GOOGLE_DOMAINS = [
+	'google.com', 'youtube.com', 'googleapis.com', 'gmail.com',
+	'googlevideo.com', 'ytimg.com', 'googleusercontent.com',
+	'ggpht.com', 'gstatic.com', 'google-analytics.com',
+	'googletagmanager.com', 'doubleclick.net', 'googlesyndication.com',
+	'accounts.google.com',
+];
+const _MERCURY_WISP = 'wss://wisp.mercurywork.shop/';
+
+function _isGoogleHost(remote) {
+	try {
+		const h = (remote instanceof URL ? remote : new URL(remote)).hostname;
+		return _GOOGLE_DOMAINS.some(d => h === d || h.endsWith('.' + d));
+	} catch { return false; }
+}
+
 /**
  * Creates a ProxyTransport for BRC based on the current transport setting.
  * Reads from localStorage directly so it works before setTransport/setWisp are called.
+ *
+ * Domain-aware routing: Google/YouTube/Gmail traffic is always sent through
+ * Mercury Workshop (high Google reputation) regardless of the user's chosen
+ * wisp server. Everything else goes through the user's configured server.
+ * This is the lightweight replacement for BOU-KSN's routing layer — no
+ * caching, no benchmarking, just the routing that actually matters.
  */
 async function _createBRCTransport() {
 	// Read wisp from localStorage — setWisp may not have been called yet
@@ -132,21 +157,55 @@ async function _createBRCTransport() {
 	const savedTransport = localStorage.getItem("transportz") || "libcurl";
 
 	const useEpoxy = savedTransport === "epoxy";
-	let transport;
+
+	// Primary transport — user's configured wisp server
+	let primary;
 	if (useEpoxy) {
 		try {
 			const { default: EpoxyTransport } = await import("/epoxy/index.mjs");
-			transport = new EpoxyTransport({ wisp });
+			primary = new EpoxyTransport({ wisp });
 		} catch (e) {
 			console.warn("lethal.js: epoxy transport failed, trying libcurl:", e.message);
 		}
 	}
-	if (!transport) {
+	if (!primary) {
 		const { default: LibcurlClient } = await import("/curl/index.mjs");
-		transport = new LibcurlClient({ wisp });
+		primary = new LibcurlClient({ wisp });
 	}
 
-	return _wrapTransportHeaders(transport);
+	// Google transport — always libcurl through Mercury Workshop.
+	// Only create if the primary isn't already Mercury Workshop.
+	let googleTransport = null;
+	if (wisp !== _MERCURY_WISP) {
+		try {
+			const { default: LibcurlClient } = await import("/curl/index.mjs");
+			googleTransport = new LibcurlClient({ wisp: _MERCURY_WISP });
+		} catch (e) {
+			console.warn("lethal.js: google transport init failed:", e.message);
+		}
+	}
+
+	// If we couldn't create a separate Google transport, just use primary for everything
+	if (!googleTransport) {
+		return _wrapTransportHeaders(primary);
+	}
+
+	// Routing wrapper — picks the right transport per request based on hostname
+	const router = {
+		get ready() { return primary.ready; },
+		async request(remote, method, body, headers, signal) {
+			const t = _isGoogleHost(remote) ? googleTransport : primary;
+			return t.request(remote, method, body, headers, signal);
+		},
+		connect(url, protocols, requestHeaders, onOpen, onData, onClose, onError) {
+			const t = _isGoogleHost(url instanceof URL ? url : (() => { try { return new URL(url); } catch { return null; } })())
+				? googleTransport : primary;
+			return t.connect(url, protocols, requestHeaders, onOpen, onData, onClose, onError);
+		},
+		meta() { return {}; },
+	};
+
+	return _wrapTransportHeaders(router);
 }
 
 /**
