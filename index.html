@@ -750,6 +750,17 @@
       // State
       var bfsIdx = 0, bfsDragging = false, bfsPlaying = false, bfsDuration = 0;
       var bfsYTFrame = null; // the hidden <iframe> element
+      var _brcReady = false;
+
+      // Track when BRC proxy is initialized so first song waits for a real proxied URL
+      document.addEventListener('brc-ready', function() {
+        _brcReady = true;
+        // If the player is visible but the iframe hasn't loaded yet, load now
+        var p = document.getElementById('bfs-player');
+        if (bfsYTFrame && p && p.style.display !== 'none' && bfsYTFrame.src.indexOf('about:blank') !== -1) {
+          bfsLoad(bfsIdx);
+        }
+      });
 
       function bfsThumb(id) { return 'https://img.youtube.com/vi/' + id + '/hqdefault.jpg'; }
       function bfsFmt(s) {
@@ -810,7 +821,12 @@
         p.style.display = 'block';
         p.style.animation = 'none'; p.offsetHeight; p.style.animation = '';
         bfsYTFrame = document.getElementById('bfs-yt');
-        bfsLoad(0);
+        // Show cover/title immediately so the widget looks right straight away
+        var s = BFS_SONGS[0]; bfsIdx = 0;
+        document.getElementById('bfs-cover').src = s.cover || bfsThumb(s.id);
+        document.getElementById('bfs-title').textContent = s.title;
+        // Defer iframe load until BRC proxy is ready; brc-ready listener handles the deferred case
+        if (_brcReady) bfsLoad(0);
       }
 
       function bfsHide() {
