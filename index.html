@@ -662,8 +662,6 @@
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
       </button>
     </div>
-    <iframe id="bfs-yt" src="about:blank" allow="autoplay;encrypted-media" referrerpolicy="no-referrer"
-      style="position:fixed;left:-9999px;top:-9999px;width:320px;height:180px;border:none;pointer-events:none;"></iframe>
   </div>
   <style>
     #bfs-player {
@@ -751,7 +749,7 @@
       ];
 
       var bfsIdx = 0, bfsDragging = false, bfsPlaying = false;
-      var bfsYT = null;
+      var bfsAudio = null;
       var bfsDur = 0, bfsCur = 0;
 
       function bfsThumb(id) { return 'https://img.youtube.com/vi/' + id + '/hqdefault.jpg'; }
@@ -769,44 +767,28 @@
         document.getElementById('bfs-thumb').style.left = pct + '%';
       }
 
-      // Send a command to the YouTube embed iframe
-      function bfsYTCmd(func, args) {
-        if (!bfsYT || !bfsYT.contentWindow) return;
-        bfsYT.contentWindow.postMessage(JSON.stringify({
-          event: 'command', func: func, args: args !== undefined ? [args] : ''
-        }), '*');
+      function bfsWireAudio() {
+        bfsAudio = new Audio();
+        bfsAudio.addEventListener('timeupdate', function() {
+          bfsCur = bfsAudio.currentTime;
+          if (!bfsDragging && bfsDur > 0) {
+            document.getElementById('bfs-current').textContent = bfsFmt(bfsCur);
+            bfsSetBar(bfsCur / bfsDur * 100);
+          }
+        });
+        bfsAudio.addEventListener('loadedmetadata', function() {
+          bfsDur = bfsAudio.duration;
+          document.getElementById('bfs-duration').textContent = bfsFmt(bfsDur);
+        });
+        bfsAudio.addEventListener('play',  function() { bfsSetPlaying(true); });
+        bfsAudio.addEventListener('pause', function() { bfsSetPlaying(false); });
+        bfsAudio.addEventListener('ended', function() {
+          bfsLoad((bfsIdx + 1) % BFS_SONGS.length, true);
+        });
       }
 
-      // YouTube embed fires infoDelivery messages with currentTime, duration, playerState
-      window.addEventListener('message', function(e) {
-        if (!bfsYT || e.source !== bfsYT.contentWindow) return;
-        try {
-          var data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-          if (data.event === 'onReady') {
-            // Player API is fully initialized — only now safe to send 'listening'
-            bfsYT.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*');
-            return;
-          }
-          if (data.event === 'infoDelivery' && data.info) {
-            var info = data.info;
-            if (typeof info.currentTime === 'number') {
-              bfsCur = info.currentTime;
-              document.getElementById('bfs-current').textContent = bfsFmt(bfsCur);
-            }
-            if (typeof info.duration === 'number') {
-              bfsDur = info.duration;
-              document.getElementById('bfs-duration').textContent = bfsFmt(bfsDur);
-            }
-            if (!bfsDragging && bfsDur > 0) bfsSetBar(bfsCur / bfsDur * 100);
-            if (typeof info.playerState === 'number') {
-              bfsSetPlaying(info.playerState === 1);
-              if (info.playerState === 0) bfsLoad((bfsIdx + 1) % BFS_SONGS.length, true);
-            }
-          }
-        } catch (_) {}
-      });
-
       function bfsLoad(idx, autoplay) {
+        var loadIdx = idx;
         bfsIdx = idx;
         var s = BFS_SONGS[idx];
         document.getElementById('bfs-cover').src = s.cover || bfsThumb(s.id);
@@ -816,25 +798,36 @@
         bfsSetBar(0);
         bfsSetPlaying(false);
         bfsCur = 0; bfsDur = 0;
-        if (!bfsYT) return;
-        if (s.unplayable) { bfsYT.src = 'about:blank'; return; }
-        bfsYT.src = 'https://callanambulance.vercel.app/player.html?id=' + s.id + (autoplay ? '&play=1' : '');
+        if (!bfsAudio) return;
+        bfsAudio.pause();
+        bfsAudio.src = '';
+        if (s.unplayable) return;
+        fetch('/api/cobalt?id=' + s.id)
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (bfsIdx !== loadIdx) return;
+            if (!data.url) throw new Error('no url');
+            bfsAudio.src = data.url;
+            bfsAudio.load();
+            if (autoplay) bfsAudio.play().catch(function() {});
+          })
+          .catch(function(e) { console.warn('[BFS] stream failed:', e); });
       }
 
       function bfsShow() {
         var p = document.getElementById('bfs-player');
         p.style.display = 'block';
         p.style.animation = 'none'; p.offsetHeight; p.style.animation = '';
-        bfsYT = document.getElementById('bfs-yt');
+        if (!bfsAudio) bfsWireAudio();
         var s = BFS_SONGS[0]; bfsIdx = 0;
         document.getElementById('bfs-cover').src = s.cover || bfsThumb(s.id);
         document.getElementById('bfs-title').textContent = s.title;
-        bfsLoad(0);
+        bfsLoad(0, false);
       }
 
       function bfsHide() {
         document.getElementById('bfs-player').style.display = 'none';
-        if (bfsYT) { bfsYT.src = 'about:blank'; }
+        if (bfsAudio) bfsAudio.pause();
         bfsSetPlaying(false);
       }
 
@@ -846,7 +839,7 @@
         bfsSetBar(pct * 100);
         var seekTime = pct * bfsDur;
         document.getElementById('bfs-current').textContent = bfsFmt(seekTime);
-        if (bfsDur) bfsYTCmd('seekTo', seekTime);
+        if (bfsDur && bfsAudio) bfsAudio.currentTime = seekTime;
       }
       barEl.addEventListener('mousedown', function(e) {
         bfsDragging = true; barEl.classList.add('dragging');
@@ -861,8 +854,8 @@
 
       // Controls
       document.getElementById('bfs-playpause').addEventListener('click', function() {
-        if (!bfsYT || BFS_SONGS[bfsIdx].unplayable) return;
-        bfsPlaying ? bfsYTCmd('pauseVideo') : bfsYTCmd('playVideo');
+        if (!bfsAudio || BFS_SONGS[bfsIdx].unplayable || !bfsAudio.src) return;
+        bfsAudio.paused ? bfsAudio.play().catch(function(){}) : bfsAudio.pause();
       });
       document.getElementById('bfs-prev').addEventListener('click', function() {
         bfsLoad((bfsIdx - 1 + BFS_SONGS.length) % BFS_SONGS.length, true);
