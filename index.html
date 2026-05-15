@@ -686,38 +686,35 @@
     /* option type */
     .notif[data-t="option"]  { border-left: 3px solid #8b5cf6; min-width: 290px; }
     .notif[data-t="option"]  .notif-bar { background: #8b5cf6; }
-    .notif-options { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
+    .notif-options { display: flex; flex-direction: row; gap: 5px; margin-top: 10px; }
     .notif-opt-btn {
-      display: flex; align-items: center; gap: 7px;
+      display: flex; flex: 1; align-items: center; justify-content: center; gap: 5px;
       background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.11);
-      border-radius: 6px; padding: 7px 10px; cursor: pointer; color: inherit;
-      font-size: 0.81rem; text-align: left; width: 100%;
+      border-radius: 6px; padding: 7px 8px; cursor: pointer; color: inherit;
+      font-size: 0.78rem; text-align: center;
       transition: background 0.15s, border-color 0.15s;
     }
     .notif-opt-btn:hover { background: rgba(255,255,255,0.13); border-color: rgba(255,255,255,0.26); }
-    .notif-opt-btn.opt-skip { opacity: 0.5; font-size: 0.78rem; }
+    .notif-opt-btn.opt-skip { opacity: 0.5; font-size: 0.75rem; }
     .notif-opt-btn.opt-skip:hover { opacity: 0.8; }
     .notif-opt-label { flex: 1; }
-    .notif-opt-info-wrap {
-      position: relative; flex-shrink: 0;
-      width: 17px; height: 17px;
-    }
+    .notif-opt-info-wrap { flex-shrink: 0; width: 15px; height: 15px; }
     .notif-opt-info-btn {
-      width: 17px; height: 17px; border-radius: 50%;
+      width: 15px; height: 15px; border-radius: 50%;
       background: rgba(255,255,255,0.13); border: none; cursor: pointer;
-      color: inherit; font-size: 0.62rem; display: flex; align-items: center;
+      color: inherit; font-size: 0.6rem; display: flex; align-items: center;
       justify-content: center; opacity: 0.55; transition: opacity 0.15s;
       line-height: 1; padding: 0;
     }
     .notif-opt-info-btn:hover { opacity: 1; }
+    /* tooltip — position/display driven by JS for viewport-awareness */
     .notif-opt-tooltip {
-      display: none; position: absolute; right: 0; bottom: calc(100% + 7px);
+      display: none; position: fixed;
       background: #18181f; color: #ddd; border: 1px solid rgba(255,255,255,0.14);
       border-radius: 7px; padding: 8px 11px; font-size: 0.76rem;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.5); z-index: 99999;
-      width: 210px; white-space: normal; text-align: left; pointer-events: none;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5); z-index: 999999;
+      width: 200px; white-space: normal; text-align: left; pointer-events: none;
     }
-    .notif-opt-info-wrap:hover .notif-opt-tooltip { display: block; }
   </style>
   <div id="notif-container" aria-live="polite"></div>
   <script>
@@ -829,6 +826,38 @@
 
         // Very long timeout (5 min) — effectively manual dismiss only
         setTimeout(dismiss, 300000);
+
+        // Viewport-aware tooltip positioning (escapes overflow:hidden + clamps to screen)
+        el.querySelectorAll(".notif-opt-info-wrap").forEach(function (wrap) {
+          var infoBtn = wrap.querySelector(".notif-opt-info-btn");
+          var tooltip = wrap.querySelector(".notif-opt-tooltip");
+
+          infoBtn.addEventListener("mouseenter", function () {
+            // Measure tooltip size while invisible
+            tooltip.style.visibility = "hidden";
+            tooltip.style.display = "block";
+            var ttW = tooltip.offsetWidth;
+            var ttH = tooltip.offsetHeight;
+            tooltip.style.visibility = "";
+            tooltip.style.display = "none";
+
+            var rect = infoBtn.getBoundingClientRect();
+            // Prefer above, flip below if it would go off the top
+            var topAbove = rect.top - ttH - 7;
+            var top = topAbove >= 10 ? topAbove : rect.bottom + 7;
+            // Center horizontally over button, clamped inside viewport
+            var left = rect.left + rect.width / 2 - ttW / 2;
+            left = Math.max(10, Math.min(left, window.innerWidth - ttW - 10));
+
+            tooltip.style.top = top + "px";
+            tooltip.style.left = left + "px";
+            tooltip.style.display = "block";
+          });
+
+          infoBtn.addEventListener("mouseleave", function () {
+            tooltip.style.display = "none";
+          });
+        });
 
         container.appendChild(el);
       };
