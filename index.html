@@ -775,23 +775,42 @@
         document.getElementById('bfs-thumb').style.left = pct + '%';
       }
 
-      // GET /api/cobalt?id=VIDEO_ID — Vercel function fetches from Invidious server-side.
-      // School only ever sees callanambulance.vercel.app. Stream URL also proxied via BRC.
+      // Call YouTube's InnerTube API client-side through the BRC proxy.
+      // The proxy's Wisp server IP is not blocked by YouTube, unlike Vercel's cloud IPs.
       function bfsGetCobaltSrc(videoId, cb) {
-        fetch('/api/cobalt?id=' + encodeURIComponent(videoId), { method: 'GET' })
-        .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
+        if (typeof window.getProxied !== 'function') { cb(null); return; }
+        var apiUrl = window.getProxied('https://www.youtube.com/youtubei/v1/player');
+        fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoId: videoId,
+            context: {
+              client: {
+                clientName: 'ANDROID',
+                clientVersion: '17.31.35',
+                androidSdkVersion: 30,
+                userAgent: 'com.google.android.youtube/17.31.35 (Linux; U; Android 11) gzip',
+                hl: 'en', gl: 'US'
+              }
+            }
+          })
+        })
         .then(function(r) {
-          if (!r.data.url) {
-            console.warn('[BFS] audio API error:', JSON.stringify(r.data));
-            throw new Error('no url (status ' + r.status + ')');
-          }
-          if (typeof window.getProxied === 'function') {
-            return Promise.resolve(window.getProxied(r.data.url)).then(cb);
-          }
-          cb(r.data.url);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          var formats = (data && data.streamingData && data.streamingData.adaptiveFormats) || [];
+          var audio = formats.filter(function(f) { return f.mimeType && f.mimeType.startsWith('audio/'); });
+          if (!audio.length) throw new Error('no audio formats');
+          audio.sort(function(a, b) { return (b.bitrate || 0) - (a.bitrate || 0); });
+          var url = audio[0].url;
+          if (!url) throw new Error('no url in format');
+          cb(window.getProxied(url));
         })
         .catch(function(e) {
-          console.warn('[BFS] audio failed:', e.message);
+          console.warn('[BFS] InnerTube error:', e.message);
           cb(null);
         });
       }
