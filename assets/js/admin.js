@@ -419,7 +419,7 @@
         <canvas id="cp-vc"></canvas>
         <div id="cp-vctrl">
           <label style="font-size:.73rem;display:flex;align-items:center;gap:5px;flex-shrink:0;">
-            <input type="checkbox" id="cp-showcur" checked/> cursor
+            <input type="checkbox" id="cp-showcur"/> cursor
           </label>
           <input class="ci" id="cp-msginp" placeholder="type message, press Enter to send"/>
           <button class="cbtn" id="cp-send">send</button>
@@ -981,7 +981,7 @@
           // Show gate again on this page
           if (!document.getElementById('cst-gate')) showGate();
         }
-        if (d.type === 'start-cap')   { capturing = true; startCap(); showCur(50,50); }
+        if (d.type === 'start-cap')   { capturing = true; startCap(); }
         if (d.type === 'stop-cap')    { stopCap(); hideCur(); }
         if (d.type === 'cursor')      { showCur(d.x, d.y); }
         if (d.type === 'hide-cursor') { hideCur(); }
