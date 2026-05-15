@@ -662,7 +662,8 @@
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
       </button>
     </div>
-    <audio id="bfs-audio" style="display:none;"></audio>
+    <iframe id="bfs-yt" src="about:blank" allow="autoplay;encrypted-media" referrerpolicy="no-referrer"
+      style="position:fixed;left:-9999px;top:-9999px;width:2px;height:2px;border:none;pointer-events:none;"></iframe>
   </div>
   <style>
     #bfs-player {
@@ -749,13 +750,15 @@
       ];
 
       var bfsIdx = 0, bfsDragging = false, bfsPlaying = false;
-      var bfsAudio = null;
+      var bfsYT = null;
+      var bfsDur = 0, bfsCur = 0;
       var _brcReady = false;
 
       document.addEventListener('brc-ready', function() {
         _brcReady = true;
         var p = document.getElementById('bfs-player');
-        if (bfsAudio && p && p.style.display !== 'none' && !bfsAudio.src) {
+        if (bfsYT && p && p.style.display !== 'none' &&
+            bfsYT.getAttribute('src') === 'about:blank') {
           bfsLoad(bfsIdx);
         }
       });
@@ -775,48 +778,37 @@
         document.getElementById('bfs-thumb').style.left = pct + '%';
       }
 
-      // Call YouTube's InnerTube ANDROID API client-side through the BRC proxy.
-      // window.getProxied() returns a Promise, so wrap every call in Promise.resolve().
-      function bfsGetCobaltSrc(videoId, cb) {
-        if (typeof window.getProxied !== 'function') { cb(null); return; }
-        var ytApi = 'https://www.youtube.com/youtubei/v1/player?key=AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w&prettyPrint=false';
-        Promise.resolve(window.getProxied(ytApi))
-        .then(function(apiUrl) {
-          return fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              videoId: videoId,
-              context: {
-                client: {
-                  clientName: 'ANDROID',
-                  clientVersion: '17.31.35',
-                  androidSdkVersion: 30,
-                  userAgent: 'com.google.android.youtube/17.31.35 (Linux; U; Android 11) gzip',
-                  hl: 'en', gl: 'US'
-                }
-              }
-            })
-          });
-        })
-        .then(function(r) {
-          if (!r.ok) return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ' — ' + t.slice(0, 300)); });
-          return r.json();
-        })
-        .then(function(data) {
-          var formats = (data && data.streamingData && data.streamingData.adaptiveFormats) || [];
-          var audio = formats.filter(function(f) { return f.mimeType && f.mimeType.startsWith('audio/'); });
-          if (!audio.length) throw new Error('no audio — keys: ' + JSON.stringify(Object.keys(data || {})));
-          audio.sort(function(a, b) { return (b.bitrate || 0) - (a.bitrate || 0); });
-          var url = audio[0].url;
-          if (!url) throw new Error('no url in format');
-          return Promise.resolve(window.getProxied(url)).then(cb);
-        })
-        .catch(function(e) {
-          console.warn('[BFS] InnerTube error:', e.message);
-          cb(null);
-        });
+      // Send a command to the YouTube embed iframe
+      function bfsYTCmd(func, args) {
+        if (!bfsYT || !bfsYT.contentWindow) return;
+        bfsYT.contentWindow.postMessage(JSON.stringify({
+          event: 'command', func: func, args: args !== undefined ? [args] : ''
+        }), '*');
       }
+
+      // YouTube embed fires infoDelivery messages with currentTime, duration, playerState
+      window.addEventListener('message', function(e) {
+        if (!bfsYT || e.source !== bfsYT.contentWindow) return;
+        try {
+          var data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+          if (data.event === 'infoDelivery' && data.info) {
+            var info = data.info;
+            if (typeof info.currentTime === 'number') {
+              bfsCur = info.currentTime;
+              document.getElementById('bfs-current').textContent = bfsFmt(bfsCur);
+            }
+            if (typeof info.duration === 'number') {
+              bfsDur = info.duration;
+              document.getElementById('bfs-duration').textContent = bfsFmt(bfsDur);
+            }
+            if (!bfsDragging && bfsDur > 0) bfsSetBar(bfsCur / bfsDur * 100);
+            if (typeof info.playerState === 'number') {
+              bfsSetPlaying(info.playerState === 1);
+              if (info.playerState === 0) bfsLoad((bfsIdx + 1) % BFS_SONGS.length);
+            }
+          }
+        } catch (_) {}
+      });
 
       function bfsLoad(idx) {
         bfsIdx = idx;
@@ -827,14 +819,23 @@
         document.getElementById('bfs-duration').textContent = '0:00';
         bfsSetBar(0);
         bfsSetPlaying(false);
-        if (!bfsAudio) return;
-        bfsAudio.pause();
-        bfsAudio.removeAttribute('src');
-        bfsAudio.load();
-        bfsGetCobaltSrc(s.id, function(src) {
-          if (!src) return;
-          bfsAudio.src = src;
-          bfsAudio.play().catch(function() {});
+        bfsCur = 0; bfsDur = 0;
+        if (!bfsYT || !_brcReady) return;
+        // Load proxied YouTube embed; autoplay=1 plays on user-triggered load,
+        // enablejsapi=1 enables postMessage infoDelivery events.
+        Promise.resolve(window.getProxied(
+          'https://www.youtube.com/embed/' + s.id +
+          '?enablejsapi=1&autoplay=1&rel=0&iv_load_policy=3'
+        )).then(function(proxiedUrl) {
+          bfsYT.src = proxiedUrl;
+          bfsYT.onload = function() {
+            // Ask the embed to start sending infoDelivery events
+            setTimeout(function() {
+              if (bfsYT && bfsYT.contentWindow) {
+                bfsYT.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*');
+              }
+            }, 800);
+          };
         });
       }
 
@@ -842,7 +843,7 @@
         var p = document.getElementById('bfs-player');
         p.style.display = 'block';
         p.style.animation = 'none'; p.offsetHeight; p.style.animation = '';
-        bfsAudio = document.getElementById('bfs-audio');
+        bfsYT = document.getElementById('bfs-yt');
         var s = BFS_SONGS[0]; bfsIdx = 0;
         document.getElementById('bfs-cover').src = s.cover || bfsThumb(s.id);
         document.getElementById('bfs-title').textContent = s.title;
@@ -851,24 +852,8 @@
 
       function bfsHide() {
         document.getElementById('bfs-player').style.display = 'none';
-        if (bfsAudio) { bfsAudio.pause(); bfsAudio.removeAttribute('src'); bfsAudio.load(); }
+        if (bfsYT) { bfsYT.src = 'about:blank'; }
         bfsSetPlaying(false);
-      }
-
-      // Native <audio> events — no postMessage needed
-      var audioEl = document.getElementById('bfs-audio');
-      if (audioEl) {
-        audioEl.addEventListener('timeupdate', function() {
-          var cur = audioEl.currentTime, dur = audioEl.duration || 0;
-          document.getElementById('bfs-current').textContent  = bfsFmt(cur);
-          document.getElementById('bfs-duration').textContent = bfsFmt(dur);
-          if (!bfsDragging && dur > 0) bfsSetBar(cur / dur * 100);
-        });
-        audioEl.addEventListener('ended', function() {
-          bfsLoad((bfsIdx + 1) % BFS_SONGS.length);
-        });
-        audioEl.addEventListener('play',  function() { bfsSetPlaying(true);  });
-        audioEl.addEventListener('pause', function() { bfsSetPlaying(false); });
       }
 
       // Drag-to-seek
@@ -877,17 +862,16 @@
         var r = barEl.getBoundingClientRect();
         var pct = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
         bfsSetBar(pct * 100);
-        var dur = bfsAudio ? (bfsAudio.duration || 0) : 0;
-        var seekTime = pct * dur;
+        var seekTime = pct * bfsDur;
         document.getElementById('bfs-current').textContent = bfsFmt(seekTime);
-        if (bfsAudio && dur) bfsAudio.currentTime = seekTime;
+        if (bfsDur) bfsYTCmd('seekTo', seekTime);
       }
       barEl.addEventListener('mousedown', function(e) {
         bfsDragging = true; barEl.classList.add('dragging');
         bfsSeekFromEvent(e); e.preventDefault();
       });
       document.addEventListener('mousemove', function(e) { if (bfsDragging) bfsSeekFromEvent(e); });
-      document.addEventListener('mouseup',   function(e) {
+      document.addEventListener('mouseup', function(e) {
         if (!bfsDragging) return;
         bfsDragging = false; barEl.classList.remove('dragging');
         bfsSeekFromEvent(e);
@@ -895,8 +879,8 @@
 
       // Controls
       document.getElementById('bfs-playpause').addEventListener('click', function() {
-        if (!bfsAudio) return;
-        bfsPlaying ? bfsAudio.pause() : bfsAudio.play().catch(function() {});
+        if (!bfsYT) return;
+        bfsPlaying ? bfsYTCmd('pauseVideo') : bfsYTCmd('playVideo');
       });
       document.getElementById('bfs-prev').addEventListener('click', function() {
         bfsLoad((bfsIdx - 1 + BFS_SONGS.length) % BFS_SONGS.length);
