@@ -785,9 +785,13 @@
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           body: JSON.stringify({ url: ytUrl, downloadMode: 'audio', audioFormat: 'mp3' })
         })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (!data.url) throw new Error('no url in cobalt response');
+        .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
+        .then(function(res) {
+          var data = res.data;
+          if (!data.url) {
+            console.warn('[BFS] Cobalt error response:', JSON.stringify(data));
+            throw new Error('no url (status ' + res.status + ')');
+          }
           if (typeof window.getProxied === 'function') {
             return Promise.resolve(window.getProxied(data.url)).then(cb);
           }
