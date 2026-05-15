@@ -9,7 +9,6 @@
 
   const HUB_ID     = 'celestial-chat-hub-v1';
   const APPEAR_KEY = 'cst-appearance';
-  const NOTIF_KEY  = 'cst-chat-notif-seen';
   const MAX_CHARS  = 400;
   const COOLDOWN   = 1000;
 
@@ -49,65 +48,25 @@
 
   // ── notification ──────────────────────────────────────────────
   function maybeShowNotif() {
-    if (!canChat()) return;
-    if (localStorage.getItem(NOTIF_KEY) || isChatOn()) return;
+    if (!canChat() || isChatOn()) return;
     setTimeout(() => {
-      if (document.getElementById('cst-chat-notif')) return;
-      const el = document.createElement('div');
-      el.id = 'cst-chat-notif';
-      el.style.cssText =
-        'position:fixed;bottom:60px;left:16px;z-index:2147483643;' +
-        'background:#0d0d0d;border:1px solid #252525;border-radius:10px;' +
-        'padding:14px 16px;max-width:260px;font-family:system-ui,sans-serif;color:#ccc;' +
-        'box-shadow:0 4px 20px rgba(0,0,0,.6);';
-      el.innerHTML = `
-        <div style="font-size:.88rem;font-weight:600;margin-bottom:4px;">✦ Test Chat App?</div>
-        <div style="font-size:.73rem;color:#555;margin-bottom:12px;">
-          Chat with other verified users in real time. Beta feature.
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button id="cst-cn-en" style="flex:1;padding:7px;background:#111;border:1px solid #2a2a2a;
-            border-radius:6px;color:#bbb;font-size:.78rem;cursor:pointer;">Enable</button>
-          <button id="cst-cn-no" style="flex:1;padding:7px;background:none;border:1px solid #1a1a1a;
-            border-radius:6px;color:#444;font-size:.78rem;cursor:pointer;">Maybe later</button>
-        </div>`;
-      document.body.appendChild(el);
-      document.getElementById('cst-cn-en').onclick = () => { enableChat(); el.remove(); };
-      document.getElementById('cst-cn-no').onclick = () => {
-        localStorage.setItem(NOTIF_KEY, '1'); el.remove();
-      };
+      if (isChatOn()) return;
+      window.notifyOption?.('✦ Test Chat App?',
+        'Chat with other verified users in real time. Beta feature.',
+        [
+          { label: 'Enable',       info: 'Turn on real-time chat with other verified users.', onClick: enableChat },
+          { label: 'Maybe later',  info: 'Dismiss — the option stays in Appearance settings.', className: 'opt-skip', onClick: () => {} },
+        ]
+      );
     }, 3500);
   }
 
   function enableChat() {
     setChatOn(true);
-    localStorage.setItem(NOTIF_KEY, '1');
     const tog = document.getElementById('chatTog');
     if (tog) tog.checked = true;
     initChat();
-    showDisableHint();
-  }
-
-  function showDisableHint() {
-    const t = document.createElement('div');
-    t.style.cssText =
-      'position:fixed;bottom:60px;left:50%;transform:translateX(-50%);' +
-      'background:#0d0d0d;border:1px solid #252525;border-radius:8px;' +
-      'padding:10px 16px;font-family:system-ui,sans-serif;font-size:.76rem;color:#666;' +
-      'z-index:2147483643;display:flex;align-items:center;gap:8px;white-space:nowrap;' +
-      'opacity:1;transition:opacity .4s;';
-    t.innerHTML = `
-      To disable:
-      <span style="display:inline-flex;align-items:center;justify-content:center;
-        width:22px;height:22px;border:1px solid #333;border-radius:5px;font-size:.9rem;">⋮</span>
-      <span style="color:#555;">→</span>
-      <span style="display:inline-flex;align-items:center;gap:3px;border:1px solid #333;
-        border-radius:5px;padding:2px 7px;font-size:.72rem;">◈ Appearance</span>
-      <span style="color:#555;">→</span>
-      <span style="display:inline-flex;align-items:center;gap:4px;border:1px solid #333;
-        border-radius:5px;padding:2px 7px;font-size:.72rem;">✦ Chat <span style="color:#bbb;">off</span></span>`;
-    document.body.appendChild(t);
-    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 450); }, 6000);
+    window.notify?.('To disable: ⋮ → Appearance → toggle ✦ Chat off', 'info', 7000);
   }
 
   // ── hub election ──────────────────────────────────────────────
@@ -402,7 +361,7 @@
     tog.checked = isChatOn();
     tog.addEventListener('change', () => {
       setChatOn(tog.checked);
-      if (tog.checked) { localStorage.setItem(NOTIF_KEY, '1'); initChat(); }
+      if (tog.checked) { initChat(); }
       else {
         // tear down (user disabled chat)
         if (hubConn) { try { hubConn.close(); } catch {} hubConn = null; }
