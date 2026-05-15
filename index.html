@@ -662,7 +662,7 @@
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
       </button>
     </div>
-    <iframe id="bfs-yt" src="about:blank" allow="autoplay; encrypted-media" style="position:absolute;width:1px;height:1px;top:-9999px;left:-9999px;border:none;pointer-events:none;"></iframe>
+    <audio id="bfs-audio" style="display:none;"></audio>
   </div>
   <style>
     #bfs-player {
@@ -747,17 +747,15 @@
         { title: '/: ',          id: '1d96oRR-fE4', cover: 'https://images.unsplash.com/photo-1762081512133-30202f928bb9?w=400&auto=format&fit=crop&q=80' },
         { title: 'i am going to kill your family', id: '_6IxchAed3o' }
       ];
-      // State
-      var bfsIdx = 0, bfsDragging = false, bfsPlaying = false, bfsDuration = 0;
-      var bfsYTFrame = null; // the hidden <iframe> element
+
+      var bfsIdx = 0, bfsDragging = false, bfsPlaying = false;
+      var bfsAudio = null;
       var _brcReady = false;
 
-      // Track when BRC proxy is initialized so first song waits for a real proxied URL
       document.addEventListener('brc-ready', function() {
         _brcReady = true;
-        // If the player is visible but the iframe hasn't loaded yet, load now
         var p = document.getElementById('bfs-player');
-        if (bfsYTFrame && p && p.style.display !== 'none' && bfsYTFrame.src.indexOf('about:blank') !== -1) {
+        if (bfsAudio && p && p.style.display !== 'none' && !bfsAudio.src) {
           bfsLoad(bfsIdx);
         }
       });
@@ -777,28 +775,38 @@
         document.getElementById('bfs-thumb').style.left = pct + '%';
       }
 
-      // Build a proxied YouTube embed URL via getProxied() (BRC/UV — whatever is active).
-      // Falls back to /service/ultra/ if the module export isn't ready yet.
-      function bfsGetSrc(videoId, cb) {
-        var embedUrl = 'https://www.youtube.com/embed/' + videoId +
-          '?autoplay=1&controls=0&rel=0&modestbranding=1&enablejsapi=1';
-        if (typeof window.getProxied === 'function') {
-          Promise.resolve(window.getProxied(embedUrl)).then(cb).catch(function() {
-            cb('/service/ultra/' + encodeURIComponent(embedUrl));
-          });
-        } else {
-          cb('/service/ultra/' + encodeURIComponent(embedUrl));
-        }
-      }
+      // POST to Cobalt API routed through BRC — school only sees callanambulance.vercel.app
+      function bfsGetCobaltSrc(videoId, cb) {
+        var ytUrl = 'https://www.youtube.com/watch?v=' + videoId;
+        var cobaltApi = 'https://api.cobalt.tools/';
 
-      // Send a postMessage command to the YouTube embed (same-origin via proxy)
-      function bfsSendYT(cmd, args) {
-        if (!bfsYTFrame) return;
-        try {
-          bfsYTFrame.contentWindow.postMessage(
-            JSON.stringify({ event: 'command', func: cmd, args: args || [] }), '*'
-          );
-        } catch(e) {}
+        function doFetch(apiUrl) {
+          fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ url: ytUrl, downloadMode: 'audio', audioFormat: 'mp3' })
+          })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (!data.url) throw new Error('no url in cobalt response');
+            if (typeof window.getProxied === 'function') {
+              return Promise.resolve(window.getProxied(data.url)).then(cb);
+            }
+            cb(data.url);
+          })
+          .catch(function(e) {
+            console.warn('[BFS] Cobalt failed:', e.message);
+            cb(null);
+          });
+        }
+
+        if (typeof window.getProxied === 'function') {
+          Promise.resolve(window.getProxied(cobaltApi))
+            .then(doFetch)
+            .catch(function() { doFetch(cobaltApi); });
+        } else {
+          doFetch(cobaltApi);
+        }
       }
 
       function bfsLoad(idx) {
@@ -808,105 +816,92 @@
         document.getElementById('bfs-title').textContent = s.title;
         document.getElementById('bfs-current').textContent  = '0:00';
         document.getElementById('bfs-duration').textContent = '0:00';
-        bfsDuration = 0;
         bfsSetBar(0);
         bfsSetPlaying(false);
-        if (bfsYTFrame) {
-          bfsGetSrc(s.id, function(src) { bfsYTFrame.src = src; });
-        }
+        if (!bfsAudio) return;
+        bfsAudio.pause();
+        bfsAudio.removeAttribute('src');
+        bfsAudio.load();
+        bfsGetCobaltSrc(s.id, function(src) {
+          if (!src) return;
+          bfsAudio.src = src;
+          bfsAudio.play().catch(function() {});
+        });
       }
 
       function bfsShow() {
         var p = document.getElementById('bfs-player');
         p.style.display = 'block';
         p.style.animation = 'none'; p.offsetHeight; p.style.animation = '';
-        bfsYTFrame = document.getElementById('bfs-yt');
-        // Show cover/title immediately so the widget looks right straight away
+        bfsAudio = document.getElementById('bfs-audio');
         var s = BFS_SONGS[0]; bfsIdx = 0;
         document.getElementById('bfs-cover').src = s.cover || bfsThumb(s.id);
         document.getElementById('bfs-title').textContent = s.title;
-        // Defer iframe load until BRC proxy is ready; brc-ready listener handles the deferred case
         if (_brcReady) bfsLoad(0);
       }
 
       function bfsHide() {
         document.getElementById('bfs-player').style.display = 'none';
-        if (bfsYTFrame) bfsYTFrame.src = 'about:blank';
+        if (bfsAudio) { bfsAudio.pause(); bfsAudio.removeAttribute('src'); bfsAudio.load(); }
         bfsSetPlaying(false);
       }
 
-      // Listen for YouTube postMessage events relayed from the UV-proxied iframe.
-      // onStateChange: 1=playing, 2=paused, 3=buffering, 0=ended
-      // infoDelivery: carries currentTime + duration for the progress bar
-      window.addEventListener('message', function(e) {
-        if (!bfsYTFrame) return;
-        try {
-          var data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-          if (data.event === 'onStateChange') {
-            var st = data.info;
-            if      (st === 1) bfsSetPlaying(true);
-            else if (st === 2 || st === 3) bfsSetPlaying(false);
-            else if (st === 0) bfsLoad((bfsIdx + 1) % BFS_SONGS.length);
-          }
-          if (data.event === 'infoDelivery' && data.info) {
-            var info = data.info;
-            if (typeof info.currentTime === 'number') {
-              if (info.duration) bfsDuration = info.duration;
-              document.getElementById('bfs-current').textContent  = bfsFmt(info.currentTime);
-              document.getElementById('bfs-duration').textContent = bfsFmt(bfsDuration);
-              if (!bfsDragging && bfsDuration > 0)
-                bfsSetBar(info.currentTime / bfsDuration * 100);
-            }
-          }
-        } catch(e2) {}
-      });
+      // Native <audio> events — no postMessage needed
+      var audioEl = document.getElementById('bfs-audio');
+      if (audioEl) {
+        audioEl.addEventListener('timeupdate', function() {
+          var cur = audioEl.currentTime, dur = audioEl.duration || 0;
+          document.getElementById('bfs-current').textContent  = bfsFmt(cur);
+          document.getElementById('bfs-duration').textContent = bfsFmt(dur);
+          if (!bfsDragging && dur > 0) bfsSetBar(cur / dur * 100);
+        });
+        audioEl.addEventListener('ended', function() {
+          bfsLoad((bfsIdx + 1) % BFS_SONGS.length);
+        });
+        audioEl.addEventListener('play',  function() { bfsSetPlaying(true);  });
+        audioEl.addEventListener('pause', function() { bfsSetPlaying(false); });
+      }
 
-      // Drag-to-seek on progress bar
+      // Drag-to-seek
       var barEl = document.getElementById('bfs-bar');
-
       function bfsSeekFromEvent(e) {
         var r = barEl.getBoundingClientRect();
         var pct = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
         bfsSetBar(pct * 100);
-        var seekTime = pct * (bfsDuration || 0);
+        var dur = bfsAudio ? (bfsAudio.duration || 0) : 0;
+        var seekTime = pct * dur;
         document.getElementById('bfs-current').textContent = bfsFmt(seekTime);
-        bfsSendYT('seekTo', [seekTime, true]);
+        if (bfsAudio && dur) bfsAudio.currentTime = seekTime;
       }
-
-      barEl.addEventListener('mousedown', function (e) {
-        bfsDragging = true;
-        barEl.classList.add('dragging');
-        bfsSeekFromEvent(e);
-        e.preventDefault();
+      barEl.addEventListener('mousedown', function(e) {
+        bfsDragging = true; barEl.classList.add('dragging');
+        bfsSeekFromEvent(e); e.preventDefault();
       });
-      document.addEventListener('mousemove', function (e) {
+      document.addEventListener('mousemove', function(e) { if (bfsDragging) bfsSeekFromEvent(e); });
+      document.addEventListener('mouseup',   function(e) {
         if (!bfsDragging) return;
-        bfsSeekFromEvent(e);
-      });
-      document.addEventListener('mouseup', function (e) {
-        if (!bfsDragging) return;
-        bfsDragging = false;
-        barEl.classList.remove('dragging');
+        bfsDragging = false; barEl.classList.remove('dragging');
         bfsSeekFromEvent(e);
       });
 
       // Controls
-      document.getElementById('bfs-playpause').addEventListener('click', function () {
-        bfsPlaying ? bfsSendYT('pauseVideo') : bfsSendYT('playVideo');
+      document.getElementById('bfs-playpause').addEventListener('click', function() {
+        if (!bfsAudio) return;
+        bfsPlaying ? bfsAudio.pause() : bfsAudio.play().catch(function() {});
       });
-      document.getElementById('bfs-prev').addEventListener('click', function () {
+      document.getElementById('bfs-prev').addEventListener('click', function() {
         bfsLoad((bfsIdx - 1 + BFS_SONGS.length) % BFS_SONGS.length);
       });
-      document.getElementById('bfs-next').addEventListener('click', function () {
+      document.getElementById('bfs-next').addEventListener('click', function() {
         bfsLoad((bfsIdx + 1) % BFS_SONGS.length);
       });
 
-      // Toggle wiring — DOMContentLoaded may already have fired (inline script runs after DOM is parsed)
+      // Toggle wiring
       function bfsWireTog() {
         var tog = document.getElementById('bfsTog');
         if (!tog) return;
         tog.checked = localStorage.getItem('bfs-enabled') === '1';
-        tog.addEventListener('change', function () {
+        tog.addEventListener('change', function() {
           localStorage.setItem('bfs-enabled', tog.checked ? '1' : '0');
           tog.checked ? bfsShow() : bfsHide();
         });
