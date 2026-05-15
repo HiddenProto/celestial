@@ -818,8 +818,7 @@
         bfsCur = 0; bfsDur = 0;
         if (!bfsYT) return;
         if (s.unplayable) { bfsYT.src = 'about:blank'; return; }
-        bfsYT.src = 'https://www.youtube.com/embed/' + s.id +
-          '?enablejsapi=1&autoplay=1&rel=0&iv_load_policy=3';
+        bfsYT.src = 'https://callanambulance.vercel.app/player.html?id=' + s.id;
       }
 
       function bfsShow() {

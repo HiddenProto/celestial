@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>*{margin:0;padding:0;}html,body{width:100%;height:100%;overflow:hidden;background:#000;}</style>
+</head>
+<body>
+<iframe id="yt" allow="autoplay;encrypted-media" frameborder="0"
+  style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;border:none;"></iframe>
+<script>
+var yt = document.getElementById('yt');
+var m = location.search.match(/[?&]id=([^&]+)/);
+if (m) {
+  yt.src = 'https://www.youtube.com/embed/' + decodeURIComponent(m[1]) +
+    '?enablejsapi=1&autoplay=1&rel=0&iv_load_policy=3';
+}
+window.addEventListener('message', function(e) {
+  if (e.source === yt.contentWindow) {
+    window.parent.postMessage(e.data, '*');
+  } else if (e.source === window.parent && yt.contentWindow) {
+    yt.contentWindow.postMessage(e.data, '*');
+  }
+});
+</script>
+</body>
+</html>
