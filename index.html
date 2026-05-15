@@ -633,7 +633,10 @@
 
   <!-- ===== BFS Music Player ===== -->
   <div id="bfs-player">
-    <img id="bfs-cover" src="https://images.unsplash.com/photo-1619213579094-6dcaa7fa5d54?w=400&auto=format&fit=crop&q=80" alt="cover" />
+    <div id="bfs-cover-wrap" style="position:relative;">
+      <img id="bfs-cover" src="https://images.unsplash.com/photo-1619213579094-6dcaa7fa5d54?w=400&auto=format&fit=crop&q=80" alt="cover" />
+      <div id="bfs-eye-glow"></div>
+    </div>
     <div class="bfs-info">
       <div class="bfs-title" id="bfs-title">Egy</div>
     </div>
@@ -682,7 +685,6 @@
     #bfs-cover {
       width: 100%; height: 130px;
       object-fit: cover; display: block;
-      filter: brightness(0.8) grayscale(0.2);
     }
     .bfs-info { padding: 10px 12px 6px; border-bottom: 1px solid #1e1e1e; }
     .bfs-title {
@@ -733,14 +735,27 @@
       padding: 0 !important;
     }
     .bfs-playpause:hover { background: #d0d0d0 !important; }
+    #bfs-cover-wrap { position: relative; }
+    #bfs-cover-wrap #bfs-cover { display: block; width: 100%; height: 130px; object-fit: cover; filter: brightness(0.8) grayscale(0.2); }
+    #bfs-eye-glow {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; opacity: 1; transition: opacity 0.4s ease;
+      background: radial-gradient(ellipse 20px 15px at 57% 46%, rgba(255,210,0,0.92) 0%, rgba(255,150,0,0.55) 38%, transparent 72%);
+      mix-blend-mode: screen;
+      animation: bfs-eye-pulse 2s ease-in-out infinite;
+    }
+    @keyframes bfs-eye-pulse {
+      0%, 100% { filter: blur(1.5px) brightness(1); opacity: 0.85; }
+      50%       { filter: blur(0.6px) brightness(1.4); opacity: 1; }
+    }
   </style>
   <script>
     (function () {
       var BFS_SONGS = [
-        { title: 'Egy',          id: 'LFCAwmWa6mo' },
-        { title: 'A Rough Time', id: 'D0WzeTJlFHA' },
-        { title: 'Fallen Sky',   id: 'dZpD74pJkNE' },
-        { title: '/: ',          id: '1d96oRR-fE4' }
+        { title: 'Egy',          id: 'LFCAwmWa6mo', cover: 'https://images.unsplash.com/photo-1619213579094-6dcaa7fa5d54?w=400&auto=format&fit=crop&q=80' },
+        { title: 'A Rough Time', id: 'D0WzeTJlFHA', cover: 'https://images.unsplash.com/photo-1755923040436-c932c873cacf?w=400&auto=format&fit=crop&q=80' },
+        { title: 'Fallen Sky',   id: 'dZpD74pJkNE', cover: 'https://images.unsplash.com/photo-1750167000423-d448265fd79e?w=400&auto=format&fit=crop&q=80' },
+        { title: '/: ',          id: '1d96oRR-fE4', cover: 'https://images.unsplash.com/photo-1762081512133-30202f928bb9?w=400&auto=format&fit=crop&q=80' }
       ];
       var bfsIdx = 0, bfsYT = null, bfsApiReady = false, bfsTick = null, bfsDragging = false;
 
@@ -774,12 +789,14 @@
       function bfsLoad(idx) {
         bfsIdx = idx;
         var s = BFS_SONGS[idx];
-        document.getElementById('bfs-cover').src = bfsThumb(s.id);
+        document.getElementById('bfs-cover').src = s.cover || bfsThumb(s.id);
         document.getElementById('bfs-title').textContent = s.title;
         document.getElementById('bfs-current').textContent  = '0:00';
         document.getElementById('bfs-duration').textContent = '0:00';
         bfsSetBar(0);
         if (bfsYT && bfsApiReady) bfsYT.loadVideoById(s.id);
+        var eyeGlow = document.getElementById('bfs-eye-glow');
+        if (eyeGlow) eyeGlow.style.opacity = idx === 0 ? '1' : '0';
       }
 
       function bfsInitYT() {
@@ -869,8 +886,8 @@
         bfsLoad((bfsIdx + 1) % BFS_SONGS.length);
       });
 
-      // Toggle wiring
-      window.addEventListener('DOMContentLoaded', function () {
+      // Toggle wiring — DOMContentLoaded may already have fired (inline script runs after DOM is parsed)
+      function bfsWireTog() {
         var tog = document.getElementById('bfsTog');
         if (!tog) return;
         tog.checked = localStorage.getItem('bfs-enabled') === '1';
@@ -879,7 +896,12 @@
           tog.checked ? bfsShow() : bfsHide();
         });
         if (tog.checked) bfsShow();
-      });
+      }
+      if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', bfsWireTog);
+      } else {
+        bfsWireTog();
+      }
     })();
   </script>
 
