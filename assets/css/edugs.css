@@ -191,3 +191,60 @@ select::-ms-expand {
 .card.favorited .favoriteBook {
     color: #FFD700;
 }
+
+/* ── unavailable card state ── */
+.card.unavailable {
+    filter: grayscale(1) brightness(0.5);
+    cursor: default;
+}
+.card.unavailable:hover { transform: none; }
+.card.unavailable:hover p { opacity: 0; }
+.card.unavailable:hover .thumb { filter: none; }
+.card.unavailable .card-unavail { display: flex; }
+
+.card-unavail {
+    display: none;
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 4;
+    background: rgba(0,0,0,0.82);
+    padding: 3px 8px;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.6rem;
+    color: #555;
+    letter-spacing: 0.05em;
+    pointer-events: none;
+}
+.card-unavail-i {
+    font-size: 0.72rem;
+    color: #555;
+    cursor: default;
+    position: relative;
+    pointer-events: all;
+    flex-shrink: 0;
+}
+.card-unavail-i::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 210px;
+    background: #111;
+    color: #999;
+    font-size: 0.65rem;
+    line-height: 1.5;
+    padding: 8px 10px;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 99999;
+    white-space: normal;
+    text-align: left;
+    letter-spacing: normal;
+    font-weight: normal;
+}
+.card-unavail-i:hover::after { opacity: 1; }

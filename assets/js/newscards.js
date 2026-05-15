@@ -5,6 +5,84 @@ var search = document.querySelector(".textbook");
 var cat = document.querySelectorAll("select")[0];
 var order = document.querySelectorAll("select")[1];
 
+// ── Health check ────────────────────────────────────────────────────────────
+// Results cached in sessionStorage for 5 min so re-filtering never re-fetches.
+// Checks run once per page load in batches of 5 to stay minimal.
+const HC_TTL  = 5 * 60 * 1000;
+const HC_BATCH = 5;
+const UNAVAIL_MSG = "when the original site got obliterated I never expected it and I had no time to export the games that were original exclusive, therefore these will not be available until i find a solution.";
+
+const deadUrls = new Set();   // populated once; read by showGames on every render
+let   hcStarted = false;
+
+function hcGet(url) {
+  try {
+    const raw = sessionStorage.getItem("hc:" + url);
+    if (!raw) return null;
+    const { s, t } = JSON.parse(raw);
+    return Date.now() - t < HC_TTL ? s : null;
+  } catch { return null; }
+}
+function hcSet(url, s) {
+  try { sessionStorage.setItem("hc:" + url, JSON.stringify({ s, t: Date.now() })); } catch {}
+}
+
+async function hcOne(url, sameOrigin) {
+  const cached = hcGet(url);
+  if (cached !== null) return cached;
+  try {
+    const res = await Promise.race([
+      fetch(url, { method: "HEAD", mode: sameOrigin ? "same-origin" : "no-cors" }),
+      new Promise((_, r) => setTimeout(() => r(new Error("timeout")), 3000)),
+    ]);
+    const s = sameOrigin ? (res.ok ? "ok" : "dead") : "ok";
+    hcSet(url, s); return s;
+  } catch { hcSet(url, "dead"); return "dead"; }
+}
+
+async function runHealthChecks(games) {
+  if (hcStarted) return;
+  hcStarted = true;
+
+  // Apply already-cached results immediately (zero network)
+  for (const g of games) {
+    if (g.source === "dice") continue;
+    if (hcGet(g.url) === "dead") {
+      const hasFallback = g.localFallback && hcGet(g.localFallback) === "ok";
+      if (!hasFallback) deadUrls.add(g.url);
+    }
+  }
+  if (deadUrls.size) updateDeadCards();
+
+  // Background: check only uncached entries
+  const unchecked = games.filter(g => g.source !== "dice" && hcGet(g.url) === null);
+  for (let i = 0; i < unchecked.length; i += HC_BATCH) {
+    await Promise.all(
+      unchecked.slice(i, i + HC_BATCH).map(async (g) => {
+        const local = g.source === "local";
+        const status = await hcOne(g.url, local);
+        if (status === "dead") {
+          // Proxied with fallback: also check local copy
+          if (g.localFallback) {
+            const fb = await hcOne(g.localFallback, true);
+            if (fb === "ok") return;
+          }
+          deadUrls.add(g.url);
+          updateDeadCards();
+        }
+      })
+    );
+    // Small gap between batches — avoids hammering the network
+    if (i + HC_BATCH < unchecked.length) await new Promise(r => setTimeout(r, 80));
+  }
+}
+
+function updateDeadCards() {
+  document.querySelectorAll(".card[data-hcurl]").forEach(c => {
+    if (deadUrls.has(c.dataset.hcurl)) c.classList.add("unavailable");
+  });
+}
+
 /** The localstorage key that has all the favorite games */
 const FAVORITES_KEY = "favoriteGames";
 
@@ -35,12 +113,15 @@ function showGames(list) {
     <div class="thumb"><img loading="${imageLoading}" decoding="async" fetchpriority="${imagePriority}" src="${g.img}" alt="${g.name}"></div>
     <p>${g.name}</p>
     <svg class="favoriteBook" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="24" height="24" fill="currentColor"> <path d="${heartPath}"/> </svg>
-
+    <div class="card-unavail"><span>unavailable</span><span class="card-unavail-i" data-tip="${UNAVAIL_MSG}">ⓘ</span></div>
     `;
 
     var card = document.createElement("div"); // create a new game card
     card.className = "card";
+    card.dataset.hcurl = g.url;
+    if (deadUrls.has(g.url)) card.classList.add("unavailable");
     card.onclick = () => {
+      if (card.classList.contains("unavailable")) return;
       if (g.source === "dice") {
         rngGame();
       } else if (g.source === "local") {
@@ -154,6 +235,8 @@ fetch("/assets/json/books.json").then(r => r.json())
 
     // make sure ts loads
     update();
+    // kick off health checks after first render — non-blocking
+    runHealthChecks(originalGames);
   });
 
 function rngGame() {

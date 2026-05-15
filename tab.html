@@ -188,6 +188,16 @@
       <hr>
 
       <details open>
+        <summary>05/15 — game sync &amp; system updates</summary>
+        <p>- 25 new games pulled from genizy/web-port: OMORI, Tattletail, That's Not My Neighbor, Karlson, Hotline Miami, Raft, Getting Over It, Andy's Apple Farm, Witch Heart, and more — all running as local ports</p>
+        <p>- cross-origin fallback: if an original external game source goes down, a locally saved copy automatically loads instead</p>
+        <p>- game health check: cards for unreachable games (no local file, no reachable source) are now grayed out with an "unavailable" badge. hover the ⓘ for context.</p>
+        <p>- sovereign theme is now fully admin-exclusive and removed from the regular theme picker</p>
+        <p>- default theme for new visitors is now always "default" — no longer inherits a previous session</p>
+        <p>- regards — some games that were exclusive to the original site before it went down couldn't be exported in time. working on a solution.</p>
+      </details>
+
+      <details open>
         <summary>05/14 — major update</summary>
         <p>- all 250 games manually ported — no longer depend on the original site going down</p>
         <p>- outage notice added: creditrepair911.us went offline around 10 am, any fetches to it will fail</p>
@@ -572,10 +582,10 @@
     document.getElementById("close").addEventListener("click", exitUpdLog);
 
     window.addEventListener("load", function () {
-      if (!localStorage.getItem("updlogview14")) {
+      if (!localStorage.getItem("updlogview15")) {
         document.getElementById("update-log").style.display = "block";
         document.querySelector(".upd-bg").style.display = "block";
-        localStorage.setItem("updlogview14", "1");
+        localStorage.setItem("updlogview15", "1");
       }
     });
   </script>
