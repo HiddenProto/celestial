@@ -61,7 +61,8 @@
         "type": "exclusive",
 		"url": "https://learn-with.jskjsv6.workers.dev/genizy/web-port/b76984e373891dc5e22fb9a7f4f784671c620420/amanda-the-adventurer/index.html",
         "categories": ["indie", "horror", "port"],
-        "source": "proxied"
+        "source": "proxied",
+        "localFallback": "/assets/src/amanda-the-adventurer/index.html"
 	},
     {
 		"name": "Cookie Run Kingdom",
@@ -269,7 +270,8 @@
         "type": "regular",
         "url": "https://learn-with.jskjsv6.workers.dev/BinBashBanana/gfiles/b76984e373891dc5e22fb9a7f4f784671c620420/gfiles/flash/index.html?swf=portal.swf",
         "categories": ["puzzle", "adventure"],
-        "source": "proxied"
+        "source": "proxied",
+        "localFallback": "/assets/src/portal-flash/index.html"
     },
     {
         "name": "Slender; The Eight Pages",
@@ -733,7 +735,8 @@
         "type": "regular",
 		"url": "https://learn-with.jskjsv6.workers.dev/genizy/web-port/b76984e373891dc5e22fb9a7f4f784671c620420/the-man-in-the-window/index.html",
         "categories": ["horror", "indie"],
-        "source": "proxied"
+        "source": "proxied",
+        "localFallback": "/assets/src/the-man-from-the-window/index.html"
 	},
     {
 		"name": "The Last Spartan",
@@ -805,7 +808,8 @@
         "type": "regular",
 		"url": "https://learn-with.jskjsv6.workers.dev/genizy/web-port/b76984e373891dc5e22fb9a7f4f784671c620420/yume-nikki/index.html",
         "categories": ["indie", "port"],
-        "source": "proxied"
+        "source": "proxied",
+        "localFallback": "/assets/src/yume-nikki/index.html"
 	},
     {
 		"name": "Jumbo Mario",

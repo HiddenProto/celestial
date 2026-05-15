@@ -47,6 +47,23 @@ function showGames(list) {
         // Local games load via frame.html which handles 404 gracefully (shows "unavailable" screen)
         // Assets are served from /assets/src/ → Vercel rewrites to creditrepair911.us
         location.href = "/news/frame.html?mbed=" + encodeURIComponent(g.url);
+      } else if (g.localFallback) {
+        // Proxied game with a saved local copy — check if the cross-origin source is reachable.
+        // mode:'no-cors' gives an opaque response when the server is UP (CORS blocks the read
+        // but the network round-trip succeeds). A TypeError is thrown only on a real network
+        // failure or DNS error, meaning the source is genuinely down.
+        card.style.opacity = "0.5";
+        card.style.pointerEvents = "none";
+        Promise.race([
+          fetch(g.url, { method: "HEAD", mode: "no-cors" }),
+          new Promise((_, r) => setTimeout(() => r(new Error("timeout")), 2500)),
+        ])
+          .then(() => {
+            location.href = `/tab.html?autofill=${encodeURIComponent(g.url)}`;
+          })
+          .catch(() => {
+            location.href = "/news/frame.html?mbed=" + encodeURIComponent(g.localFallback);
+          });
       } else {
         location.href = `/tab.html?autofill=${encodeURIComponent(g.url)}`;
       }
