@@ -12,6 +12,10 @@
   const MAX_CHARS  = 400;
   const COOLDOWN   = 1000;
 
+  function getAdminId()   { try { return JSON.parse(localStorage.getItem('cst-admin-id')||'{}'); } catch { return {}; } }
+  function getAdminChatName()  { const id = getAdminId(); return id.name || 'Admin'; }
+  function getAdminChatColor() { const id = getAdminId(); return id.color || '#c9a84c'; }
+
   // ── helpers ───────────────────────────────────────────────────
   function getAppear()  { try { return JSON.parse(localStorage.getItem(APPEAR_KEY) || '{}'); } catch { return {}; } }
   function setAppear(o) { localStorage.setItem(APPEAR_KEY, JSON.stringify(o)); }
@@ -21,7 +25,7 @@
   function amAdmin()   { return localStorage.getItem('cst-admin') === '1'; }
   function getMyName() {
     if (amAdmin()) {
-      try { return JSON.parse(localStorage.getItem('cst-approved'))?.name || 'Admin'; } catch { return 'Admin'; }
+      return getAdminChatName();
     }
     try { return JSON.parse(localStorage.getItem('cst-approved'))?.name || null; } catch { return null; }
   }
@@ -133,7 +137,7 @@
       broadcastOnline();
     }
     if (d.type === 'msg') {
-      const msg = { type: 'msg', name: d.name, text: (d.text || '').slice(0, MAX_CHARS), isAdmin: !!d.isAdmin, ts: Date.now() };
+      const msg = { type: 'msg', name: d.name, text: (d.text || '').slice(0, MAX_CHARS), isAdmin: !!d.isAdmin, adminColor: d.adminColor || undefined, mentions: d.mentions || undefined, ts: Date.now() };
       relayMsg(cid, msg);
       appendMsg(msg);
     }
@@ -159,7 +163,26 @@
   function onHubMsg(d) {
     if (!d || typeof d !== 'object') return;
     if (d.type === 'online') updateOnline(d.users || []);
-    if (d.type === 'msg')    { appendMsg(d); if (!chatOpen) { unread++; updateBubble(); } }
+    if (d.type === 'msg') {
+      appendMsg(d);
+      const myName = getMyName();
+      // Check if we're mentioned
+      const mentioned = myName && d.mentions && d.mentions.some(n =>
+        n.toLowerCase() === myName.toLowerCase());
+      if (!chatOpen) {
+        unread++;
+        updateBubble();
+        if (mentioned) {
+          // Ping notification — shows even if notify is otherwise suppressed
+          window.notify?.(`📣 ${d.name || 'someone'} mentioned you: ${d.text.slice(0,80)}`, 'info', 9000);
+        } else {
+          window.notify?.(`${d.name || '?'}: ${d.text.slice(0,60)}`, 'info', 5000);
+        }
+      } else if (mentioned) {
+        // Chat is open but still notify for mentions
+        window.notify?.(`📣 ${d.name || 'someone'} mentioned you`, 'info', 5000);
+      }
+    }
   }
 
   // ── send ──────────────────────────────────────────────────────
@@ -173,7 +196,8 @@
       return;
     }
     lastSent = now;
-    const msg = { type: 'msg', name: getMyName(), text, isAdmin: amAdmin(), ts: now };
+    const mentions = parseMentions(text);
+    const msg = { type: 'msg', name: getMyName(), text, isAdmin: amAdmin(), adminColor: amAdmin() ? getAdminChatColor() : undefined, mentions: mentions.length ? mentions : undefined, ts: now };
     if (isHubMode) { relayMsg(null, msg); appendMsg(msg); }
     else if (hubConn && hubConn.open) { hubConn.send(msg); appendMsg(msg); }
   }
@@ -196,13 +220,24 @@
     '-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;' +
     'font-weight:700;background-size:200%;animation:cst-admname 2.5s linear infinite;';
 
-  function adminNameStyle(inline) {
+  function adminNameStyle(inline, color) {
+    if (color && color !== '#c9a84c') {
+      return `color:${color};font-weight:700;`;
+    }
     return inline
       ? 'background:linear-gradient(90deg,#c9a84c,#ffe082,#c9a84c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700;'
       : ADMIN_GRADIENT;
   }
 
   function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function parseMentions(text) {
+    const out = [];
+    const re = /@([\w][^\s@]{0,23})/g;
+    let m;
+    while ((m = re.exec(text)) !== null) out.push(m[1].trim());
+    return out;
+  }
 
   let widgetEl = null;
 
@@ -277,7 +312,7 @@
   <div id="cst-chat-chars">0 / ${MAX_CHARS}</div>
   <div id="cst-chat-cool"></div>
   <div id="cst-chat-inp-row">
-    <textarea id="cst-chat-inp" placeholder="say something…" maxlength="${MAX_CHARS}" rows="1"></textarea>
+    <textarea id="cst-chat-inp" placeholder="say something… (@name to ping)" maxlength="${MAX_CHARS}" rows="1"></textarea>
     <button id="cst-chat-send">send</button>
   </div>
 </div>`;
@@ -333,11 +368,14 @@
     const mine = msg.name === getMyName();
     const d = document.createElement('div');
     d.className = 'cst-msg' + (mine ? ' cst-msg-me' : '');
-    const nameStyle = msg.isAdmin ? adminNameStyle(false) : 'color:#555;';
+    const nameStyle = msg.isAdmin ? adminNameStyle(false, msg.adminColor) : 'color:#555;';
     const nameHtml  = msg.name
       ? `<div class="cst-msg-name" style="${nameStyle}">${esc(msg.name)}</div>`
       : '';
-    d.innerHTML = `${nameHtml}<div class="cst-msg-body">${esc(msg.text)}</div>`;
+    // Render @mentions with a highlight span
+    const bodyHtml = esc(msg.text).replace(/@([\w\s]{1,25})/g, (m, n) =>
+      `<span style="color:#7eb8ff;font-weight:600;">@${esc(n)}</span>`);
+    d.innerHTML = `${nameHtml}<div class="cst-msg-body">${bodyHtml}</div>`;
     box.appendChild(d);
     scrollMsgs();
   }

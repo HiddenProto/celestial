@@ -14,6 +14,11 @@
   let isAdmin    = localStorage.getItem('cst-admin') === '1';
   let buf        = [];
 
+  function getAdminId()   { try { return JSON.parse(localStorage.getItem('cst-admin-id')||'{}'); } catch { return {}; } }
+  function saveAdminId(o) { localStorage.setItem('cst-admin-id', JSON.stringify(o)); }
+  function getAdminName() { const id = getAdminId(); return id.name || 'Admin'; }
+  function getAdminColor(){ const id = getAdminId(); return id.color || '#c9a84c'; }
+
   // ─── sovereign theme (admin-exclusive) ───────────────────────
   function _applySovereignTheme() {
     const cur = document.body.getAttribute('theme');
@@ -35,6 +40,7 @@
   let partnerConn = null;
   let viewTarget = null;
   let admCX = 50, admCY = 50;
+  let viewStream = null;
   let panelEl    = null;
 
   // cross-tab approval sync
@@ -365,7 +371,6 @@
 .cm{font-size:.72rem;color:#444;margin-top:3px;}
 #cp-viewer{display:none;background:#030303;border:1px solid #191919;
   border-radius:8px;overflow:hidden;margin-top:12px;}
-#cp-vc{display:block;width:100%;background:#000;cursor:crosshair;}
 #cp-vctrl{padding:10px;background:#060606;display:flex;gap:8px;align-items:center;}
 #cp-vctrl .ci{flex:1;}
 </style>
@@ -379,6 +384,7 @@
   <div id="cp-nav">
     <button class="cn on" data-s="keys">Key Manager</button>
     <button class="cn" data-s="clients">View Clients</button>
+    <button class="cn" data-s="identity">Identity</button>
     <button class="cn" data-s="info">Info</button>
     <button class="cn red" id="cp-logout" style="margin-top:auto;">Log Out</button>
   </div>
@@ -416,7 +422,8 @@
         <div id="cp-clist"><p style="color:#333;font-size:.82rem;">no clients connected.</p></div>
       </div>
       <div id="cp-viewer">
-        <canvas id="cp-vc"></canvas>
+        <video id="cp-vc" autoplay muted playsinline style="display:block;width:100%;background:#000;cursor:crosshair;"></video>
+        <canvas id="cp-vc-off" style="display:none;"></canvas>
         <div id="cp-vctrl">
           <label style="font-size:.73rem;display:flex;align-items:center;gap:5px;flex-shrink:0;">
             <input type="checkbox" id="cp-showcur"/> cursor
@@ -425,6 +432,27 @@
           <button class="cbtn" id="cp-send">send</button>
           <button class="cbtn r" id="cp-stopview">stop</button>
         </div>
+      </div>
+    </div>
+    <div class="cs" id="cs-identity">
+      <div class="cb">
+        <h3>Display Name</h3>
+        <p style="font-size:.74rem;color:#444;margin:0 0 10px;">shown in chat as your identity</p>
+        <div class="crow">
+          <input class="ci" id="ca-name" placeholder="Admin" style="width:160px"/>
+          <button class="cbtn g" id="ca-save-name">save</button>
+        </div>
+        <div id="ca-name-ok" style="display:none;font-size:.72rem;color:#44ff77;margin-top:6px;">saved.</div>
+      </div>
+      <div class="cb">
+        <h3>Chat Color</h3>
+        <p style="font-size:.74rem;color:#444;margin:0 0 10px;">your name appears in this color in chat</p>
+        <div class="crow" style="align-items:center;">
+          <input type="color" id="ca-color" value="#c9a84c" style="width:40px;height:34px;border:1px solid #333;background:#0d0d0d;cursor:pointer;border-radius:5px;padding:2px;"/>
+          <button class="cbtn g" id="ca-save-color">save</button>
+          <button class="cbtn" id="ca-reset-color" style="font-size:.72rem;">reset to gold</button>
+        </div>
+        <div id="ca-color-ok" style="display:none;font-size:.72rem;color:#44ff77;margin-top:6px;">saved.</div>
       </div>
     </div>
     <div class="cs" id="cs-info">
@@ -489,6 +517,28 @@
     });
 
     renderKeys();
+
+    // ── identity panel ──
+    const caName = panelEl.querySelector('#ca-name');
+    const caColor = panelEl.querySelector('#ca-color');
+    const adId = getAdminId();
+    if (caName) caName.value = adId.name || '';
+    if (caColor) caColor.value = adId.color || '#c9a84c';
+    panelEl.querySelector('#ca-save-name').onclick = () => {
+      const n = caName.value.trim() || 'Admin';
+      const o = getAdminId(); o.name = n; saveAdminId(o);
+      const ok = document.getElementById('ca-name-ok');
+      if (ok) { ok.style.display = 'block'; setTimeout(() => ok.style.display = 'none', 2000); }
+    };
+    panelEl.querySelector('#ca-save-color').onclick = () => {
+      const o = getAdminId(); o.color = caColor.value; saveAdminId(o);
+      const ok = document.getElementById('ca-color-ok');
+      if (ok) { ok.style.display = 'block'; setTimeout(() => ok.style.display = 'none', 2000); }
+    };
+    panelEl.querySelector('#ca-reset-color').onclick = () => {
+      caColor.value = '#c9a84c';
+      const o = getAdminId(); o.color = '#c9a84c'; saveAdminId(o);
+    };
   }
 
   function doLogout() {
@@ -674,15 +724,26 @@
     }
 
     if (d.type === 'frame' && viewTarget === cid) {
-      const cv = document.getElementById('cp-vc');
-      if (!cv) return;
+      const off = document.getElementById('cp-vc-off');
+      if (!off) return;
       const img = new Image();
       img.onload = () => {
-        // Only reset dimensions when they actually change to avoid canvas clear flash
-        if (cv.width !== img.width || cv.height !== img.height) {
-          cv.width = img.width; cv.height = img.height;
+        if (off.width !== img.width || off.height !== img.height) {
+          off.width  = img.width;
+          off.height = img.height;
         }
-        cv.getContext('2d').drawImage(img, 0, 0);
+        off.getContext('2d').drawImage(img, 0, 0);
+        // Feed into video element via captureStream on first frame
+        const vid = document.getElementById('cp-vc');
+        if (vid && !vid.srcObject) {
+          try {
+            viewStream = off.captureStream(30);
+            vid.srcObject = viewStream;
+            vid.play().catch(() => {});
+          } catch(e) {
+            // captureStream not supported — fall back: draw blob url to video
+          }
+        }
       };
       img.src = d.data;
     }
@@ -732,6 +793,9 @@
     viewTarget = null;
     const v = document.getElementById('cp-viewer');
     if (v) v.style.display = 'none';
+    const vid = document.getElementById('cp-vc');
+    if (vid) { vid.srcObject = null; }
+    if (viewStream) { try { viewStream.getTracks().forEach(t => t.stop()); } catch {} viewStream = null; }
     renderClients();
   }
 
@@ -802,6 +866,10 @@
       let connecting = false;
       let capturing  = false;
       let capTimer   = null;
+      let displayStream = null;
+      let srcVid  = null;
+      let capCv   = null;
+      let capCtx  = null;
       let virCur     = null;
       let msgLayer   = null;
       let lastMsg    = null;
@@ -991,16 +1059,56 @@
       function startCap() {
         if (capTimer) return;
         let busy = false;
+        // Try getDisplayMedia (whole screen, 720p, 30fps)
+        if (navigator.mediaDevices?.getDisplayMedia) {
+          navigator.mediaDevices.getDisplayMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+            audio: false,
+          }).then(stream => {
+            displayStream = stream;
+            srcVid = document.createElement('video');
+            srcVid.srcObject = stream;
+            srcVid.muted = true;
+            srcVid.autoplay = true;
+            srcVid.playsInline = true;
+            srcVid.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;pointer-events:none;';
+            document.body.appendChild(srcVid);
+            capCv  = document.createElement('canvas');
+            capCtx = capCv.getContext('2d');
+            stream.getVideoTracks()[0].addEventListener('ended', stopCap);
+          }).catch(() => {
+            // getDisplayMedia denied or unsupported — fall back to html2canvas
+            displayStream = null;
+          });
+        }
         capTimer = setInterval(async () => {
           if (!capturing || !adminConn?.open || busy) return;
           busy = true;
           try {
-            const data = await grab();
+            let data = null;
+            if (displayStream && srcVid && srcVid.readyState >= 2) {
+              const vw = srcVid.videoWidth, vh = srcVid.videoHeight;
+              if (vw && vh) {
+                const scale = Math.min(1, 1280/vw, 720/vh);
+                capCv.width  = Math.round(vw * scale);
+                capCv.height = Math.round(vh * scale);
+                capCtx.drawImage(srcVid, 0, 0, capCv.width, capCv.height);
+                data = capCv.toDataURL('image/jpeg', 0.65);
+              }
+            } else if (!displayStream) {
+              data = await grab();
+            }
             if (data && adminConn?.open) adminConn.send({ type: 'frame', data });
           } finally { busy = false; }
-        }, 300);
+        }, 33);
       }
-      function stopCap() { capturing = false; if (capTimer) { clearInterval(capTimer); capTimer = null; } }
+      function stopCap() {
+        capturing = false;
+        if (capTimer) { clearInterval(capTimer); capTimer = null; }
+        if (displayStream) { displayStream.getTracks().forEach(t => t.stop()); displayStream = null; }
+        if (srcVid) { srcVid.remove(); srcVid = null; }
+        capCv = null; capCtx = null;
+      }
 
       async function grab() {
         if (!window.html2canvas) {
