@@ -121,7 +121,7 @@ async function ensureScramjet() {
  */
 async function _createBRCTransport() {
 	// Read wisp from localStorage — setWisp may not have been called yet
-	const savedWisp = localStorage.getItem("location") || "wss://celestial-wisp.onrender.com/";
+	const savedWisp = localStorage.getItem("location") || "wss://wisp.mercurywork.shop/";
 	const wisp = wispURL || (
 		(savedWisp.startsWith("wss://") || savedWisp.startsWith("ws://"))
 			? savedWisp
@@ -144,6 +144,24 @@ async function _createBRCTransport() {
 	if (!transport) {
 		const { default: LibcurlClient } = await import("/curl/index.mjs");
 		transport = new LibcurlClient({ wisp });
+
+		// Silently pre-load epoxy; fall back to it on SSL error 35
+		let _sslFallback = null;
+		import("/epoxy/index.mjs").then(({ default: EpoxyTransport }) => {
+			_sslFallback = new EpoxyTransport({ wisp });
+		}).catch(() => {});
+		const _lcReq = transport.request.bind(transport);
+		transport.request = async function(remote, method, body, headers, signal) {
+			try {
+				return await _lcReq(remote, method, body, headers, signal);
+			} catch (e) {
+				if (_sslFallback && e?.message?.includes("error code 35")) {
+					console.warn("lethal.js: SSL error 35, retrying via epoxy");
+					return await _sslFallback.request(remote, method, body, headers, signal);
+				}
+				throw e;
+			}
+		};
 	}
 
 	return _wrapTransportHeaders(transport);
@@ -304,7 +322,7 @@ async function ensureBRC() {
 // so opening a throwaway WebSocket now means it's ready by the time the user clicks.
 (function _wispPing() {
 	try {
-		const saved = localStorage.getItem("location") || "wss://celestial-wisp.onrender.com/";
+		const saved = localStorage.getItem("location") || "wss://wisp.mercurywork.shop/";
 		const url = (saved.startsWith("wss://") || saved.startsWith("ws://"))
 			? saved
 			: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + saved;

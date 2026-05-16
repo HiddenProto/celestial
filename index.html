@@ -170,7 +170,7 @@
 
     setProxy(localStorage.getItem("pr0xy") || "scram");
 
-    const _wispLoc = localStorage.getItem('location') || 'wss://celestial-wisp.onrender.com/';
+    const _wispLoc = localStorage.getItem('location') || 'wss://wisp.mercurywork.shop/';
     setWisp(
       (_wispLoc.startsWith('wss://') || _wispLoc.startsWith('ws://'))
         ? _wispLoc
@@ -1041,7 +1041,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.4";
+      var SITE_VER = "2.2.5";
 
       /**
        * Show a notification toast.
@@ -1194,9 +1194,9 @@
 
       // Auto-show proxy config prompt (once only)
       setTimeout(function () {
-        const currentProxy = localStorage.getItem("pr0xy") || "scramjet";
+        const currentProxy = localStorage.getItem("pr0xy");
 
-        // Always warn about scramjet regardless of whether config was already seen
+        // Warn only for users who explicitly chose scramjet
         if (currentProxy === "scramjet") {
           window.notify(
             "The current proxy you have on, scramjet, is currently an unreliable configuration.",
@@ -1205,7 +1205,8 @@
           );
         }
 
-        if (localStorage.getItem("proxy-config-seen") === SITE_VER) return;
+        // Show config prompt only to users who have never set a proxy
+        if (currentProxy !== null) return;
 
         window.notifyOption(
           "Proxy Configuration",
@@ -1221,7 +1222,6 @@
                   localStorage.setItem("transportz", "libcurl");
                   localStorage.setItem("pr0xy", "scram");
                   localStorage.setItem("location", "wss://wisp.mercurywork.shop/");
-                  localStorage.setItem("proxy-config-seen", SITE_VER);
                   window.notify("v2 Wider Support enabled — reloading…", "success", 6000);
                   setTimeout(function () { location.reload(); }, 900);
                   return;
@@ -1262,7 +1262,6 @@
                 localStorage.setItem("transportz", "libcurl");
                 localStorage.setItem("pr0xy", "scram");
                 localStorage.setItem("location", "wss://celestial-wisp.onrender.com/");
-                localStorage.setItem("proxy-config-seen", SITE_VER);
                 window.notify("Limited but Fast enabled — reloading…", "success", 6000);
                 setTimeout(function () { location.reload(); }, 900);
               }
@@ -1272,7 +1271,7 @@
               info: "Keep current settings unchanged",
               className: "opt-skip",
               onClick: function () {
-                localStorage.setItem("proxy-config-seen", SITE_VER);
+                if (!localStorage.getItem("pr0xy")) localStorage.setItem("pr0xy", "scram");
               }
             }
           ]
