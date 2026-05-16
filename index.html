@@ -1041,7 +1041,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.5";
+      var SITE_VER = "2.2.6";
 
       /**
        * Show a notification toast.
@@ -1205,8 +1205,8 @@
           );
         }
 
-        // Show config prompt only to users who have never set a proxy
-        if (currentProxy !== null) return;
+        // Show for new users (no proxy set) OR returning users who haven't seen this version
+        if (currentProxy !== null && localStorage.getItem("proxy-config-seen") === SITE_VER) return;
 
         window.notifyOption(
           "Proxy Configuration",
@@ -1222,6 +1222,7 @@
                   localStorage.setItem("transportz", "libcurl");
                   localStorage.setItem("pr0xy", "scram");
                   localStorage.setItem("location", "wss://wisp.mercurywork.shop/");
+                  localStorage.setItem("proxy-config-seen", SITE_VER);
                   window.notify("v2 Wider Support enabled — reloading…", "success", 6000);
                   setTimeout(function () { location.reload(); }, 900);
                   return;
@@ -1262,6 +1263,7 @@
                 localStorage.setItem("transportz", "libcurl");
                 localStorage.setItem("pr0xy", "scram");
                 localStorage.setItem("location", "wss://celestial-wisp.onrender.com/");
+                localStorage.setItem("proxy-config-seen", SITE_VER);
                 window.notify("Limited but Fast enabled — reloading…", "success", 6000);
                 setTimeout(function () { location.reload(); }, 900);
               }
@@ -1272,6 +1274,7 @@
               className: "opt-skip",
               onClick: function () {
                 if (!localStorage.getItem("pr0xy")) localStorage.setItem("pr0xy", "scram");
+                localStorage.setItem("proxy-config-seen", SITE_VER);
               }
             }
           ]
