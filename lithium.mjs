@@ -129,7 +129,7 @@ async function _createBRCTransport() {
 	);
 
 	// Transport preference — epoxy or libcurl
-	const savedTransport = localStorage.getItem("transportz") || "libcurl";
+	const savedTransport = localStorage.getItem("transportz") || "epoxy";
 
 	const useEpoxy = savedTransport === "epoxy";
 	let transport;
@@ -299,6 +299,20 @@ async function ensureBRC() {
 	})();
 	return _brcInitPromise;
 }
+
+// Pre-warm the wisp server immediately — Render free tier cold-starts in ~50 s,
+// so opening a throwaway WebSocket now means it's ready by the time the user clicks.
+(function _wispPing() {
+	try {
+		const saved = localStorage.getItem("location") || "wss://celestial-wisp.onrender.com/";
+		const url = (saved.startsWith("wss://") || saved.startsWith("ws://"))
+			? saved
+			: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + saved;
+		const ws = new WebSocket(url);
+		ws.onopen  = () => { console.log("lethal.js: wisp pre-warm ok"); ws.close(); };
+		ws.onerror = () => {};
+	} catch {}
+})();
 
 registerSW()
 	.then(async () => {
