@@ -24,6 +24,7 @@ export const addressInput = document.getElementById("address");
 const transportOptions = {
 	epoxy:   "/epoxy/index.mjs",
 	libcurl: "/curl/index.mjs",
+	photon:  "/photon/index.mjs",
 };
 
 //////////////////////////////
@@ -128,12 +129,19 @@ async function _createBRCTransport() {
 			: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + savedWisp
 	);
 
-	// Transport preference — epoxy or libcurl
+	// Transport preference — photon, epoxy, or libcurl
 	const savedTransport = localStorage.getItem("transportz") || "libcurl";
 
-	const useEpoxy = savedTransport === "epoxy";
 	let transport;
-	if (useEpoxy) {
+	if (savedTransport === "photon") {
+		try {
+			const { default: PhotonTransport } = await import("/photon/index.mjs");
+			transport = new PhotonTransport();
+			console.log("lethal.js: photon transport active");
+		} catch (e) {
+			console.warn("lethal.js: photon transport failed, falling back to libcurl:", e.message);
+		}
+	} else if (savedTransport === "epoxy") {
 		try {
 			const { default: EpoxyTransport } = await import("/epoxy/index.mjs");
 			transport = new EpoxyTransport({ wisp });

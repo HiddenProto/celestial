@@ -391,12 +391,13 @@
               #wispCustom { margin-top: 6px; width: 100%; box-sizing: border-box; }
             </style>
             <div class="box">
-              <h3>Transport <span class="info-icon"><span class="tip">Controls how proxied requests are sent through the network.<br><br><b>epoxy</b> — WebAssembly-based, better site compatibility. Required for multiplayer games with bumblcat rrc — epoxy forwards WebSocket headers (like Origin) to the server, which libcurl does not. Slower. Type: <b>client-side</b>.<br><br><b>libcurl</b> — C-based, faster and more stable. Recommended for most sites. Does not forward custom WebSocket headers — use epoxy for multiplayer games. Type: <b>client-side</b>.</span></span></h3>
+              <h3>Transport <span class="info-icon"><span class="tip">Controls how proxied requests are sent through the network.<br><br><b>photon</b> — bumblcat's own transport. Server-side TLS via Cloudflare Worker — no WASM SSL, no error 35. Best compatibility. Type: <b>server-side</b>.<br><br><b>epoxy</b> — WebAssembly-based, better site compatibility. Required for multiplayer games with bumblcat rrc — epoxy forwards WebSocket headers (like Origin) to the server, which libcurl does not. Slower. Type: <b>client-side</b>.<br><br><b>libcurl</b> — C-based, faster and more stable. Recommended for most sites. Does not forward custom WebSocket headers — use epoxy for multiplayer games. Type: <b>client-side</b>.</span></span></h3>
               <p class="desc">
                 change how the pr<span>o</span>xy is handled, can lead to sites
                 that were broken to work or lead to sites that were working to break
               </p>
               <select class="select" id="tselect">
+                <option value="photon">photon (bumblcat)</option>
                 <option value="epoxy">epoxy</option>
                 <option value="libcurl" selected>libcurl</option>
               </select>
@@ -1041,7 +1042,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.7";
+      var SITE_VER = "2.2.8";
 
       /**
        * Show a notification toast.
