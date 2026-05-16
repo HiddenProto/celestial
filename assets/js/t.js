@@ -9,7 +9,7 @@ setWisp(
     : (location.protocol === "https:" ? "wss://" : "ws://") + location.host + _wispLoc
 );
 setProxy(localStorage.getItem("pr0xy") || "scram");
-setTransport(localStorage.getItem("transportz") || "epoxy");
+setTransport(localStorage.getItem("transportz") || "libcurl");
 
 const search = localStorage.getItem("search-engine") || "https://search.brave.com/search?q=%s";
 

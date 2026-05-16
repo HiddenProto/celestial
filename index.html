@@ -1241,6 +1241,18 @@
         );
       }, 0);
 
+      // ── Version update check ─────────────────────────────────────────────
+      (function () {
+        var SITE_VER = "1.0";
+        var stored = localStorage.getItem("cst-ver");
+        if (stored && stored !== SITE_VER) {
+          setTimeout(function () {
+            window.notify("Updated v" + stored + " → v" + SITE_VER, "info", 8000);
+          }, 1200);
+        }
+        localStorage.setItem("cst-ver", SITE_VER);
+      })();
+
       // BRC lifecycle — silent, no toasts for fallback
     })();
   </script>
