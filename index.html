@@ -1041,6 +1041,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
+      var SITE_VER = "2.2.4";
 
       /**
        * Show a notification toast.
@@ -1134,8 +1135,13 @@
           btn.addEventListener("click", function (e) {
             if (e.target.closest(".notif-opt-info-btn")) return;
             const idx = parseInt(btn.getAttribute("data-opt-idx"), 10);
-            dismiss();
-            options[idx].onClick();
+            const opt = options[idx];
+            if (opt.rawClick) {
+              opt.onClick(btn, dismiss);
+            } else {
+              dismiss();
+              opt.onClick();
+            }
           });
           const infoBtn = btn.querySelector(".notif-opt-info-btn");
           if (infoBtn) {
@@ -1199,7 +1205,7 @@
           );
         }
 
-        if (localStorage.getItem("proxy-config-seen")) return;
+        if (localStorage.getItem("proxy-config-seen") === SITE_VER) return;
 
         window.notifyOption(
           "Proxy Configuration",
@@ -1208,13 +1214,45 @@
             {
               label: "Wider Support",
               info: "libcurl + bumblcat rrc + bumblcat ultra edition — best compatibility, bypasses Google anomaly checks",
-              onClick: function () {
-                localStorage.setItem("transportz", "libcurl");
-                localStorage.setItem("pr0xy", "scram");
-                localStorage.setItem("location", "wss://wisp.mercurywork.shop/");
-                localStorage.setItem("proxy-config-seen", "1");
-                window.notify("Wider Support enabled — reloading…", "success", 6000);
-                setTimeout(function () { location.reload(); }, 900);
+              rawClick: true,
+              onClick: function (btn, dismissFn) {
+                if (btn._wsReady) {
+                  dismissFn();
+                  localStorage.setItem("transportz", "libcurl");
+                  localStorage.setItem("pr0xy", "scram");
+                  localStorage.setItem("location", "wss://wisp.mercurywork.shop/");
+                  localStorage.setItem("proxy-config-seen", SITE_VER);
+                  window.notify("v2 Wider Support enabled — reloading…", "success", 6000);
+                  setTimeout(function () { location.reload(); }, 900);
+                  return;
+                }
+                var labelEl = btn.querySelector(".notif-opt-label");
+                btn.disabled = true;
+                btn.style.opacity = "0.45";
+                window.notify("i'm joking", "info", 2500);
+                var original = "Wider Support";
+                var newName = "v2 Wider Support";
+                setTimeout(function () {
+                  var cur = original;
+                  var backTimer = setInterval(function () {
+                    cur = cur.slice(0, -1);
+                    labelEl.textContent = cur;
+                    if (cur.length === 0) {
+                      clearInterval(backTimer);
+                      var typed = "";
+                      var typeTimer = setInterval(function () {
+                        typed += newName[typed.length];
+                        labelEl.textContent = typed;
+                        if (typed === newName) {
+                          clearInterval(typeTimer);
+                          btn.disabled = false;
+                          btn.style.opacity = "";
+                          btn._wsReady = true;
+                        }
+                      }, 60);
+                    }
+                  }, 55);
+                }, 2000);
               }
             },
             {
@@ -1224,7 +1262,7 @@
                 localStorage.setItem("transportz", "libcurl");
                 localStorage.setItem("pr0xy", "scram");
                 localStorage.setItem("location", "wss://celestial-wisp.onrender.com/");
-                localStorage.setItem("proxy-config-seen", "1");
+                localStorage.setItem("proxy-config-seen", SITE_VER);
                 window.notify("Limited but Fast enabled — reloading…", "success", 6000);
                 setTimeout(function () { location.reload(); }, 900);
               }
@@ -1234,7 +1272,7 @@
               info: "Keep current settings unchanged",
               className: "opt-skip",
               onClick: function () {
-                localStorage.setItem("proxy-config-seen", "1");
+                localStorage.setItem("proxy-config-seen", SITE_VER);
               }
             }
           ]
@@ -1243,7 +1281,6 @@
 
       // ── Version update check ─────────────────────────────────────────────
       (function () {
-        var SITE_VER = "2.2.3";
         var stored = localStorage.getItem("cst-ver");
         setTimeout(function () {
           if (!stored) {
