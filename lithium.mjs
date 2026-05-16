@@ -243,6 +243,20 @@ function _wrapTransportHeaders(transport) {
 		// Inject missing browser headers before the request leaves
 		headers = _injectBrowserHeaders(headers);
 
+		// If UV SW left Origin as our proxy domain, replace it with the target
+		// origin so the remote server sees a same-origin request, not a proxy.
+		const _proxyOrigin = location.origin;
+		const _originIdx = headers.findIndex(([k]) => k.toLowerCase() === 'origin');
+		if (_originIdx !== -1 && headers[_originIdx][1] === _proxyOrigin) {
+			try { headers[_originIdx] = ['Origin', new URL(remote).origin]; } catch {}
+		}
+		// Same fix for Referer — strip to just the target origin when it still
+		// points at our proxy domain.
+		const _refIdx = headers.findIndex(([k]) => k.toLowerCase() === 'referer');
+		if (_refIdx !== -1 && headers[_refIdx][1].startsWith(_proxyOrigin)) {
+			try { headers[_refIdx] = ['Referer', new URL(remote).origin + '/']; } catch {}
+		}
+
 		const resp = await origRequest(remote, method, body, headers, signal);
 		if (resp && resp.headers && !Array.isArray(resp.headers)) {
 			const flat = [];
