@@ -49,7 +49,7 @@ document.write(`
 
 <div class="gs"></div>
 
-<script src="/assets/js/t.js" type="module"></script>
+<script src="/assets/js/t.js"></script>
 </body>
 <script src="/assets/js/theme.js"></script>
 </html>
