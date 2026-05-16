@@ -1041,7 +1041,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.6";
+      var SITE_VER = "2.2.7";
 
       /**
        * Show a notification toast.
@@ -1292,6 +1292,22 @@
           }
         }, 1200);
         localStorage.setItem("cst-ver", SITE_VER);
+      })();
+
+      // ── Mercury Workshop swap notice (one-time) ─────────────────────────
+      (function () {
+        var key = "mw-swap-notice-shown";
+        if (localStorage.getItem(key)) return;
+        localStorage.setItem(key, "1");
+        setTimeout(function () {
+          window.notify(
+            "for everybody saying some stuff is broken like in quick apps or media: " +
+            "the issue was Mercury Workshop was stripped of support of its server architecture " +
+            "so it was swapped to fallback.",
+            "info",
+            14000
+          );
+        }, 2000);
       })();
 
       // BRC lifecycle — silent, no toasts for fallback

@@ -595,7 +595,7 @@
       if (sessionStorage.getItem("outage-notice-shown")) return;
       sessionStorage.setItem("outage-notice-shown", "1");
       const msg =
-        "⚠ underlying issue: the original site went down around 10 am — " +
+        "⚠ underlying issue: the original site went down around 10 am on 05/14 — " +
         "fetches to it won't work. url search has been fixed.";
       function fireNotif() {
         const ev = new CustomEvent("notify", {
