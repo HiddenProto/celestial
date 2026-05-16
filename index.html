@@ -1243,13 +1243,15 @@
 
       // ── Version update check ─────────────────────────────────────────────
       (function () {
-        var SITE_VER = "1.0";
+        var SITE_VER = "1.1";
         var stored = localStorage.getItem("cst-ver");
-        if (stored && stored !== SITE_VER) {
-          setTimeout(function () {
+        setTimeout(function () {
+          if (!stored) {
+            window.notify("This is the new version system, current is v" + SITE_VER + ".", "info", 8000);
+          } else if (stored !== SITE_VER) {
             window.notify("Updated v" + stored + " → v" + SITE_VER, "info", 8000);
-          }, 1200);
-        }
+          }
+        }, 1200);
         localStorage.setItem("cst-ver", SITE_VER);
       })();
 
