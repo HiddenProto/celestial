@@ -1079,7 +1079,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.24";
+      var SITE_VER = "2.2.25";
 
       /**
        * Show a notification toast.
@@ -1231,9 +1231,11 @@
       };
 
       // ── Proxy config version ─────────────────────────────────────────────────
-      // "v1" → show only to new users (no proxy set)
-      // "v2" → show to new users OR users who haven't seen this version
-      var PROXY_CFG_VER = "v2";
+      // Proxy config gate:
+      // Shows to new users (no proxy set) OR users who haven't seen it yet.
+      // Once seen it won't show again — UNLESS a future special update bumps
+      // PROXY_CFG_INTERNAL above the stored value (to be implemented later).
+      var PROXY_CFG_INTERNAL = 1; // bump this when a major proxy update needs re-showing
 
       // Auto-show proxy config prompt
       setTimeout(function () {
@@ -1248,12 +1250,9 @@
           );
         }
 
-        // Gate: v1 = new users only; v2 = new users OR haven't seen this version
-        if (PROXY_CFG_VER === "v1") {
-          if (currentProxy !== null) return;
-        } else {
-          if (currentProxy !== null && localStorage.getItem("proxy-config-seen") === SITE_VER) return;
-        }
+        // Gate: show if never seen, or if stored version is below current internal version
+        var seenVal = parseInt(localStorage.getItem("proxy-config-seen") || "0", 10);
+        if (currentProxy !== null && seenVal >= PROXY_CFG_INTERNAL) return;
 
         // ── v2 buttons (with Wider Support animation) ──────────────────────
         var buttons_v2 = [
@@ -1267,7 +1266,7 @@
                 localStorage.setItem("transportz", "libcurl");
                 localStorage.setItem("pr0xy", "scram");
                 localStorage.setItem("location", "ws://localhost:3001/");
-                localStorage.setItem("proxy-config-seen", SITE_VER);
+                localStorage.setItem("proxy-config-seen", String(PROXY_CFG_INTERNAL));
                 window.notify("v2 Wider Support enabled — reloading…", "success", 6000);
                 setTimeout(function () { location.reload(); }, 900);
                 return;
@@ -1308,7 +1307,7 @@
               localStorage.setItem("transportz", "libcurl");
               localStorage.setItem("pr0xy", "scram");
               localStorage.setItem("location", "wss://celestial-wisp.onrender.com/");
-              localStorage.setItem("proxy-config-seen", SITE_VER);
+              localStorage.setItem("proxy-config-seen", String(PROXY_CFG_INTERNAL));
               window.notify("Limited but Fast enabled — reloading…", "success", 6000);
               setTimeout(function () { location.reload(); }, 900);
             }
@@ -1319,7 +1318,7 @@
             className: "opt-skip",
             onClick: function () {
               if (!localStorage.getItem("pr0xy")) localStorage.setItem("pr0xy", "scram");
-              localStorage.setItem("proxy-config-seen", SITE_VER);
+              localStorage.setItem("proxy-config-seen", String(PROXY_CFG_INTERNAL));
             }
           }
         ];
@@ -1361,7 +1360,7 @@
         window.notifyOption(
           "Proxy Configuration",
           "Choose how the proxy handles connections.",
-          PROXY_CFG_VER === "v2" ? buttons_v2 : buttons_v1
+          buttons_v2
         );
       }, 0);
 
