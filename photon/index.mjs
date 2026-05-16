@@ -14,10 +14,9 @@ export default class PhotonTransport {
   async init() {}
 
   async request(remote, method, body, headers, signal) {
-    const scheme = remote.tls ? "https" : "http";
-    const defaultPort = remote.tls ? 443 : 80;
-    const portStr = remote.port && remote.port !== defaultPort ? `:${remote.port}` : "";
-    const targetUrl = `${scheme}://${remote.host}${portStr}${remote.path}`;
+    // remote is a URL object (BRC passes new URL(e))
+    const targetUrl = remote instanceof URL ? remote.href
+      : `${remote.tls ? "https" : "http"}://${remote.hostname || remote.host}${remote.port ? `:${remote.port}` : ""}${remote.pathname || remote.path || "/"}`;
 
     // Normalize headers to plain object
     const headersObj = {};
