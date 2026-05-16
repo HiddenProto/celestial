@@ -122,7 +122,7 @@ async function ensureScramjet() {
  */
 async function _createBRCTransport() {
 	// Read wisp from localStorage — setWisp may not have been called yet
-	const savedWisp = localStorage.getItem("location") || "wss://wisp.mercurywork.shop/";
+	const savedWisp = localStorage.getItem("location") || "wss://celestial-wisp.onrender.com/";
 	const wisp = wispURL || (
 		(savedWisp.startsWith("wss://") || savedWisp.startsWith("ws://"))
 			? savedWisp
@@ -330,7 +330,7 @@ async function ensureBRC() {
 // so opening a throwaway WebSocket now means it's ready by the time the user clicks.
 (function _wispPing() {
 	try {
-		const saved = localStorage.getItem("location") || "wss://wisp.mercurywork.shop/";
+		const saved = localStorage.getItem("location") || "wss://celestial-wisp.onrender.com/";
 		const url = (saved.startsWith("wss://") || saved.startsWith("ws://"))
 			? saved
 			: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + saved;
