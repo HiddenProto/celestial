@@ -177,7 +177,7 @@
         : (location.protocol === "https:" ? "wss://" : "ws://") + location.host + _wispLoc
     );
 
-    setTransport(localStorage.getItem("transportz") || "epoxy");
+    setTransport(localStorage.getItem("transportz") || "libcurl");
     async function autofill(url) {
       const urlToLoad = makeURL(url, search);
       const proxiedUrl = await getProxied(urlToLoad);
@@ -397,8 +397,8 @@
                 that were broken to work or lead to sites that were working to break
               </p>
               <select class="select" id="tselect">
-                <option value="epoxy" selected>epoxy</option>
-                <option value="libcurl">libcurl</option>
+                <option value="epoxy">epoxy</option>
+                <option value="libcurl" selected>libcurl</option>
               </select>
             </div>
             <div class="box">

@@ -129,7 +129,7 @@ async function _createBRCTransport() {
 	);
 
 	// Transport preference — epoxy or libcurl
-	const savedTransport = localStorage.getItem("transportz") || "epoxy";
+	const savedTransport = localStorage.getItem("transportz") || "libcurl";
 
 	const useEpoxy = savedTransport === "epoxy";
 	let transport;
