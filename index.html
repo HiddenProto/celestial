@@ -768,6 +768,9 @@
       var bfsIdx = 0, bfsDragging = false, bfsPlaying = false;
       var bfsYT = null, bfsApiReady = false, bfsTick = null;
       var bfsLoop = 0; // 0=off 1=loop-all 2=loop-one
+      // Proxy-iframe mode — used only for proxyOnly songs
+      var bfsProxied = false, bfsProxyEl = null, bfsProxyReady = false;
+      var bfsCurTime = 0, bfsDur = 0;
 
       function bfsThumb(id) { return 'https://img.youtube.com/vi/' + id + '/hqdefault.jpg'; }
       function bfsFmt(s) {
@@ -784,18 +787,60 @@
         document.getElementById('bfs-thumb').style.left = pct + '%';
       }
 
+      // --- Proxy iframe postMessage helper ---
+      function bfsPM(func, args) {
+        if (!bfsProxyEl) return;
+        try { bfsProxyEl.contentWindow.postMessage(JSON.stringify({ event: 'command', func: func, args: args !== undefined ? args : '' }), '*'); } catch(e) {}
+      }
+
+      // Listen for state/time from the proxy iframe (only active for proxyOnly songs)
+      window.addEventListener('message', function(ev) {
+        if (!bfsProxied) return;
+        try {
+          var d = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data;
+          if (!d) return;
+          if (d.event === 'onReady') {
+            bfsProxyReady = true;
+            bfsPM('playVideo');
+          }
+          if (d.event === 'onStateChange') {
+            var st = d.info;
+            if (st === 1) {
+              bfsSetPlaying(true);
+              if (!bfsTick) bfsTick = setInterval(bfsUpdateBar, 250);
+            } else if (st === 2) {
+              bfsSetPlaying(false);
+            } else if (st === 0) {
+              bfsSetPlaying(false);
+              clearInterval(bfsTick); bfsTick = null;
+              if (bfsLoop === 2) {
+                bfsPM('playVideo');
+              } else {
+                var nxt = (bfsIdx + 1) % BFS_SONGS.length;
+                if (bfsIdx < BFS_SONGS.length - 1 || bfsLoop === 1) bfsLoad(nxt, true);
+              }
+            }
+          }
+          if (d.event === 'infoDelivery' && d.info) {
+            if (d.info.currentTime !== undefined) bfsCurTime = d.info.currentTime;
+            if (d.info.duration) bfsDur = d.info.duration;
+          }
+        } catch(ex) {}
+      });
+
       function bfsUpdateBar() {
         if (bfsDragging) return;
         try {
-          var cur = bfsYT.getCurrentTime() || 0;
-          var dur = bfsYT.getDuration() || 0;
+          var cur, dur;
+          if (bfsProxied) { cur = bfsCurTime; dur = bfsDur; }
+          else { cur = bfsYT.getCurrentTime() || 0; dur = bfsYT.getDuration() || 0; }
           document.getElementById('bfs-current').textContent  = bfsFmt(cur);
           document.getElementById('bfs-duration').textContent = bfsFmt(dur);
           bfsSetBar(dur > 0 ? (cur / dur * 100) : 0);
         } catch(e) {}
       }
 
-      // Fix postMessage target origin for YouTube iframes
+      // Fix postMessage target origin for direct-mode YouTube iframes
       (function bfsPMFix() {
         var _cwDesc = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
         if (!_cwDesc || !_cwDesc.get) return;
@@ -821,15 +866,44 @@
         });
       })();
 
-      // Gate for proxyOnly songs — only unlocked when UV SW is active
       function bfsIsProxyActive() {
         return !!(window.__uv$config && navigator.serviceWorker && navigator.serviceWorker.controller);
       }
 
+      // Song can play in current mode?
       function bfsCanPlay(s) {
         return !s.unplayable && !(s.proxyOnly && !bfsIsProxyActive());
       }
 
+      // --- Proxy iframe (proxyOnly songs only) ---
+      function bfsLaunchProxy(videoId) {
+        bfsProxied = true; bfsProxyReady = false;
+        bfsCurTime = 0; bfsDur = 0;
+        if (bfsYT && bfsApiReady) try { bfsYT.stopVideo(); } catch(e) {}
+        if (!bfsProxyEl) {
+          bfsProxyEl = document.createElement('iframe');
+          bfsProxyEl.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;pointer-events:none;';
+          bfsProxyEl.allow = 'autoplay';
+          document.body.appendChild(bfsProxyEl);
+        }
+        var params = 'enablejsapi=1&autoplay=1&controls=0&rel=0&modestbranding=1&origin=' + encodeURIComponent(location.origin);
+        bfsProxyEl.src = '/service/ultra/' + window.__uv$config.encodeUrl('https://www.youtube.com/embed/' + videoId + '?' + params);
+        bfsProxyEl.onload = function() {
+          setTimeout(function() {
+            try { bfsProxyEl.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'); } catch(e) {}
+          }, 300);
+        };
+      }
+
+      function bfsExitProxy() {
+        bfsProxied = false; bfsProxyReady = false;
+        bfsCurTime = 0; bfsDur = 0;
+        bfsSetPlaying(false);
+        clearInterval(bfsTick); bfsTick = null;
+        if (bfsProxyEl) bfsProxyEl.src = 'about:blank';
+      }
+
+      // --- Direct YT.Player (all non-proxyOnly songs) ---
       function bfsInitYT() {
         if (bfsYT) return;
         var prev = window.onYouTubeIframeAPIReady;
@@ -874,17 +948,28 @@
       function bfsLoad(idx, autoplay) {
         bfsIdx = idx;
         var s = BFS_SONGS[idx];
+        bfsCurTime = 0; bfsDur = 0;
         document.getElementById('bfs-cover').src = s.cover || bfsThumb(s.id);
         document.getElementById('bfs-title').textContent = s.title;
         document.getElementById('bfs-current').textContent  = '0:00';
         document.getElementById('bfs-duration').textContent = '0:00';
         bfsSetBar(0);
         bfsSetPlaying(false);
-        if (!bfsYT || !bfsApiReady) return;
-        try {
-          if (!bfsCanPlay(s)) { bfsYT.stopVideo(); return; }
-          if (autoplay) { bfsYT.loadVideoById(s.id); } else { bfsYT.cueVideoById(s.id); }
-        } catch(e) {}
+        if (s.proxyOnly && bfsIsProxyActive()) {
+          // Route this song through the UV proxy iframe
+          if (bfsProxied && bfsProxyReady) {
+            bfsPM('loadVideoById', [s.id, 0]);
+          } else {
+            bfsLaunchProxy(s.id);
+          }
+        } else {
+          if (bfsProxied) bfsExitProxy();
+          if (!bfsYT || !bfsApiReady) return;
+          try {
+            if (!bfsCanPlay(s)) { bfsYT.stopVideo(); return; }
+            if (autoplay) { bfsYT.loadVideoById(s.id); } else { bfsYT.cueVideoById(s.id); }
+          } catch(e) {}
+        }
       }
 
       function bfsShow() {
@@ -897,17 +982,21 @@
         document.getElementById('bfs-current').textContent  = '0:00';
         document.getElementById('bfs-duration').textContent = '0:00';
         bfsSetBar(0);
-        if (!bfsYT) {
-          bfsInitYT();
-        } else if (bfsApiReady && bfsCanPlay(s)) {
-          try { bfsYT.loadVideoById(s.id); } catch(e) {}
+        if (s.proxyOnly && bfsIsProxyActive()) {
+          if (!bfsProxied) bfsLaunchProxy(s.id);
+          else if (bfsProxyReady) bfsPM('loadVideoById', [s.id, 0]);
+        } else {
+          if (bfsProxied) bfsExitProxy();
+          if (!bfsYT) { bfsInitYT(); }
+          else if (bfsApiReady && bfsCanPlay(s)) { try { bfsYT.loadVideoById(s.id); } catch(e) {} }
         }
       }
 
       function bfsHide() {
         document.getElementById('bfs-player').style.display = 'none';
         bfsSetPlaying(false);
-        if (bfsYT && bfsApiReady) try { bfsYT.stopVideo(); } catch(e) {}
+        if (bfsProxied) { bfsPM('stopVideo'); }
+        else { if (bfsYT && bfsApiReady) try { bfsYT.stopVideo(); } catch(e) {} }
         clearInterval(bfsTick); bfsTick = null;
       }
 
@@ -918,10 +1007,13 @@
         var pct = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
         bfsSetBar(pct * 100);
         try {
-          var dur = (bfsYT && bfsApiReady) ? (bfsYT.getDuration() || 0) : 0;
+          var dur = bfsProxied ? bfsDur : ((bfsYT && bfsApiReady) ? (bfsYT.getDuration() || 0) : 0);
           var seekTime = pct * dur;
           document.getElementById('bfs-current').textContent = bfsFmt(seekTime);
-          if (bfsApiReady && dur) bfsYT.seekTo(seekTime, true);
+          if (dur) {
+            if (bfsProxied && bfsProxyReady) bfsPM('seekTo', [seekTime, true]);
+            else if (bfsApiReady) bfsYT.seekTo(seekTime, true);
+          }
         } catch(e) {}
       }
       barEl.addEventListener('mousedown', function(e) {
@@ -937,8 +1029,15 @@
 
       // Controls
       document.getElementById('bfs-playpause').addEventListener('click', function() {
-        if (!bfsYT || !bfsApiReady || !bfsCanPlay(BFS_SONGS[bfsIdx])) return;
-        try { bfsPlaying ? bfsYT.pauseVideo() : bfsYT.playVideo(); } catch(e) {}
+        var s = BFS_SONGS[bfsIdx];
+        if (!bfsCanPlay(s)) return;
+        if (bfsProxied) {
+          if (!bfsProxyReady) return;
+          bfsPM(bfsPlaying ? 'pauseVideo' : 'playVideo');
+        } else {
+          if (!bfsYT || !bfsApiReady) return;
+          try { bfsPlaying ? bfsYT.pauseVideo() : bfsYT.playVideo(); } catch(e) {}
+        }
       });
       document.getElementById('bfs-prev').addEventListener('click', function() {
         bfsLoad((bfsIdx - 1 + BFS_SONGS.length) % BFS_SONGS.length, true);
@@ -1080,7 +1179,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.31";
+      var SITE_VER = "2.2.32";
 
       /**
        * Show a notification toast.
