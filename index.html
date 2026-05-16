@@ -1042,7 +1042,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.8";
+      var SITE_VER = "2.2.9";
 
       /**
        * Show a notification toast.
@@ -1090,7 +1090,7 @@
        * @param {string} message
        * @param {Array<{label:string, info:string, className?:string, onClick:function}>} options
        */
-      window.notifyOption = function (title, message, options) {
+      window.notifyOption = function (title, message, options, cfg) {
         const el = document.createElement("div");
         el.className = "notif";
         el.setAttribute("data-t", "option");
@@ -1118,7 +1118,7 @@
             <button class="notif-close" aria-label="dismiss">✕</button>
           </div>
           <div class="notif-options">${btnsHTML}</div>
-          <div class="notif-bar" style="animation-duration:300000ms"></div>`;
+          <div class="notif-bar" style="animation-duration:${cfg && cfg.noAutoDismiss ? "99999999" : "300000"}ms"></div>`;
 
         // Collect body-hoisted tooltips so dismiss can clean them up
         var _tooltips = [];
@@ -1150,8 +1150,7 @@
           }
         });
 
-        // Very long timeout (5 min) — effectively manual dismiss only
-        setTimeout(dismiss, 300000);
+        if (!(cfg && cfg.noAutoDismiss)) setTimeout(dismiss, 300000);
 
         // Hoist each tooltip to <body> so it escapes overflow:hidden + transforms,
         // then position it with viewport clamping on hover.
@@ -1295,18 +1294,26 @@
         localStorage.setItem("cst-ver", SITE_VER);
       })();
 
-      // ── Mercury Workshop swap notice (one-time) ─────────────────────────
+      // ── Mercury Workshop swap notice (persists until acknowledged) ───────
       (function () {
-        var key = "mw-swap-notice-shown";
+        var key = "mw-swap-notice-ack";
         if (localStorage.getItem(key)) return;
-        localStorage.setItem(key, "1");
         setTimeout(function () {
-          window.notify(
+          window.notifyOption(
+            "notice",
             "for everybody saying some stuff is broken like in quick apps or media: " +
             "the issue was Mercury Workshop was stripped of support of its server architecture " +
             "so it was swapped to fallback.",
-            "info",
-            14000
+            [
+              {
+                label: "acknowledge",
+                info: "dismiss this notice permanently",
+                onClick: function () {
+                  localStorage.setItem(key, "1");
+                }
+              }
+            ],
+            { noAutoDismiss: true }
           );
         }, 2000);
       })();
