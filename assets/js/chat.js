@@ -202,7 +202,9 @@
       const mentioned = myName && d.mentions && d.mentions.some(n =>
         n.toLowerCase() === myName.toLowerCase());
       const notifsOn = isNotifsOn();
-      if (!chatOpen) {
+      // "Seeing" the chat = tab is visible AND chat panel is open
+      const isSeeingChat = !document.hidden && chatOpen;
+      if (!isSeeingChat) {
         unread++;
         updateBubble();
         if (notifsOn) {
@@ -288,10 +290,13 @@
 
   function parseMentions(text) {
     const out = [];
-    // @[name with spaces] syntax — bracket delimiters allow spaces
-    const re = /\@\[([^\]]{1,40})\]/g;
+    // Combined: @[name with spaces] and plain @word
+    const re = /\@\[([^\]]{1,40})\]|@([\w\-\.]{1,40})/g;
     let m;
-    while ((m = re.exec(text)) !== null) out.push(m[1].trim());
+    while ((m = re.exec(text)) !== null) {
+      const name = (m[1] || m[2]).trim();
+      if (name && !out.includes(name)) out.push(name);
+    }
     return out;
   }
 
@@ -498,9 +503,11 @@
     const nameHtml  = msg.name
       ? `<div class="cst-msg-name" style="${nameStyle}">${esc(msg.name)}</div>`
       : '';
-    // Render @mentions with a highlight span
-    const bodyHtml = esc(msg.text).replace(/\@\[([^\]]+)\]/g, (_, n) =>
-      `<span style="color:#7eb8ff;font-weight:600;">@${esc(n)}</span>`);
+    // Render @mentions with a highlight span — single pass handles both @[name] and plain @word
+    const bodyHtml = esc(msg.text).replace(/\@\[([^\]]+)\]|@([\w\-\.]{1,40})/g, (full, bracketN, plainN) => {
+      const n = bracketN !== undefined ? bracketN : plainN;
+      return `<span style="color:#7eb8ff;font-weight:600;">@${esc(n)}</span>`;
+    });
     d.innerHTML = `${nameHtml}<div class="cst-msg-body">${bodyHtml}</div>`;
     box.appendChild(d);
     scrollMsgs();

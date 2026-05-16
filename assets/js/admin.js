@@ -147,12 +147,25 @@
       'background:#0d0d0d;border:1px solid #222;border-radius:50px;padding:7px 14px;' +
       'color:#888;font-family:system-ui,sans-serif;font-size:.75rem;cursor:pointer;' +
       'display:flex;align-items:center;gap:6px;transition:background .15s;';
-    btn.innerHTML = (hasBadges ? '<span style="font-size:.9rem">★</span>' : '') +
-      `<span>${appr.name || 'user'}</span>`;
+    function _daysLeft() { return Math.max(0, Math.ceil((appr.expires - Date.now()) / 86400000)); }
+    function _updateBtn() {
+      const d = _daysLeft();
+      const dLabel = d === 0 ? 'today' : `${d}d`;
+      btn.innerHTML = (hasBadges ? '<span style="font-size:.9rem">★</span>' : '') +
+        `<span>${appr.name || 'user'}</span>` +
+        `<span id="cst-badge-days" style="color:#444;font-size:.7rem;">${dLabel}</span>`;
+    }
+    _updateBtn();
     btn.onmouseenter = () => btn.style.background = '#181818';
     btn.onmouseleave = () => btn.style.background = '#0d0d0d';
     btn.onclick = showBadgePanel;
     document.body.appendChild(btn);
+    // Live countdown — refresh every minute
+    const _int = setInterval(() => {
+      if (!document.body.contains(btn)) { clearInterval(_int); return; }
+      if (Date.now() >= appr.expires) { btn.remove(); clearInterval(_int); return; }
+      _updateBtn();
+    }, 60000);
   }
 
   function showBadgePanel() {
