@@ -1047,7 +1047,9 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.20";
+      var SITE_VER = "2.2.21";
+      // Chris: update this whenever you start a new ngrok session
+      var LAPTOP_NGROK_URL = "";
 
       /**
        * Show a notification toast.
@@ -1283,26 +1285,11 @@
           },
           {
             label: "Laptop Reliant",
-            info: "libcurl + bumblcat rrc + ngrok tunnel — routes through Chris's laptop IP via ngrok. Requires start-wisp.bat to be running.",
+            info: "libcurl + bumblcat rrc + ngrok tunnel — routes through Chris's laptop IP via ngrok. May be offline on weekends.",
             onClick: function () {
-              var ngrok = localStorage.getItem("ngrok-url");
+              var ngrok = localStorage.getItem("ngrok-url") || LAPTOP_NGROK_URL;
               if (!ngrok) {
-                document.getElementById("settings").style.display = "block";
-                document.querySelector(".settings-bg").style.display = "block";
-                show("browsing");
-                var wsEl = document.getElementById("wispSelect");
-                var ngEl = document.getElementById("ngrokUrl");
-                var wcEl = document.getElementById("wispCustom");
-                if (wsEl) wsEl.value = "ngrok";
-                if (wcEl) wcEl.style.display = "none";
-                if (ngEl) {
-                  ngEl.style.display = "block";
-                  setTimeout(function () {
-                    ngEl.scrollIntoView({ behavior: "smooth", block: "center" });
-                    ngEl.focus();
-                  }, 200);
-                }
-                window.notify("paste your ngrok URL in the field below, then press Enter ↲", "info", 10000);
+                window.notify("Laptop Reliant is currently offline — Chris's laptop isn't running the tunnel right now.", "error", 10000);
                 return;
               }
               localStorage.setItem("transportz", "libcurl");
@@ -1350,26 +1337,11 @@
           },
           {
             label: "Laptop Reliant",
-            info: "libcurl + bumblcat rrc + ngrok tunnel — routes through Chris's laptop IP via ngrok. Requires start-wisp.bat to be running.",
+            info: "libcurl + bumblcat rrc + ngrok tunnel — routes through Chris's laptop IP via ngrok. May be offline on weekends.",
             onClick: function () {
-              var ngrok = localStorage.getItem("ngrok-url");
+              var ngrok = localStorage.getItem("ngrok-url") || LAPTOP_NGROK_URL;
               if (!ngrok) {
-                document.getElementById("settings").style.display = "block";
-                document.querySelector(".settings-bg").style.display = "block";
-                show("browsing");
-                var wsEl = document.getElementById("wispSelect");
-                var ngEl = document.getElementById("ngrokUrl");
-                var wcEl = document.getElementById("wispCustom");
-                if (wsEl) wsEl.value = "ngrok";
-                if (wcEl) wcEl.style.display = "none";
-                if (ngEl) {
-                  ngEl.style.display = "block";
-                  setTimeout(function () {
-                    ngEl.scrollIntoView({ behavior: "smooth", block: "center" });
-                    ngEl.focus();
-                  }, 200);
-                }
-                window.notify("paste your ngrok URL in the field below, then press Enter ↲", "info", 10000);
+                window.notify("Laptop Reliant is currently offline — Chris's laptop isn't running the tunnel right now.", "error", 10000);
                 return;
               }
               localStorage.setItem("transportz", "libcurl");
