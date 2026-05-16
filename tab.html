@@ -188,19 +188,6 @@
       <hr>
 
       <details open>
-        <summary>05/16 — admin &amp; chat overhaul</summary>
-        <p>- admin identity: set your display name and chat/cursor color per-admin in the Identity tab</p>
-        <p>- screen viewer: now uses browser screen-share (getDisplayMedia) — captures whole screen at 720p/30fps, not just the page</p>
-        <p>- screen viewer: theme CSS no longer bleeds into the viewer; flicker from canvas resize eliminated</p>
-        <p>- cursor color is now derived from your admin chat/cursor color setting</p>
-        <p>- global actions panel: announce text to all clients or specific clients via 📢; nuke a client's tab with a fullscreen video via 💥 (rickroll, nyan cat, lofi, or custom URL)</p>
-        <p>- ping indicator: viewer shows live latency to client (green &lt;200ms, orange &lt;500ms, red otherwise)</p>
-        <p>- chat @mentions now use @[name] syntax — supports names with spaces</p>
-        <p>- chat notifications can be toggled off in Appearance settings; pinging someone with notifs off tells you they have them disabled</p>
-        <p>- proxy origin/referer fix: cross-origin sub-requests now correctly attribute the page origin, not the sub-resource</p>
-      </details>
-
-      <details open>
         <summary>05/16 — photon transport</summary>
         <p>- photon: new custom proxy transport backed by a Cloudflare Worker — server-side TLS, no WASM SSL, no error 35 fingerprinting issues</p>
         <p>- SSL error 35 auto-recovery: libcurl transport now silently retries through epoxy when it hits a TLS fingerprint rejection (Cloudflare-protected sites)</p>
