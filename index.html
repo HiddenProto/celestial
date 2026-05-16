@@ -414,11 +414,11 @@
               </select>
             </div>
             <div class="box">
-              <h3>Wisp Server <span class="info-icon"><span class="tip">The backend WebSocket server that relays your proxy traffic. Required for the proxy to work.<br><br><b>bumblcat's server (v1)</b> — recommended. Private server, clean IP, works with Google without CAPTCHA. Type: <b>private server</b>.<br><br><b>Mercury Workshop — ultrapatch</b> — currently degraded. Server architecture changed; triggers Google CAPTCHA on navigation. Type: <b>public server</b>.<br><br><b>custom</b> — enter your own wisp server URL. Type: <b>self-hosted server</b>.</span></span></h3>
+              <h3>Wisp Server <span class="info-icon"><span class="tip">The backend WebSocket server that relays your proxy traffic. Required for the proxy to work.<br><br><b>bumblcat's server</b> — private server hosted by bumblcat. Has full cross-origin support, meaning more apps and games load correctly. Type: <b>private server</b>.<br><br><b>bumblcat ultrapatch</b> — Mercury Workshop wisp server. Currently degraded — server architecture changed, may trigger Google CAPTCHA. Type: <b>public server</b>.<br><br><b>custom</b> — enter your own wisp server URL. Type: <b>self-hosted server</b>.</span></span></h3>
               <p class="desc">the server that routes your proxied traffic</p>
               <select class="select" id="wispSelect">
-                <option value="wss://celestial-wisp.onrender.com/">bumblcat's server — v1 (recommended)</option>
-                <option value="wss://wisp.mercurywork.shop/">Mercury Workshop — ultrapatch (degraded)</option>
+                <option value="wss://celestial-wisp.onrender.com/">bumblcat's server</option>
+                <option value="wss://wisp.mercurywork.shop/" disabled style="color:#888">bumblcat ultrapatch (degraded)</option>
                 <option value="wss://anura.pro/wisp/">anura (free)</option>
                 <option value="wss://wisp.nodeppt.com/">nodeppt (free)</option>
                 <option value="custom">custom server...</option>
@@ -1044,7 +1044,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.12";
+      var SITE_VER = "2.2.13";
 
       /**
        * Show a notification toast.
@@ -1217,19 +1217,25 @@
           [
             {
               label: "Wider Support",
-              info: "currently degraded — Mercury Workshop's server changed architecture and now triggers Google CAPTCHA. use Standard instead.",
-              className: "opt-degraded",
-              onClick: function () {}
+              info: "libcurl + bumblcat rrc + bumblcat ultrapatch — best compatibility, bypasses Google anomaly checks",
+              onClick: function () {
+                localStorage.setItem("transportz", "libcurl");
+                localStorage.setItem("pr0xy", "scram");
+                localStorage.setItem("location", "wss://wisp.mercurywork.shop/");
+                localStorage.setItem("proxy-config-seen", SITE_VER);
+                window.notify("Wider Support enabled — reloading…", "success", 6000);
+                setTimeout(function () { location.reload(); }, 900);
+              }
             },
             {
-              label: "Standard (recommended)",
-              info: "libcurl + bumblcat rrc + bumblcat's server (v1) — recommended. clean IP, works with Google without CAPTCHA.",
+              label: "Limited but Fast",
+              info: "libcurl + bumblcat rrc + bumblcat's server — faster for most sites, Google may show anomaly checks",
               onClick: function () {
                 localStorage.setItem("transportz", "libcurl");
                 localStorage.setItem("pr0xy", "scram");
                 localStorage.setItem("location", "wss://celestial-wisp.onrender.com/");
                 localStorage.setItem("proxy-config-seen", SITE_VER);
-                window.notify("Standard enabled — reloading…", "success", 6000);
+                window.notify("Limited but Fast enabled — reloading…", "success", 6000);
                 setTimeout(function () { location.reload(); }, 900);
               }
             },
