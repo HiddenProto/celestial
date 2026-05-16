@@ -439,27 +439,18 @@ function cookieStorage() {
   const pr0xySelect = document.getElementById('pr0xySelect');
   const wispSelect = document.getElementById('wispSelect');
   const wispCustom = document.getElementById('wispCustom');
-  const ngrokUrl = document.getElementById('ngrokUrl');
   if (!tselect || !pr0xySelect || !wispSelect) return;
 
   // Restore saved values into selects
   tselect.value = localStorage.getItem('transportz') || 'libcurl';
   pr0xySelect.value = localStorage.getItem('pr0xy') || 'scram';
   const savedWisp = localStorage.getItem('location') || 'wss://celestial-wisp.onrender.com/';
-  const savedNgrok = localStorage.getItem('ngrok-url') || '';
 
-  // If the active wisp URL is the saved ngrok URL, show ngrok option selected
-  if (savedNgrok && savedWisp === savedNgrok) {
-    wispSelect.value = 'ngrok';
-    if (ngrokUrl) { ngrokUrl.style.display = 'block'; ngrokUrl.value = savedNgrok; }
-  } else if ([...wispSelect.options].some(o => o.value === savedWisp)) {
+  if ([...wispSelect.options].some(o => o.value === savedWisp)) {
     wispSelect.value = savedWisp;
-    // Pre-fill ngrok input with saved ngrok URL even if not currently active
-    if (ngrokUrl && savedNgrok) ngrokUrl.value = savedNgrok;
   } else if (savedWisp) {
     wispSelect.value = 'custom';
     if (wispCustom) { wispCustom.style.display = 'block'; wispCustom.value = savedWisp; }
-    if (ngrokUrl && savedNgrok) ngrokUrl.value = savedNgrok;
   }
 
   // Save on change (blocked when CF mode is active)
@@ -477,34 +468,14 @@ function cookieStorage() {
 
   wispSelect.addEventListener('change', () => {
     if (localStorage.getItem('cfmode') === '1') return;
-    if (wispSelect.value === 'ngrok') {
-      if (wispCustom) wispCustom.style.display = 'none';
-      if (ngrokUrl) ngrokUrl.style.display = 'block';
-      // Don't reload yet — wait for user to enter/confirm the ngrok URL
-    } else if (wispSelect.value === 'custom') {
-      if (ngrokUrl) ngrokUrl.style.display = 'none';
+    if (wispSelect.value === 'custom') {
       if (wispCustom) wispCustom.style.display = 'block';
     } else {
       if (wispCustom) wispCustom.style.display = 'none';
-      if (ngrokUrl) ngrokUrl.style.display = 'none';
       localStorage.setItem('location', wispSelect.value);
       location.reload();
     }
   });
-
-  if (ngrokUrl) {
-    // Pre-fill with saved ngrok URL
-    if (savedNgrok) ngrokUrl.value = savedNgrok;
-    ngrokUrl.addEventListener('change', () => {
-      if (localStorage.getItem('cfmode') === '1') return;
-      const val = ngrokUrl.value.trim();
-      if (val) {
-        localStorage.setItem('ngrok-url', val);
-        localStorage.setItem('location', val);
-        location.reload();
-      }
-    });
-  }
 
   if (wispCustom) {
     wispCustom.addEventListener('change', () => {
