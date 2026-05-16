@@ -1045,7 +1045,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.16";
+      var SITE_VER = "2.2.17";
 
       /**
        * Show a notification toast.
@@ -1390,6 +1390,29 @@
             { noAutoDismiss: true }
           );
         }, 3500);
+      })();
+
+      // ── Ultrapatch (local) notice — shows when local server is selected ──
+      (function () {
+        var key = "ultrapatch-local-notice-ack";
+        if (localStorage.getItem(key)) return;
+        if (localStorage.getItem("location") !== "ws://localhost:3001/") return;
+        setTimeout(function () {
+          window.notifyOption(
+            "notice",
+            "this proxy is ran through Chris's laptop. Expect downtime on the weekends.",
+            [
+              {
+                label: "acknowledge",
+                info: "dismiss this notice permanently",
+                onClick: function () {
+                  localStorage.setItem(key, "1");
+                }
+              }
+            ],
+            { noAutoDismiss: true }
+          );
+        }, 4500);
       })();
 
       // BRC lifecycle — silent, no toasts for fallback
