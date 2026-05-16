@@ -184,9 +184,65 @@ async function _createBRCTransport() {
  * without a fallback, so a non-iterable object throws "TypeError: i is not
  * iterable".  This shim fixes that at the transport boundary.
  */
+// ── Browser fingerprint defaults — pulled from the REAL browser for consistency ──
+const _defaultUA   = navigator.userAgent;
+const _defaultLang = (() => {
+	const l = navigator.language || 'en-US';
+	const s = l.split('-')[0];
+	return l === s ? l : `${l},${s};q=0.9`;
+})();
+let _secChUA       = '"Not A(Brand";v="99", "Chromium";v="99"';
+let _secChUAMobile = '?0';
+let _secChUAPlat   = '"Windows"';
+try {
+	if (navigator.userAgentData) {
+		const b = navigator.userAgentData.brands || [];
+		if (b.length) _secChUA = b.map(x => `"${x.brand}";v="${x.version}"`).join(', ');
+		_secChUAMobile = navigator.userAgentData.mobile ? '?1' : '?0';
+		_secChUAPlat   = `"${navigator.userAgentData.platform || 'Windows'}"`;
+	}
+} catch (_) {}
+
+/**
+ * Injects missing browser-like request headers so upstream servers see a real
+ * Chrome fingerprint instead of a bare libcurl/epoxy request.
+ * Only fills headers BRC hasn't already set — never overrides existing values.
+ */
+function _injectBrowserHeaders(headers) {
+	// Normalise incoming headers to [[name, value], ...] array
+	let arr = [];
+	if (!headers) {
+		arr = [];
+	} else if (Array.isArray(headers)) {
+		arr = headers.slice();
+	} else if (typeof headers[Symbol.iterator] === 'function') {
+		for (const [k, v] of headers) arr.push([k, v]);
+	} else {
+		for (const [k, v] of Object.entries(headers))
+			arr.push([k, Array.isArray(v) ? v[0] : String(v)]);
+	}
+
+	const has = new Set(arr.map(([k]) => k.toLowerCase()));
+
+	const fill = [
+		['User-Agent',        _defaultUA],
+		['Accept-Language',   _defaultLang],
+		['Sec-CH-UA',         _secChUA],
+		['Sec-CH-UA-Mobile',  _secChUAMobile],
+		['Sec-CH-UA-Platform', _secChUAPlat],
+	];
+	for (const [name, value] of fill) {
+		if (!has.has(name.toLowerCase())) arr.push([name, value]);
+	}
+	return arr;
+}
+
 function _wrapTransportHeaders(transport) {
 	const origRequest = transport.request.bind(transport);
 	transport.request = async function(remote, method, body, headers, signal) {
+		// Inject missing browser headers before the request leaves
+		headers = _injectBrowserHeaders(headers);
+
 		const resp = await origRequest(remote, method, body, headers, signal);
 		if (resp && resp.headers && !Array.isArray(resp.headers)) {
 			const flat = [];
