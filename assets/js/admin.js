@@ -432,9 +432,9 @@
         <div class="crow" style="align-items:center;">
           <select class="ci" id="cp-nuke-sel" style="flex:1;min-width:0;">
             <option value="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&controls=0">🎵 Rick Roll</option>
-            <option value="https://www.youtube.com/embed/nyLgZTn-bnY?autoplay=1&controls=0">🐱 Nyan Cat (10h)</option>
-            <option value="https://www.youtube.com/embed/eBGIQ7ZuuiU?autoplay=1&controls=0">🌿 Lofi Hip-Hop</option>
-            <option value="https://www.youtube.com/embed/bM7SZ5SBzyY?autoplay=1&controls=0">📺 Big Buck Bunny</option>
+            <option value="https://www.youtube.com/embed/2yJgwwDcgV8?autoplay=1&controls=0">🐱 Nyan Cat</option>
+            <option value="https://www.youtube.com/embed/wGrbkkAl3hY?autoplay=1&controls=0">🎸 Bones?</option>
+            <option value="https://www.youtube.com/embed/YE7VzlLtp-4?autoplay=1&controls=0">📺 Big Buck Bunny</option>
             <option value="custom">✏️ custom URL…</option>
           </select>
           <input class="ci" id="cp-nuke-url" placeholder="embed URL…" style="display:none;flex:1;min-width:0;"/>

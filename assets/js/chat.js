@@ -96,6 +96,9 @@
       hubConn  = conn;
       isHubMode = false;
       conn.send({ type: 'join', name: getMyName(), isAdmin: amAdmin() });
+      // Request current online list explicitly after a short delay — ensures hub's
+      // data channel is fully flushed before we expect a response (late-join fix)
+      setTimeout(() => { if (conn.open) conn.send({ type: 'get-online' }); }, 600);
     });
     conn.on('data', onHubMsg);
     conn.on('close', () => {
@@ -136,12 +139,31 @@
     if (d.type === 'join') {
       c.name    = d.name;
       c.isAdmin = !!d.isAdmin;
+      // Send current online list directly to this new client first (belt-and-suspenders for late joiners)
+      const curUsers = [
+        { name: getMyName(), isAdmin: amAdmin() },
+        ...Object.values(hubClients).filter(x => x.name).map(x => ({ name: x.name, isAdmin: x.isAdmin })),
+      ];
+      try { c.conn.send({ type: 'online', users: curUsers }); } catch {}
       broadcastOnline();
+    }
+    if (d.type === 'get-online') {
+      // Client explicitly requested the online list — send directly to them
+      const curUsers = [
+        { name: getMyName(), isAdmin: amAdmin() },
+        ...Object.values(hubClients).filter(x => x.name).map(x => ({ name: x.name, isAdmin: x.isAdmin })),
+      ];
+      try { c.conn.send({ type: 'online', users: curUsers }); } catch {}
     }
     if (d.type === 'msg') {
       const msg = { type: 'msg', name: d.name, text: (d.text || '').slice(0, MAX_CHARS), isAdmin: !!d.isAdmin, adminColor: d.adminColor || undefined, mentions: d.mentions || undefined, ts: Date.now() };
       relayMsg(cid, msg);
       appendMsg(msg);
+      // Hub: check if the hub user themselves is mentioned
+      const hubName = getMyName();
+      if (hubName && msg.mentions && msg.mentions.some(n => n.toLowerCase() === hubName.toLowerCase()) && isNotifsOn()) {
+        window.notify?.(`📣 ${msg.name || 'someone'} mentioned you: ${msg.text.slice(0,80)}`, 'info', 9000);
+      }
     }
     if (d.type === 'notif-off') {
       // Relay feedback to pinger (forName)
@@ -363,14 +385,83 @@
     const send = widgetEl.querySelector('#cst-chat-send');
     const chars = widgetEl.querySelector('#cst-chat-chars');
 
+    // ── @ autocomplete ──────────────────────────────────────────
+    let _atStart = -1, _atList = [], _atSel = 0, _atEl = null;
+
+    function _atBuild() {
+      if (_atEl) return _atEl;
+      _atEl = document.createElement('div');
+      _atEl.style.cssText = 'position:absolute;bottom:calc(100% + 2px);left:0;right:0;' +
+        'background:#0e0e0e;border:1px solid #282828;border-radius:8px;overflow:hidden;' +
+        'z-index:9999;display:none;max-height:150px;overflow-y:auto;' +
+        'box-shadow:0 -4px 16px rgba(0,0,0,.7);font-family:system-ui,sans-serif;';
+      const row = widgetEl.querySelector('#cst-chat-inp-row');
+      row.style.position = 'relative';
+      row.appendChild(_atEl);
+      return _atEl;
+    }
+    function _atHide() { if (_atEl) _atEl.style.display = 'none'; _atStart = -1; }
+    function _atHighlight() {
+      if (!_atEl) return;
+      _atEl.querySelectorAll('[data-i]').forEach((item, i) => {
+        item.style.background = i === _atSel ? '#1c1c1c' : '';
+      });
+    }
+    function _atShow(filter) {
+      const names = onlineList.map(u => u.name).filter(n => n && n !== getMyName());
+      const filt  = filter ? names.filter(n => n.toLowerCase().includes(filter.toLowerCase())) : names;
+      if (!filt.length) { _atHide(); return; }
+      _atList = filt; _atSel = 0;
+      const el = _atBuild();
+      el.innerHTML = filt.map((n, i) =>
+        `<div data-i="${i}" style="padding:6px 12px;cursor:pointer;font-size:.78rem;color:#ccc;` +
+        (i === 0 ? 'background:#1c1c1c;' : '') +
+        `display:flex;align-items:center;gap:6px;">` +
+        `<span style="color:#7eb8ff;font-size:.7rem;font-weight:600;">@</span>${esc(n)}</div>`
+      ).join('');
+      el.querySelectorAll('[data-i]').forEach(item => {
+        item.addEventListener('mousedown', ev => { ev.preventDefault(); _atAccept(+item.dataset.i); });
+      });
+      el.style.display = 'block';
+    }
+    function _atAccept(i) {
+      const name = _atList[i]; if (!name) return;
+      const before = inp.value.slice(0, _atStart);
+      const after  = inp.value.slice(inp.selectionStart);
+      inp.value = before + '@[' + name + '] ' + after;
+      const pos = (before + '@[' + name + '] ').length;
+      inp.setSelectionRange(pos, pos);
+      _atHide();
+      chars.textContent = `${inp.value.length} / ${MAX_CHARS}`;
+      inp.style.height = '34px';
+      inp.style.height = Math.min(inp.scrollHeight, 80) + 'px';
+    }
+
     inp.addEventListener('input', () => {
       chars.textContent = `${inp.value.length} / ${MAX_CHARS}`;
       inp.style.height = '34px';
       inp.style.height = Math.min(inp.scrollHeight, 80) + 'px';
+      // @[name] autocomplete trigger
+      const val = inp.value, cur = inp.selectionStart;
+      const atPos = val.lastIndexOf('@', cur - 1);
+      if (atPos !== -1) {
+        const frag = val.slice(atPos + 1, cur);
+        if (!frag.includes('[') && !frag.includes(']') && !frag.includes('@') && frag.length <= 32) {
+          _atStart = atPos;
+          _atShow(frag);
+        } else { _atHide(); }
+      } else { _atHide(); }
     });
     inp.addEventListener('keydown', e => {
+      if (_atEl && _atEl.style.display !== 'none') {
+        if (e.key === 'Tab') { e.preventDefault(); _atAccept(_atSel); return; }
+        if (e.key === 'ArrowDown') { e.preventDefault(); _atSel = Math.min(_atSel + 1, _atList.length - 1); _atHighlight(); return; }
+        if (e.key === 'ArrowUp')   { e.preventDefault(); _atSel = Math.max(_atSel - 1, 0); _atHighlight(); return; }
+        if (e.key === 'Escape')    { e.preventDefault(); _atHide(); return; }
+      }
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
     });
+    inp.addEventListener('blur', () => { setTimeout(_atHide, 150); });
     send.onclick = doSend;
 
     function doSend() {
@@ -378,6 +469,7 @@
       inp.value = '';
       chars.textContent = `0 / ${MAX_CHARS}`;
       inp.style.height = '34px';
+      _atHide();
     }
   }
 
