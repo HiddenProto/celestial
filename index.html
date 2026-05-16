@@ -761,7 +761,7 @@
         { title: 'A Rough Time', id: 'D0WzeTJlFHA', cover: 'https://images.unsplash.com/photo-1755923040436-c932c873cacf?w=400&auto=format&fit=crop&q=80' },
         { title: 'Fallen Sky',   id: 'dZpD74pJkNE', cover: 'https://images.unsplash.com/photo-1750167000423-d448265fd79e?w=400&auto=format&fit=crop&q=80' },
         { title: '/: ',          id: '1d96oRR-fE4', cover: 'https://images.unsplash.com/photo-1762081512133-30202f928bb9?w=400&auto=format&fit=crop&q=80' },
-        { title: 'i am going to kill your family', id: '_6IxchAed3o', unplayable: true },
+        { title: 'i am going to kill your family', id: '_6IxchAed3o' },
         { title: 'Further Away', id: 'NrLkTZrPZA4', cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&auto=format&fit=crop&q=80' }
       ];
 
@@ -794,6 +794,35 @@
           bfsSetBar(dur > 0 ? (cur / dur * 100) : 0);
         } catch(e) {}
       }
+
+      // Fix: when YouTube iframe is served through the proxy its origin becomes
+      // callanambulance.vercel.app, so widgetapi's postMessage calls to
+      // 'https://www.youtube.com' get rejected by the browser. Intercept
+      // contentWindow access on YouTube iframes and normalize the target origin.
+      (function bfsPMFix() {
+        var _cwDesc = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
+        if (!_cwDesc || !_cwDesc.get) return;
+        var _origGet = _cwDesc.get;
+        Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
+          get: function () {
+            var cw = _origGet.call(this);
+            if (!cw) return cw;
+            if (!(this.src || '').includes('youtube')) return cw;
+            return new Proxy(cw, {
+              get: function (target, prop) {
+                if (prop === 'postMessage') {
+                  return function (data, targetOrigin, transfer) {
+                    target.postMessage(data, '*', transfer);
+                  };
+                }
+                var val = target[prop];
+                return typeof val === 'function' ? val.bind(target) : val;
+              }
+            });
+          },
+          configurable: true
+        });
+      })();
 
       function bfsInitYT() {
         if (bfsYT) return;
@@ -1045,7 +1074,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.22";
+      var SITE_VER = "2.2.23";
 
       /**
        * Show a notification toast.
