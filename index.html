@@ -761,7 +761,7 @@
         { title: 'A Rough Time', id: 'D0WzeTJlFHA', cover: 'https://images.unsplash.com/photo-1755923040436-c932c873cacf?w=400&auto=format&fit=crop&q=80' },
         { title: 'Fallen Sky',   id: 'dZpD74pJkNE', cover: 'https://images.unsplash.com/photo-1750167000423-d448265fd79e?w=400&auto=format&fit=crop&q=80' },
         { title: '/: ',          id: '1d96oRR-fE4', cover: 'https://images.unsplash.com/photo-1762081512133-30202f928bb9?w=400&auto=format&fit=crop&q=80' },
-        { title: 'i am going to kill your family', id: '_6IxchAed3o' },
+        { title: 'i am going to kill your family', id: '_6IxchAed3o', proxyOnly: true },
         { title: 'Further Away', id: 'NrLkTZrPZA4', cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&auto=format&fit=crop&q=80' }
       ];
 
@@ -913,7 +913,8 @@
             events: {
               onReady: function() {
                 bfsApiReady = true;
-                if (!BFS_SONGS[bfsIdx].unplayable) bfsYT.playVideo();
+                var s = BFS_SONGS[bfsIdx];
+                if (!s.unplayable && !s.proxyOnly) bfsYT.playVideo();
               },
               onStateChange: function(e) {
                 var S = YT.PlayerState;
@@ -969,7 +970,7 @@
         } else {
           if (!bfsYT || !bfsApiReady) return;
           try {
-            if (s.unplayable) { bfsYT.stopVideo(); return; }
+            if (s.unplayable || s.proxyOnly) { bfsYT.stopVideo(); return; }
             if (autoplay) { bfsYT.loadVideoById(s.id); } else { bfsYT.cueVideoById(s.id); }
           } catch(e) {}
         }
@@ -987,7 +988,7 @@
         bfsSetBar(0);
         if (!bfsProxied && !bfsYT) {
           bfsInitPlayer();
-        } else if (bfsApiReady && !s.unplayable) {
+        } else if (bfsApiReady && !s.unplayable && (!s.proxyOnly || bfsProxied)) {
           if (bfsProxied) bfsPM('loadVideoById', [s.id, 0]);
           else try { bfsYT.loadVideoById(s.id); } catch(e) {}
         }
@@ -1033,7 +1034,8 @@
 
       // Controls
       document.getElementById('bfs-playpause').addEventListener('click', function() {
-        if (!bfsApiReady || BFS_SONGS[bfsIdx].unplayable) return;
+        var s = BFS_SONGS[bfsIdx];
+        if (!bfsApiReady || s.unplayable || (s.proxyOnly && !bfsProxied)) return;
         if (bfsProxied) {
           bfsPM(bfsPlaying ? 'pauseVideo' : 'playVideo');
         } else {
@@ -1181,7 +1183,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.27";
+      var SITE_VER = "2.2.28";
 
       /**
        * Show a notification toast.
