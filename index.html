@@ -645,7 +645,7 @@
   <!-- ===== BFS Music Player ===== -->
   <div id="bfs-player">
     <div id="bfs-cover-wrap" style="position:relative;">
-      <img id="bfs-cover" src="https://images.unsplash.com/photo-1619213579094-6dcaa7fa5d54?w=400&auto=format&fit=crop&q=80" alt="cover" />
+      <img id="bfs-cover" src="https://images.unsplash.com/photo-1619213579094-6dcaa7fa5d54?w=400&auto=format&fit=crop&q=80" alt="" />
     </div>
     <div class="bfs-info">
       <div class="bfs-title" id="bfs-title">Egy</div>
@@ -751,8 +751,9 @@
       padding: 0 !important;
     }
     .bfs-playpause:hover { background: #d0d0d0 !important; }
-    #bfs-cover-wrap { position: relative; }
+    #bfs-cover-wrap { position: relative; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); }
     #bfs-cover-wrap #bfs-cover { display: block; width: 100%; height: 130px; object-fit: cover; filter: brightness(0.8) grayscale(0.2); }
+    #bfs-cover-wrap #bfs-cover.bfs-cover-hidden { visibility: hidden; }
   </style>
   <script>
     (function () {
@@ -779,6 +780,21 @@
         if (s.proxyOnly && bfsIsProxyActive && bfsIsProxyActive() && window.__uv$config)
           return '/service/ultra/' + window.__uv$config.encodeUrl(direct);
         return direct;
+      }
+      function bfsSetCover(s) {
+        var img = document.getElementById('bfs-cover');
+        img.onload = function() { img.classList.remove('bfs-cover-hidden'); };
+        img.onerror = function() {
+          // If we used the direct URL but proxy is now active, retry through UV
+          if (s.proxyOnly && bfsIsProxyActive && bfsIsProxyActive() && window.__uv$config) {
+            var proxied = '/service/ultra/' + window.__uv$config.encodeUrl(bfsThumb(s.id));
+            if (img.src.indexOf('/service/ultra/') === -1) { img.src = proxied; return; }
+          }
+          // All else failed — hide the img so the gradient background shows
+          img.classList.add('bfs-cover-hidden');
+        };
+        img.classList.remove('bfs-cover-hidden');
+        img.src = bfsCover(s);
       }
       function bfsFmt(s) {
         s = Math.floor(s || 0);
@@ -956,7 +972,7 @@
         bfsIdx = idx;
         var s = BFS_SONGS[idx];
         bfsCurTime = 0; bfsDur = 0;
-        document.getElementById('bfs-cover').src = bfsCover(s);
+        bfsSetCover(s);
         document.getElementById('bfs-title').textContent = s.title;
         document.getElementById('bfs-current').textContent  = '0:00';
         document.getElementById('bfs-duration').textContent = '0:00';
@@ -984,7 +1000,7 @@
         p.style.display = 'block';
         p.style.animation = 'none'; p.offsetHeight; p.style.animation = '';
         var s = BFS_SONGS[bfsIdx];
-        document.getElementById('bfs-cover').src = bfsCover(s);
+        bfsSetCover(s);
         document.getElementById('bfs-title').textContent = s.title;
         document.getElementById('bfs-current').textContent  = '0:00';
         document.getElementById('bfs-duration').textContent = '0:00';
@@ -1186,7 +1202,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.34";
+      var SITE_VER = "2.2.35";
 
       /**
        * Show a notification toast.
