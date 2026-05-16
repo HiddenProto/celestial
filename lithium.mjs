@@ -243,18 +243,6 @@ function _wrapTransportHeaders(transport) {
 		// Inject missing browser headers before the request leaves
 		headers = _injectBrowserHeaders(headers);
 
-		// Inject Origin for google.com requests — Google's APIs return 403 if Origin
-		// is missing or is the proxy domain instead of a google.com origin.
-		const _hasOrigin = headers.some(([k]) => k.toLowerCase() === 'origin');
-		if (!_hasOrigin) {
-			try {
-				const _u = new URL(remote);
-				if (_u.hostname === 'google.com' || _u.hostname.endsWith('.google.com')) {
-					headers.push(['Origin', 'https://www.google.com']);
-				}
-			} catch {}
-		}
-
 		const resp = await origRequest(remote, method, body, headers, signal);
 		if (resp && resp.headers && !Array.isArray(resp.headers)) {
 			const flat = [];
