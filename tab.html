@@ -188,6 +188,14 @@
       <hr>
 
       <details open>
+        <summary>05/16 — photon transport</summary>
+        <p>- photon: new custom proxy transport backed by a Cloudflare Worker — server-side TLS, no WASM SSL, no error 35 fingerprinting issues</p>
+        <p>- SSL error 35 auto-recovery: libcurl transport now silently retries through epoxy when it hits a TLS fingerprint rejection (Cloudflare-protected sites)</p>
+        <p>- proxy config prompt now re-shows on each new version so returning users see updated options</p>
+        <p>- mercury workshop swap notice: persistent one-time notice explaining the server architecture change — stays until acknowledged</p>
+      </details>
+
+      <details open>
         <summary>05/15 — game sync &amp; system updates</summary>
         <p>- 25 new games pulled from genizy/web-port: OMORI, Tattletail, That's Not My Neighbor, Karlson, Hotline Miami, Raft, Getting Over It, Andy's Apple Farm, Witch Heart, and more — all running as local ports</p>
         <p>- cross-origin fallback: if an original external game source goes down, a locally saved copy automatically loads instead</p>
