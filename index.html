@@ -414,11 +414,11 @@
               </select>
             </div>
             <div class="box">
-              <h3>Wisp Server <span class="info-icon"><span class="tip">The backend WebSocket server that relays your proxy traffic. Required for the proxy to work.<br><br><b>bumblcat's server</b> — private server hosted by bumblcat. Has full cross-origin support, meaning more apps and games load correctly. Type: <b>private server</b>.<br><br><b>bumblcat ultrapatch</b> — Mercury Workshop wisp server. Currently degraded — server architecture changed, may trigger Google CAPTCHA. Type: <b>public server</b>.<br><br><b>custom</b> — enter your own wisp server URL. Type: <b>self-hosted server</b>.</span></span></h3>
+              <h3>Wisp Server <span class="info-icon"><span class="tip">The backend WebSocket server that relays your proxy traffic. Required for the proxy to work.<br><br><b>bumblcat's server</b> — private server hosted by bumblcat. Has full cross-origin support, meaning more apps and games load correctly. Type: <b>private server</b>.<br><br><b>mercury workshop</b> — free public community server. Currently degraded — server architecture changed, may trigger Google CAPTCHA. Type: <b>public server</b>.<br><br><b>custom</b> — enter your own wisp server URL. Type: <b>self-hosted server</b>.</span></span></h3>
               <p class="desc">the server that routes your proxied traffic</p>
               <select class="select" id="wispSelect">
                 <option value="wss://celestial-wisp.onrender.com/">bumblcat's server</option>
-                <option value="wss://wisp.mercurywork.shop/" disabled style="color:#888">bumblcat ultrapatch (degraded)</option>
+                <option value="wss://wisp.mercurywork.shop/" disabled style="color:#888">mercury workshop (degraded)</option>
                 <option value="wss://anura.pro/wisp/">anura (free)</option>
                 <option value="wss://wisp.nodeppt.com/">nodeppt (free)</option>
                 <option value="custom">custom server...</option>
@@ -1044,7 +1044,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.13";
+      var SITE_VER = "2.2.14";
 
       /**
        * Show a notification toast.
