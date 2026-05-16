@@ -768,6 +768,8 @@
       var bfsIdx = 0, bfsDragging = false, bfsPlaying = false;
       var bfsYT = null, bfsApiReady = false, bfsTick = null;
       var bfsLoop = 0; // 0=off 1=loop-all 2=loop-one
+      var bfsProxied = false; // true = UV proxy iframe mode
+      var bfsCurTime = 0, bfsDur = 0; // time tracking in proxy mode
 
       function bfsThumb(id) { return 'https://img.youtube.com/vi/' + id + '/hqdefault.jpg'; }
       function bfsFmt(s) {
@@ -784,21 +786,65 @@
         document.getElementById('bfs-thumb').style.left = pct + '%';
       }
 
+      // --- Proxy-mode postMessage helper ---
+      function bfsPM(func, args) {
+        var el = document.getElementById('bfs-yt');
+        if (!el || el.tagName !== 'IFRAME') return;
+        try { el.contentWindow.postMessage(JSON.stringify({ event: 'command', func: func, args: args !== undefined ? args : '' }), '*'); } catch(e) {}
+      }
+
+      // Listen for state/time messages from the proxied YouTube iframe
+      window.addEventListener('message', function(ev) {
+        if (!bfsProxied) return;
+        try {
+          var d = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data;
+          if (!d) return;
+          if (d.event === 'onReady') {
+            bfsApiReady = true;
+            if (!BFS_SONGS[bfsIdx].unplayable) bfsPM('playVideo');
+          }
+          if (d.event === 'onStateChange') {
+            var st = d.info;
+            if (st === 1) { // playing
+              bfsSetPlaying(true);
+              if (!bfsTick) bfsTick = setInterval(bfsUpdateBar, 250);
+            } else if (st === 2) { // paused
+              bfsSetPlaying(false);
+            } else if (st === 0) { // ended
+              bfsSetPlaying(false);
+              clearInterval(bfsTick); bfsTick = null;
+              if (bfsLoop === 2) {
+                bfsPM('playVideo');
+              } else {
+                var nxt = (bfsIdx + 1) % BFS_SONGS.length;
+                if (bfsIdx < BFS_SONGS.length - 1 || bfsLoop === 1) bfsLoad(nxt, true);
+              }
+            }
+          }
+          if (d.event === 'infoDelivery' && d.info) {
+            if (d.info.currentTime !== undefined) bfsCurTime = d.info.currentTime;
+            if (d.info.duration) bfsDur = d.info.duration;
+          }
+        } catch(ex) {}
+      });
+
       function bfsUpdateBar() {
         if (bfsDragging) return;
         try {
-          var cur = bfsYT.getCurrentTime() || 0;
-          var dur = bfsYT.getDuration() || 0;
-          document.getElementById('bfs-current').textContent = bfsFmt(cur);
+          var cur, dur;
+          if (bfsProxied) {
+            cur = bfsCurTime; dur = bfsDur;
+          } else {
+            cur = bfsYT.getCurrentTime() || 0;
+            dur = bfsYT.getDuration() || 0;
+          }
+          document.getElementById('bfs-current').textContent  = bfsFmt(cur);
           document.getElementById('bfs-duration').textContent = bfsFmt(dur);
           bfsSetBar(dur > 0 ? (cur / dur * 100) : 0);
         } catch(e) {}
       }
 
-      // Fix: when YouTube iframe is served through the proxy its origin becomes
-      // callanambulance.vercel.app, so widgetapi's postMessage calls to
-      // 'https://www.youtube.com' get rejected by the browser. Intercept
-      // contentWindow access on YouTube iframes and normalize the target origin.
+      // Fix postMessage target origin for direct-mode YouTube iframes
       (function bfsPMFix() {
         var _cwDesc = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
         if (!_cwDesc || !_cwDesc.get) return;
@@ -824,6 +870,38 @@
         });
       })();
 
+      // --- Proxy detection + UV iframe init ---
+      function bfsIsProxyActive() {
+        return !!(window.__uv$config && window.__uv$config.encodeUrl && navigator.serviceWorker && navigator.serviceWorker.controller);
+      }
+
+      function bfsProxyEmbedUrl(videoId) {
+        var params = 'enablejsapi=1&autoplay=1&controls=0&rel=0&modestbranding=1&origin=' + encodeURIComponent(location.origin);
+        return '/service/ultra/' + window.__uv$config.encodeUrl('https://www.youtube.com/embed/' + videoId + '?' + params);
+      }
+
+      function bfsInitProxy(videoId) {
+        bfsProxied = true;
+        var existing = document.getElementById('bfs-yt');
+        var iframe = document.createElement('iframe');
+        iframe.id = 'bfs-yt';
+        iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;pointer-events:none;';
+        iframe.allow = 'autoplay';
+        iframe.src = bfsProxyEmbedUrl(videoId);
+        if (existing && existing.parentNode) {
+          existing.parentNode.replaceChild(iframe, existing);
+        } else {
+          document.body.appendChild(iframe);
+        }
+        // Register as event listener once iframe is ready
+        iframe.addEventListener('load', function() {
+          setTimeout(function() {
+            try { iframe.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'); } catch(e) {}
+          }, 300);
+        });
+      }
+
+      // --- Direct-mode init (YT.Player fallback) ---
       function bfsInitYT() {
         if (bfsYT) return;
         var prev = window.onYouTubeIframeAPIReady;
@@ -865,20 +943,36 @@
         }
       }
 
+      function bfsInitPlayer() {
+        if (bfsProxied || bfsYT) return;
+        if (bfsIsProxyActive()) {
+          bfsInitProxy(BFS_SONGS[bfsIdx].id);
+        } else {
+          bfsInitYT();
+        }
+      }
+
       function bfsLoad(idx, autoplay) {
         bfsIdx = idx;
         var s = BFS_SONGS[idx];
+        bfsCurTime = 0; bfsDur = 0;
         document.getElementById('bfs-cover').src = s.cover || bfsThumb(s.id);
         document.getElementById('bfs-title').textContent = s.title;
         document.getElementById('bfs-current').textContent  = '0:00';
         document.getElementById('bfs-duration').textContent = '0:00';
         bfsSetBar(0);
         bfsSetPlaying(false);
-        if (!bfsYT || !bfsApiReady) return;
-        try {
-          if (s.unplayable) { bfsYT.stopVideo(); return; }
-          if (autoplay) { bfsYT.loadVideoById(s.id); } else { bfsYT.cueVideoById(s.id); }
-        } catch(e) {}
+        if (bfsProxied) {
+          if (!bfsApiReady) return;
+          if (s.unplayable) { bfsPM('stopVideo'); return; }
+          bfsPM(autoplay ? 'loadVideoById' : 'cueVideoById', [s.id, 0]);
+        } else {
+          if (!bfsYT || !bfsApiReady) return;
+          try {
+            if (s.unplayable) { bfsYT.stopVideo(); return; }
+            if (autoplay) { bfsYT.loadVideoById(s.id); } else { bfsYT.cueVideoById(s.id); }
+          } catch(e) {}
+        }
       }
 
       function bfsShow() {
@@ -891,17 +985,22 @@
         document.getElementById('bfs-current').textContent  = '0:00';
         document.getElementById('bfs-duration').textContent = '0:00';
         bfsSetBar(0);
-        if (!bfsYT) {
-          bfsInitYT();
+        if (!bfsProxied && !bfsYT) {
+          bfsInitPlayer();
         } else if (bfsApiReady && !s.unplayable) {
-          try { bfsYT.loadVideoById(s.id); } catch(e) {}
+          if (bfsProxied) bfsPM('loadVideoById', [s.id, 0]);
+          else try { bfsYT.loadVideoById(s.id); } catch(e) {}
         }
       }
 
       function bfsHide() {
         document.getElementById('bfs-player').style.display = 'none';
         bfsSetPlaying(false);
-        if (bfsYT && bfsApiReady) try { bfsYT.stopVideo(); } catch(e) {}
+        if (bfsProxied) {
+          if (bfsApiReady) bfsPM('stopVideo');
+        } else {
+          if (bfsYT && bfsApiReady) try { bfsYT.stopVideo(); } catch(e) {}
+        }
         clearInterval(bfsTick); bfsTick = null;
       }
 
@@ -912,10 +1011,13 @@
         var pct = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
         bfsSetBar(pct * 100);
         try {
-          var dur = (bfsYT && bfsApiReady) ? (bfsYT.getDuration() || 0) : 0;
+          var dur = bfsProxied ? bfsDur : ((bfsYT && bfsApiReady) ? (bfsYT.getDuration() || 0) : 0);
           var seekTime = pct * dur;
           document.getElementById('bfs-current').textContent = bfsFmt(seekTime);
-          if (bfsApiReady && dur) bfsYT.seekTo(seekTime, true);
+          if (bfsApiReady && dur) {
+            if (bfsProxied) bfsPM('seekTo', [seekTime, true]);
+            else bfsYT.seekTo(seekTime, true);
+          }
         } catch(e) {}
       }
       barEl.addEventListener('mousedown', function(e) {
@@ -931,8 +1033,13 @@
 
       // Controls
       document.getElementById('bfs-playpause').addEventListener('click', function() {
-        if (!bfsYT || !bfsApiReady || BFS_SONGS[bfsIdx].unplayable) return;
-        try { bfsPlaying ? bfsYT.pauseVideo() : bfsYT.playVideo(); } catch(e) {}
+        if (!bfsApiReady || BFS_SONGS[bfsIdx].unplayable) return;
+        if (bfsProxied) {
+          bfsPM(bfsPlaying ? 'pauseVideo' : 'playVideo');
+        } else {
+          if (!bfsYT) return;
+          try { bfsPlaying ? bfsYT.pauseVideo() : bfsYT.playVideo(); } catch(e) {}
+        }
       });
       document.getElementById('bfs-prev').addEventListener('click', function() {
         bfsLoad((bfsIdx - 1 + BFS_SONGS.length) % BFS_SONGS.length, true);
@@ -1074,7 +1181,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.26";
+      var SITE_VER = "2.2.27";
 
       /**
        * Show a notification toast.
