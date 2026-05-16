@@ -490,6 +490,14 @@
                 <span class="slider"></span>
               </label>
             </div>
+            <div class="box">
+              <h3>Chat Notifications</h3>
+              <p class="desc">Show notifications for new chat messages and @mentions.</p>
+              <label class="switch">
+                <input type="checkbox" id="chatNotifTog" />
+                <span class="slider"></span>
+              </label>
+            </div>
             <div class="fakebox">
               <h3></h3>
               <p class="desc"></p>
@@ -1202,7 +1210,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.36";
+      var SITE_VER = "2.2.37";
 
       /**
        * Show a notification toast.

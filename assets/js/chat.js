@@ -21,6 +21,8 @@
   function setAppear(o) { localStorage.setItem(APPEAR_KEY, JSON.stringify(o)); }
   function isChatOn()   { return getAppear().chat === true; }
   function setChatOn(v) { const a = getAppear(); a.chat = v; setAppear(a); }
+  function isNotifsOn()   { return getAppear().chatNotifs !== false; }
+  function setNotifsOn(v) { const a = getAppear(); a.chatNotifs = v; setAppear(a); }
 
   function amAdmin()   { return localStorage.getItem('cst-admin') === '1'; }
   function getMyName() {
@@ -141,6 +143,12 @@
       relayMsg(cid, msg);
       appendMsg(msg);
     }
+    if (d.type === 'notif-off') {
+      // Relay feedback to pinger (forName)
+      const pinger = Object.entries(hubClients).find(([,v]) => v.name === d.forName);
+      if (pinger) try { pinger[1].conn.send({ type: 'notif-feedback', from: d.myName, feedback: 'notifs-off' }); } catch {}
+      if (getMyName() === d.forName) window.notify?.(`${d.myName} has notifications turned off`, 'info', 5000);
+    }
   }
 
   function relayMsg(fromCid, msg) {
@@ -163,25 +171,50 @@
   function onHubMsg(d) {
     if (!d || typeof d !== 'object') return;
     if (d.type === 'online') updateOnline(d.users || []);
+    if (d.type === 'notif-feedback') {
+      if (d.feedback === 'notifs-off') window.notify?.(`${d.from} has notifications turned off`, 'info', 6000);
+    }
     if (d.type === 'msg') {
       appendMsg(d);
       const myName = getMyName();
-      // Check if we're mentioned
       const mentioned = myName && d.mentions && d.mentions.some(n =>
         n.toLowerCase() === myName.toLowerCase());
+      const notifsOn = isNotifsOn();
       if (!chatOpen) {
         unread++;
         updateBubble();
-        if (mentioned) {
-          // Ping notification — shows even if notify is otherwise suppressed
-          window.notify?.(`📣 ${d.name || 'someone'} mentioned you: ${d.text.slice(0,80)}`, 'info', 9000);
-        } else {
-          window.notify?.(`${d.name || '?'}: ${d.text.slice(0,60)}`, 'info', 5000);
+        if (notifsOn) {
+          if (mentioned) {
+            window.notify?.(`📣 ${d.name || 'someone'} mentioned you: ${d.text.slice(0,80)}`, 'info', 9000);
+          } else {
+            window.notify?.(`${d.name || '?'}: ${d.text.slice(0,60)}`, 'info', 5000);
+          }
+        } else if (mentioned) {
+          // Notifs off but was pinged — tell the pinger
+          _sendNotifOff(d.name);
         }
       } else if (mentioned) {
-        // Chat is open but still notify for mentions
-        window.notify?.(`📣 ${d.name || 'someone'} mentioned you`, 'info', 5000);
+        if (notifsOn) {
+          window.notify?.(`📣 ${d.name || 'someone'} mentioned you`, 'info', 5000);
+        } else {
+          _sendNotifOff(d.name);
+        }
       }
+    }
+  }
+
+  function _sendNotifOff(pingerName) {
+    const myName = getMyName();
+    if (!myName) return;
+    const msg = { type: 'notif-off', forName: pingerName, myName };
+    if (isHubMode) {
+      // We ARE hub: find the pinger directly
+      const pinger = Object.entries(hubClients).find(([,c]) => c.name === pingerName);
+      if (pinger) try { pinger[1].conn.send({ type: 'notif-feedback', from: myName, feedback: 'notifs-off' }); } catch {}
+      // Also check if hub itself is the pinger
+      if (getMyName() === pingerName) window.notify?.(`${myName} has notifications turned off`, 'info', 5000);
+    } else if (hubConn && hubConn.open) {
+      hubConn.send(msg);
     }
   }
 
@@ -233,7 +266,8 @@
 
   function parseMentions(text) {
     const out = [];
-    const re = /@([\w][^\s@]{0,23})/g;
+    // @[name with spaces] syntax — bracket delimiters allow spaces
+    const re = /\@\[([^\]]{1,40})\]/g;
     let m;
     while ((m = re.exec(text)) !== null) out.push(m[1].trim());
     return out;
@@ -312,7 +346,7 @@
   <div id="cst-chat-chars">0 / ${MAX_CHARS}</div>
   <div id="cst-chat-cool"></div>
   <div id="cst-chat-inp-row">
-    <textarea id="cst-chat-inp" placeholder="say something… (@name to ping)" maxlength="${MAX_CHARS}" rows="1"></textarea>
+    <textarea id="cst-chat-inp" placeholder="say something… (@[name] to ping)" maxlength="${MAX_CHARS}" rows="1"></textarea>
     <button id="cst-chat-send">send</button>
   </div>
 </div>`;
@@ -373,7 +407,7 @@
       ? `<div class="cst-msg-name" style="${nameStyle}">${esc(msg.name)}</div>`
       : '';
     // Render @mentions with a highlight span
-    const bodyHtml = esc(msg.text).replace(/@([\w\s]{1,25})/g, (m, n) =>
+    const bodyHtml = esc(msg.text).replace(/\@\[([^\]]+)\]/g, (_, n) =>
       `<span style="color:#7eb8ff;font-weight:600;">@${esc(n)}</span>`);
     d.innerHTML = `${nameHtml}<div class="cst-msg-body">${bodyHtml}</div>`;
     box.appendChild(d);
@@ -414,6 +448,12 @@
   // ── init ──────────────────────────────────────────────────────
   function init() {
     wireChatToggle();
+    // Wire chat notifications toggle
+    const notifTog = document.getElementById('chatNotifTog');
+    if (notifTog) {
+      notifTog.checked = isNotifsOn();
+      notifTog.addEventListener('change', () => setNotifsOn(notifTog.checked));
+    }
     maybeShowNotif();
     if (isChatOn() && canChat()) {
       initChat();

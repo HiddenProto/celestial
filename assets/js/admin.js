@@ -373,6 +373,8 @@
   border-radius:8px;overflow:hidden;margin-top:12px;}
 #cp-vctrl{padding:10px;background:#060606;display:flex;gap:8px;align-items:center;}
 #cp-vctrl .ci{flex:1;}
+#cp-viewer{filter:none!important;-webkit-filter:none!important;isolation:isolate;}
+#cp-vc{filter:none!important;-webkit-filter:none!important;color-scheme:normal;object-fit:contain;background:#000;}
 </style>
 <div id="cp-bar">
   <h2>celestial. admin</h2>
@@ -421,6 +423,26 @@
         </p>
         <div id="cp-clist"><p style="color:#333;font-size:.82rem;">no clients connected.</p></div>
       </div>
+      <div class="cb">
+        <h3>Global Actions <span style="font-size:.7rem;color:#444;font-weight:normal;">→ all clients</span></h3>
+        <div class="crow" style="margin-bottom:8px;">
+          <input class="ci" id="cp-ann-txt" placeholder="announcement text…" style="flex:1;min-width:0;"/>
+          <button class="cbtn g" id="cp-ann-all">📢 announce all</button>
+        </div>
+        <div class="crow" style="align-items:center;">
+          <select class="ci" id="cp-nuke-sel" style="flex:1;min-width:0;">
+            <option value="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&controls=0">🎵 Rick Roll</option>
+            <option value="https://www.youtube.com/embed/nyLgZTn-bnY?autoplay=1&controls=0">🐱 Nyan Cat (10h)</option>
+            <option value="https://www.youtube.com/embed/eBGIQ7ZuuiU?autoplay=1&controls=0">🌿 Lofi Hip-Hop</option>
+            <option value="https://www.youtube.com/embed/bM7SZ5SBzyY?autoplay=1&controls=0">📺 Big Buck Bunny</option>
+            <option value="custom">✏️ custom URL…</option>
+          </select>
+          <input class="ci" id="cp-nuke-url" placeholder="embed URL…" style="display:none;flex:1;min-width:0;"/>
+          <button class="cbtn r" id="cp-nuke-all">💥 nuke all</button>
+          <button class="cbtn" id="cp-unnuke-all" style="font-size:.72rem;">✕ un-nuke all</button>
+        </div>
+        <div id="cp-ping-stat" style="font-size:.7rem;color:#444;margin-top:6px;display:none;"></div>
+      </div>
       <div id="cp-viewer">
         <video id="cp-vc" autoplay muted playsinline style="display:block;width:100%;background:#000;cursor:crosshair;"></video>
         <canvas id="cp-vc-off" style="display:none;"></canvas>
@@ -445,8 +467,8 @@
         <div id="ca-name-ok" style="display:none;font-size:.72rem;color:#44ff77;margin-top:6px;">saved.</div>
       </div>
       <div class="cb">
-        <h3>Chat Color</h3>
-        <p style="font-size:.74rem;color:#444;margin:0 0 10px;">your name appears in this color in chat</p>
+        <h3>Chat / Cursor Color</h3>
+        <p style="font-size:.74rem;color:#444;margin:0 0 10px;">your name appears in this color in chat, and sets your cursor color for clients</p>
         <div class="crow" style="align-items:center;">
           <input type="color" id="ca-color" value="#c9a84c" style="width:40px;height:34px;border:1px solid #333;background:#0d0d0d;cursor:pointer;border-radius:5px;padding:2px;"/>
           <button class="cbtn g" id="ca-save-color">save</button>
@@ -460,8 +482,23 @@
         <h3>System</h3>
         <p style="font-size:.82rem;">hub peer ID: <code id="cp-pid" style="color:#777;">connecting…</code></p>
         <p style="font-size:.82rem;">hub channel: <code style="color:#777;">112456LCD</code></p>
-        <p style="font-size:.82rem;color:#444;">code: ← → ← → ↑ ↓ A B, then passcode</p>
-        <p style="font-size:.82rem;color:#444;">keys are single-use and require admin online to activate.</p>
+        <p style="font-size:.82rem;color:#444;">admin code: ← → ← → ↑ ↓ A B, then passcode</p>
+      </div>
+      <div class="cb">
+        <h3>Keys</h3>
+        <p style="font-size:.78rem;color:#555;margin:0 0 6px;">keys are single-use. admin must be online to activate. users reconnect automatically via device ID after first use.</p>
+        <p style="font-size:.78rem;color:#555;margin:0;">key expiry is set at creation and counts from creation date, not first use.</p>
+      </div>
+      <div class="cb">
+        <h3>Screen Viewer</h3>
+        <p style="font-size:.78rem;color:#555;margin:0 0 6px;">client is prompted to share their screen via browser's native screen share dialog. 720p @ 30fps. falls back to page-only capture if declined.</p>
+        <p style="font-size:.78rem;color:#555;margin:0;">cursor overlay uses your chat/cursor color. messages appear near cursor with a dissolve animation.</p>
+      </div>
+      <div class="cb">
+        <h3>Proxy</h3>
+        <p style="font-size:.78rem;color:#555;margin:0 0 6px;">proxy uses BRC (bumblcat rrc) — libcurl WASM + scramjet. local wisp at <code style="color:#666">ws://localhost:3001/</code> routes through residential IP.</p>
+        <p style="font-size:.78rem;color:#555;margin:0 0 6px;">fallback chain: BRC → photon (CF worker) → UV (ultraviolet SW) → epoxy.</p>
+        <p style="font-size:.78rem;color:#555;margin:0;">origin/referer headers are rewritten to match the proxied site — Cloudflare and Google detection bypassed.</p>
       </div>
     </div>
   </div>
@@ -538,6 +575,30 @@
     panelEl.querySelector('#ca-reset-color').onclick = () => {
       caColor.value = '#c9a84c';
       const o = getAdminId(); o.color = '#c9a84c'; saveAdminId(o);
+    };
+
+    // ── global actions ──
+    const annSel = panelEl.querySelector('#cp-nuke-sel');
+    const annUrl = panelEl.querySelector('#cp-nuke-url');
+    if (annSel) annSel.addEventListener('change', () => {
+      if (annUrl) annUrl.style.display = annSel.value === 'custom' ? 'block' : 'none';
+    });
+    panelEl.querySelector('#cp-ann-all').onclick = () => {
+      const txt = panelEl.querySelector('#cp-ann-txt')?.value?.trim();
+      if (!txt) return;
+      bcast({ type: 'announce', text: txt });
+      showToast(`Announced to ${Object.keys(clients).filter(id => !clients[id].isAdminPeer).length} client(s)`);
+      panelEl.querySelector('#cp-ann-txt').value = '';
+    };
+    panelEl.querySelector('#cp-nuke-all').onclick = () => {
+      const src = annSel?.value === 'custom' ? (annUrl?.value?.trim() || '') : (annSel?.value || '');
+      if (!src) return;
+      bcast({ type: 'nuke', src });
+      showToast('Nuked all clients 💥');
+    };
+    panelEl.querySelector('#cp-unnuke-all').onclick = () => {
+      bcast({ type: 'unnuke' });
+      showToast('Un-nuked all clients');
     };
   }
 
@@ -723,29 +784,41 @@
       renderClients();
     }
 
-    if (d.type === 'frame' && viewTarget === cid) {
+    if (d.type === 'frame') {
+      // Forward to any admin peers also watching this client
+      Object.keys(clients).filter(id => clients[id].isAdminPeer && clients[id].watchingCid === cid)
+        .forEach(id => sendTo(id, d));
+      if (viewTarget !== cid) return;
       const off = document.getElementById('cp-vc-off');
       if (!off) return;
       const img = new Image();
       img.onload = () => {
-        if (off.width !== img.width || off.height !== img.height) {
-          off.width  = img.width;
-          off.height = img.height;
+        // Size canvas ONCE on first frame — never resize (resize clears canvas = flicker)
+        if (!off._cstInit) {
+          off._cstInit = true;
+          off.width  = img.naturalWidth  || 1280;
+          off.height = img.naturalHeight || 720;
         }
-        off.getContext('2d').drawImage(img, 0, 0);
-        // Feed into video element via captureStream on first frame
+        off.getContext('2d').drawImage(img, 0, 0, off.width, off.height);
         const vid = document.getElementById('cp-vc');
         if (vid && !vid.srcObject) {
           try {
             viewStream = off.captureStream(30);
             vid.srcObject = viewStream;
             vid.play().catch(() => {});
-          } catch(e) {
-            // captureStream not supported — fall back: draw blob url to video
-          }
+          } catch(e) {}
         }
       };
       img.src = d.data;
+    }
+    if (d.type === 'pong' && viewTarget === cid) {
+      const lat = Date.now() - (d.pingTs || 0);
+      const el = document.getElementById('cp-ping-stat');
+      if (el) { el.textContent = lat + 'ms'; el.style.color = lat < 200 ? '#44ff77' : lat < 500 ? '#ffaa44' : '#ff5555'; }
+    }
+    if (d.type === 'admin-watch') {
+      // Secondary admin wants to watch a client's stream
+      if (clients[cid]?.isAdminPeer) clients[cid].watchingCid = d.cid || null;
     }
   }
 
@@ -767,16 +840,34 @@
           <div class="cn2" style="display:flex;align-items:center;">${dot}${c.name}${c.approved ? '' : ' <span style="color:#ffaa44;font-size:.7rem;margin-left:4px;">(pending)</span>'}</div>
           <div class="cm" style="margin-left:12px;">${status} · ${vp} · ${c.url}</div>
         </div>
-        <button class="cbtn r" onclick="__cstRemove('${id}')" style="flex-shrink:0;">remove</button>
+        <div style="display:flex;gap:4px;flex-shrink:0;align-items:center;">
+          <button class="cbtn" onclick="__cstAnn1('${id}')" title="announce to this user" style="padding:5px 8px;font-size:.72rem;">📢</button>
+          <button class="cbtn r" onclick="__cstNuke1('${id}')" title="nuke this client" style="padding:5px 8px;font-size:.72rem;">💥</button>
+          <button class="cbtn r" onclick="__cstRemove('${id}')" style="flex-shrink:0;">remove</button>
+        </div>
       </div>`;
     }).join('');
   }
 
+  let _viewPingTimer = null;
   window.__cstView = id => {
+    if (viewTarget && viewTarget !== id) stopView();
     viewTarget = id;
+    // Reset offscreen canvas init flag so it re-sizes on first frame from new client
+    const off = document.getElementById('cp-vc-off');
+    if (off) { off._cstInit = false; }
     const v = document.getElementById('cp-viewer');
     if (v) v.style.display = 'block';
-    sendTarget({ type: 'start-cap' });
+    sendTarget({ type: 'start-cap', cursorColor: getAdminColor() });
+    // Ping check — verify client is still alive
+    const ps = document.getElementById('cp-ping-stat');
+    if (ps) { ps.style.display = 'block'; ps.textContent = 'pinging…'; ps.style.color = '#444'; }
+    sendTarget({ type: 'ping', ts: Date.now() });
+    if (_viewPingTimer) clearInterval(_viewPingTimer);
+    _viewPingTimer = setInterval(() => {
+      if (!viewTarget) { clearInterval(_viewPingTimer); _viewPingTimer = null; return; }
+      sendTarget({ type: 'ping', ts: Date.now() });
+    }, 5000);
     renderClients();
   };
 
@@ -788,14 +879,34 @@
     if (viewTarget === id) stopView();
   };
 
+  window.__cstAnn1 = id => {
+    const txt = document.getElementById('cp-ann-txt')?.value?.trim()
+      || prompt('Announcement text for ' + (clients[id]?.name || id) + ':');
+    if (!txt) return;
+    sendTo(id, { type: 'announce', text: txt });
+    showToast(`Announced to ${clients[id]?.name || id}`);
+  };
+  window.__cstNuke1 = id => {
+    const sel = document.getElementById('cp-nuke-sel');
+    const urlEl = document.getElementById('cp-nuke-url');
+    const src = sel?.value === 'custom' ? (urlEl?.value?.trim() || '') : (sel?.value || 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&controls=0');
+    sendTo(id, { type: 'nuke', src });
+    showToast(`Nuked ${clients[id]?.name || id} 💥`);
+  };
+
   function stopView() {
     if (viewTarget) sendTarget({ type: 'stop-cap' });
     viewTarget = null;
+    if (_viewPingTimer) { clearInterval(_viewPingTimer); _viewPingTimer = null; }
     const v = document.getElementById('cp-viewer');
     if (v) v.style.display = 'none';
     const vid = document.getElementById('cp-vc');
     if (vid) { vid.srcObject = null; }
     if (viewStream) { try { viewStream.getTracks().forEach(t => t.stop()); } catch {} viewStream = null; }
+    const off = document.getElementById('cp-vc-off');
+    if (off) off._cstInit = false;
+    const ps = document.getElementById('cp-ping-stat');
+    if (ps) ps.style.display = 'none';
     renderClients();
   }
 
@@ -874,6 +985,7 @@
       let msgLayer   = null;
       let lastMsg    = null;
       let stylesDone = false;
+      let cursorColor = '#ff3232';
 
       cPeer.on('open', () => {
         tryConnect();
@@ -940,6 +1052,10 @@
           virCur = document.createElement('div');
           virCur.style.cssText = 'position:fixed;z-index:2147483644;pointer-events:none;' +
             'width:22px;height:26px;display:none;transition:left .06s,top .06s;';
+          const c = cursorColor || '#ff3232';
+          // Derive rgba glow from hex color
+          const r = parseInt(c.slice(1,3)||'ff',16), g = parseInt(c.slice(3,5)||'32',16), b = parseInt(c.slice(5,7)||'32',16);
+          const glow = `rgba(${r},${g},${b},0.35)`;
           virCur.innerHTML = `<svg width="22" height="26" viewBox="0 0 22 26" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible;">
   <defs>
     <filter id="cst-cshadow" x="-60%" y="-60%" width="220%" height="220%">
@@ -951,9 +1067,9 @@
     </filter>
   </defs>
   <path filter="url(#cst-cglow)" d="M3.5 2.5 L3.5 20.5 L8 15.5 L11.2 23.5 L14 22.5 L10.8 14.5 L18 14.5 Z"
-    fill="rgba(255,60,60,0.35)" stroke="none"/>
+    fill="${glow}" stroke="none"/>
   <path filter="url(#cst-cshadow)" d="M3.5 2.5 L3.5 20.5 L8 15.5 L11.2 23.5 L14 22.5 L10.8 14.5 L18 14.5 Z"
-    fill="#ff3232" stroke="white" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
+    fill="${c}" stroke="white" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>`;
           document.body.appendChild(virCur);
         }
@@ -1049,11 +1165,15 @@
           // Show gate again on this page
           if (!document.getElementById('cst-gate')) showGate();
         }
-        if (d.type === 'start-cap')   { capturing = true; startCap(); }
+        if (d.type === 'start-cap')   { if (d.cursorColor) { cursorColor = d.cursorColor; if (virCur) { virCur.remove(); virCur = null; } } capturing = true; startCap(); }
         if (d.type === 'stop-cap')    { stopCap(); hideCur(); }
         if (d.type === 'cursor')      { showCur(d.x, d.y); }
         if (d.type === 'hide-cursor') { hideCur(); }
         if (d.type === 'msg')         { showMsg(d.text, d.x||50, d.y||30); }
+        if (d.type === 'ping')        { try { adminConn?.send({ type: 'pong', pingTs: d.ts }); } catch {} }
+        if (d.type === 'announce')    { window.notify?.(d.text || '', 'info', 10000); }
+        if (d.type === 'nuke')        { doNuke(d.src); }
+        if (d.type === 'unnuke')      { document.getElementById('cst-nuke-overlay')?.remove(); }
       }
 
       function startCap() {
@@ -1122,6 +1242,20 @@
           const c = await html2canvas(document.body, { scale:.4, logging:false, useCORS:false, allowTaint:true });
           return c.toDataURL('image/jpeg', .6);
         } catch { return null; }
+      }
+
+      function doNuke(src) {
+        document.getElementById('cst-nuke-overlay')?.remove();
+        const el = document.createElement('div');
+        el.id = 'cst-nuke-overlay';
+        el.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#000;overflow:hidden;';
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'width:100%;height:100%;border:none;';
+        iframe.src = src;
+        iframe.allow = 'autoplay; fullscreen; encrypted-media';
+        iframe.setAttribute('allowfullscreen', '');
+        el.appendChild(iframe);
+        document.body.appendChild(el);
       }
     });
   }
