@@ -11,6 +11,8 @@ export default class PhotonTransport {
     this.server = (server || PHOTON_SERVER).replace(/\/$/, "");
   }
 
+  async init() {}
+
   async request(remote, method, body, headers, signal) {
     const scheme = remote.tls ? "https" : "http";
     const defaultPort = remote.tls ? 443 : 80;
