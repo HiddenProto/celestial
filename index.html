@@ -388,7 +388,7 @@
                 box-shadow: 0 4px 16px rgba(0,0,0,0.4); font-weight: normal;
               }
               .info-icon:hover .tip { display: block; }
-              #wispCustom { margin-top: 6px; width: 100%; box-sizing: border-box; }
+              #wispCustom, #ngrokUrl { margin-top: 6px; width: 100%; box-sizing: border-box; }
             </style>
             <div class="box">
               <h3>Transport <span class="info-icon"><span class="tip">Controls how proxied requests are sent through the network.<br><br><b>photon</b> — bumblcat's own transport. Server-side TLS via Cloudflare Worker — no WASM SSL, no error 35. Best compatibility. Type: <b>server-side</b>.<br><br><b>epoxy</b> — WebAssembly-based, better site compatibility. Required for multiplayer games with bumblcat rrc — epoxy forwards WebSocket headers (like Origin) to the server, which libcurl does not. Slower. Type: <b>client-side</b>.<br><br><b>libcurl</b> — C-based, faster and more stable. Recommended for most sites. Does not forward custom WebSocket headers — use epoxy for multiplayer games. Type: <b>client-side</b>.</span></span></h3>
@@ -408,7 +408,7 @@
                 change which rewriter engine handles pr<span>o</span>xied pages
               </p>
               <select class="select" id="pr0xySelect">
-                <option value="scram" selected>bumblcat rrc (WIP)</option>
+                <option value="scram" selected>bumblcat rrc</option>
                 <option value="scramjet">sc<span>ram</span>jet (incompatible)</option>
                 <option value="violet">ul<span>tr</span>av<span>io</span>l<span>e</span>t</option>
               </select>
@@ -418,6 +418,7 @@
               <p class="desc">the server that routes your proxied traffic</p>
               <select class="select" id="wispSelect">
                 <option value="ws://localhost:3001/">bumblcat ultrapatch (local)</option>
+                <option value="ngrok">bumblcat ultrapatch (ngrok)...</option>
                 <option value="wss://celestial-wisp.onrender.com/">bumblcat's server</option>
                 <option value="wss://wisp.mercurywork.shop/">mercury workshop</option>
                 <option value="wss://anura.pro/wisp/">anura (free)</option>
@@ -426,6 +427,7 @@
               </select>
               <button onclick="__testWisp()" style="margin-top:6px;" class="button">test &amp; auto-pick fastest</button>
               <p id="wisp-test-out" style="font-size:.75rem;color:#666;margin:6px 0 0;min-height:14px;"></p>
+              <input id="ngrokUrl" class="select" placeholder="wss://xxxx.ngrok-free.app" style="display:none;" />
               <input id="wispCustom" class="select" placeholder="wss://your-server/" style="display:none;" />
             </div>
           </div>
@@ -1045,7 +1047,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.18";
+      var SITE_VER = "2.2.19";
 
       /**
        * Show a notification toast.
@@ -1280,6 +1282,23 @@
             }
           },
           {
+            label: "Laptop Reliant",
+            info: "libcurl + bumblcat rrc + ngrok tunnel — routes through Chris's laptop IP via ngrok. Requires start-wisp.bat to be running. Paste the ngrok URL in Settings → Wisp Server first.",
+            onClick: function () {
+              var ngrok = localStorage.getItem("ngrok-url");
+              if (!ngrok) {
+                window.notify("no ngrok URL saved yet — open Settings → Wisp Server and select 'bumblcat ultrapatch (ngrok)' to save it first.", "warning", 8000);
+                return;
+              }
+              localStorage.setItem("transportz", "libcurl");
+              localStorage.setItem("pr0xy", "scram");
+              localStorage.setItem("location", ngrok);
+              localStorage.setItem("proxy-config-seen", SITE_VER);
+              window.notify("Laptop Reliant enabled — reloading…", "success", 6000);
+              setTimeout(function () { location.reload(); }, 900);
+            }
+          },
+          {
             label: "Skip",
             info: "Keep current settings unchanged",
             className: "opt-skip",
@@ -1311,6 +1330,22 @@
               localStorage.setItem("pr0xy", "scram");
               localStorage.setItem("location", "wss://celestial-wisp.onrender.com/");
               window.notify("Limited but Fast enabled — reloading…", "success", 6000);
+              setTimeout(function () { location.reload(); }, 900);
+            }
+          },
+          {
+            label: "Laptop Reliant",
+            info: "libcurl + bumblcat rrc + ngrok tunnel — routes through Chris's laptop IP via ngrok. Requires start-wisp.bat running. Set ngrok URL in Settings → Wisp Server first.",
+            onClick: function () {
+              var ngrok = localStorage.getItem("ngrok-url");
+              if (!ngrok) {
+                window.notify("no ngrok URL saved yet — open Settings → Wisp Server and select 'bumblcat ultrapatch (ngrok)' to save it first.", "warning", 8000);
+                return;
+              }
+              localStorage.setItem("transportz", "libcurl");
+              localStorage.setItem("pr0xy", "scram");
+              localStorage.setItem("location", ngrok);
+              window.notify("Laptop Reliant enabled — reloading…", "success", 6000);
               setTimeout(function () { location.reload(); }, 900);
             }
           },
