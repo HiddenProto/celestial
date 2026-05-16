@@ -303,9 +303,10 @@ async function ensureBRC() {
 registerSW()
 	.then(async () => {
 		console.log("lethal.js: SW registered");
-		// Kick off BRC init in the background if the user has it selected.
+		// Kick off BRC init in the background if the user has it selected (or defaulting to it).
 		// Scramjet is currently incompatible — no longer pre-warmed.
-		if (localStorage.getItem("pr0xy") === "scram") {
+		const _px = localStorage.getItem("pr0xy");
+		if (_px === "scram" || _px === null) {
 			ensureBRC().catch(() => {});
 		}
 	})
@@ -399,8 +400,9 @@ export async function setProxy(proxy) {
 		await import("/violet/violet.config.js");
 	}
 	proxyOption = proxy;
-	// Eagerly pre-init scramjet if selected
-	if (proxy === "scramjet") ensureScramjet().catch(() => {});
+	// Eagerly pre-init the selected proxy engine
+	if (proxy === "scram") ensureBRC().catch(() => {});
+	else if (proxy === "scramjet") ensureScramjet().catch(() => {});
 }
 
 /**

@@ -31,12 +31,31 @@ async function hcOne(url, sameOrigin) {
   const cached = hcGet(url);
   if (cached !== null) return cached;
   try {
-    const res = await Promise.race([
-      fetch(url, { method: "HEAD", mode: sameOrigin ? "same-origin" : "no-cors" }),
-      new Promise((_, r) => setTimeout(() => r(new Error("timeout")), 3000)),
-    ]);
-    const s = sameOrigin ? (res.ok ? "ok" : "dead") : "ok";
-    hcSet(url, s); return s;
+    const ac = new AbortController();
+    const tid = setTimeout(() => ac.abort(), 3000);
+    if (!sameOrigin) {
+      // Cross-origin: no-cors opaque response — a network error means truly down
+      await fetch(url, { method: "HEAD", mode: "no-cors", signal: ac.signal });
+      clearTimeout(tid);
+      hcSet(url, "ok"); return "ok";
+    }
+    // Same-origin: GET so we can read the body and catch Vercel "not found" pages
+    const res = await fetch(url, { method: "GET", mode: "same-origin", signal: ac.signal });
+    clearTimeout(tid);
+    if (!res.ok) { hcSet(url, "dead"); return "dead"; }
+    // Peek at first 512 bytes — Vercel error pages start with HTML containing NOT_FOUND
+    const reader = res.body?.getReader();
+    let snippet = "";
+    if (reader) {
+      const { value } = await reader.read();
+      reader.cancel();
+      snippet = new TextDecoder().decode(value?.slice(0, 512) || new Uint8Array()).toLowerCase();
+    }
+    if (snippet.includes("not_found") || snippet.includes("page_not_found") ||
+        snippet.includes("deployment not found") || snippet.includes("this deployment")) {
+      hcSet(url, "dead"); return "dead";
+    }
+    hcSet(url, "ok"); return "ok";
   } catch { hcSet(url, "dead"); return "dead"; }
 }
 
