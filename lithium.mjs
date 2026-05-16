@@ -243,18 +243,43 @@ function _wrapTransportHeaders(transport) {
 		// Inject missing browser headers before the request leaves
 		headers = _injectBrowserHeaders(headers);
 
-		// If UV SW left Origin as our proxy domain, replace it with the target
-		// origin so the remote server sees a same-origin request, not a proxy.
+		// If UV SW left Origin/Referer pointing at our proxy domain, replace them
+		// with the true page origin so the remote server sees a same-origin request.
+		// For cross-origin sub-requests (e.g. google.com page → googleapis.com) we
+		// must use the *page's* origin, not the sub-resource's origin — so we decode
+		// the UV-encoded Referer to find the real page URL first.
 		const _proxyOrigin = location.origin;
+		const _ultraPrefix = _proxyOrigin + '/service/ultra/';
 		const _originIdx = headers.findIndex(([k]) => k.toLowerCase() === 'origin');
-		if (_originIdx !== -1 && headers[_originIdx][1] === _proxyOrigin) {
-			try { headers[_originIdx] = ['Origin', new URL(remote).origin]; } catch {}
+		const _refIdx    = headers.findIndex(([k]) => k.toLowerCase() === 'referer');
+
+		// Decode the UV Referer to learn the true page origin + full URL
+		let _truePageOrigin = null;
+		let _trueReferer    = null;
+		if (_refIdx !== -1 && headers[_refIdx][1].startsWith(_ultraPrefix)) {
+			try {
+				const enc     = headers[_refIdx][1].slice(_ultraPrefix.length).split('?')[0];
+				const decoded = window.__uv$config
+					? window.__uv$config.decodeUrl(enc)
+					: decodeURIComponent(enc);
+				_truePageOrigin = new URL(decoded).origin;
+				_trueReferer    = decoded;
+			} catch {}
 		}
-		// Same fix for Referer — strip to just the target origin when it still
-		// points at our proxy domain.
-		const _refIdx = headers.findIndex(([k]) => k.toLowerCase() === 'referer');
-		if (_refIdx !== -1 && headers[_refIdx][1].startsWith(_proxyOrigin)) {
-			try { headers[_refIdx] = ['Referer', new URL(remote).origin + '/']; } catch {}
+		// Fallback: no UV Referer available — use target origin (best guess)
+		if (!_truePageOrigin) {
+			try { _truePageOrigin = new URL(remote).origin; } catch {}
+		}
+
+		// Fix Origin
+		if (_originIdx !== -1 && headers[_originIdx][1] === _proxyOrigin && _truePageOrigin) {
+			headers[_originIdx] = ['Origin', _truePageOrigin];
+		}
+		// Fix Referer — use full decoded URL when available, else bare origin
+		if (_refIdx !== -1 && headers[_refIdx][1].startsWith(_ultraPrefix)) {
+			headers[_refIdx] = ['Referer', _trueReferer || (_truePageOrigin ? _truePageOrigin + '/' : headers[_refIdx][1])];
+		} else if (_refIdx !== -1 && headers[_refIdx][1].startsWith(_proxyOrigin) && _truePageOrigin) {
+			headers[_refIdx] = ['Referer', _truePageOrigin + '/'];
 		}
 
 		const resp = await origRequest(remote, method, body, headers, signal);
