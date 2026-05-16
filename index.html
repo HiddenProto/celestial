@@ -417,6 +417,7 @@
               <h3>Wisp Server <span class="info-icon"><span class="tip">The backend WebSocket server that relays your proxy traffic. Required for the proxy to work.<br><br><b>bumblcat's server</b> — private server hosted by bumblcat. Uses wisp-server-node. Has full cross-origin support, meaning more apps and games load correctly. Type: <b>private server</b>.<br><br><b>mercury workshop</b> — public community server. Uses wisp-js. May trigger Google CAPTCHA due to shared IP. Type: <b>public server</b>.<br><br><b>custom</b> — enter your own wisp server URL. Type: <b>self-hosted server</b>.</span></span></h3>
               <p class="desc">the server that routes your proxied traffic</p>
               <select class="select" id="wispSelect">
+                <option value="ws://localhost:3001/">bumblcat ultrapatch (local)</option>
                 <option value="wss://celestial-wisp.onrender.com/">bumblcat's server</option>
                 <option value="wss://wisp.mercurywork.shop/">mercury workshop</option>
                 <option value="wss://anura.pro/wisp/">anura (free)</option>
@@ -1044,7 +1045,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.15";
+      var SITE_VER = "2.2.16";
 
       /**
        * Show a notification toast.
@@ -1224,14 +1225,14 @@
         var buttons_v2 = [
           {
             label: "Wider Support",
-            info: "libcurl + bumblcat rrc + bumblcat ultrapatch — best compatibility, bypasses Google anomaly checks",
+            info: "libcurl + bumblcat rrc + bumblcat ultrapatch (local) — best compatibility, uses your device's IP to bypass Google anomaly checks",
             rawClick: true,
             onClick: function (btn, dismissFn) {
               if (btn._wsReady) {
                 dismissFn();
                 localStorage.setItem("transportz", "libcurl");
                 localStorage.setItem("pr0xy", "scram");
-                localStorage.setItem("location", "wss://wisp.mercurywork.shop/");
+                localStorage.setItem("location", "ws://localhost:3001/");
                 localStorage.setItem("proxy-config-seen", SITE_VER);
                 window.notify("v2 Wider Support enabled — reloading…", "success", 6000);
                 setTimeout(function () { location.reload(); }, 900);
@@ -1293,11 +1294,11 @@
         var buttons_v1 = [
           {
             label: "Wider Support",
-            info: "libcurl + bumblcat rrc + bumblcat's server — best compatibility",
+            info: "libcurl + bumblcat rrc + bumblcat ultrapatch (local) — best compatibility, uses your device's IP",
             onClick: function () {
               localStorage.setItem("transportz", "libcurl");
               localStorage.setItem("pr0xy", "scram");
-              localStorage.setItem("location", "wss://wisp.mercurywork.shop/");
+              localStorage.setItem("location", "ws://localhost:3001/");
               window.notify("Wider Support enabled — reloading…", "success", 6000);
               setTimeout(function () { location.reload(); }, 900);
             }
@@ -1365,6 +1366,30 @@
             { noAutoDismiss: true }
           );
         }, 2000);
+      })();
+
+      // ── Mercury Workshop IP flagged notice (persists until acknowledged) ──
+      (function () {
+        var key = "mw-ip-flagged-ack";
+        if (localStorage.getItem(key)) return;
+        setTimeout(function () {
+          window.notifyOption(
+            "warning",
+            "heads up: Mercury Workshop's server IP has been flagged by Google, " +
+            "so it may trigger CAPTCHA or anomaly checks. " +
+            "use bumblcat ultrapatch (local) via the start-wisp.bat on your desktop for a clean IP.",
+            [
+              {
+                label: "acknowledge",
+                info: "dismiss this notice permanently",
+                onClick: function () {
+                  localStorage.setItem(key, "1");
+                }
+              }
+            ],
+            { noAutoDismiss: true }
+          );
+        }, 3500);
       })();
 
       // BRC lifecycle — silent, no toasts for fallback
@@ -1461,6 +1486,7 @@
 // Wisp auto-test
 window.__testWisp = function() {
   const servers = [
+    'ws://localhost:3001/',
     'wss://celestial-wisp.onrender.com/',
     'wss://wisp.mercurywork.shop/',
     'wss://anura.pro/wisp/',
