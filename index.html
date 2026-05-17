@@ -1213,7 +1213,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.40";
+      var SITE_VER = "2.2.41";
 
       /**
        * Show a notification toast.
@@ -1555,6 +1555,30 @@
             { noAutoDismiss: true }
           );
         }, 3500);
+      })();
+
+      // ── Ultrapatch how-to notice ─────────────────────────────────────────
+      (function () {
+        var key = "ultrapatch-howto-ack";
+        if (localStorage.getItem(key)) return;
+        setTimeout(function () {
+          window.notifyOption(
+            "how to use bumblcat ultrapatch",
+            "1. open youtube.com and search a video — click it and let it play briefly. " +
+            "2. close that tab, then open google.com and type your query. " +
+            "note: some searches may still get flagged depending on what you search and how often.",
+            [
+              {
+                label: "got it",
+                info: "dismiss this guide permanently",
+                onClick: function () {
+                  localStorage.setItem(key, "1");
+                }
+              }
+            ],
+            { noAutoDismiss: true }
+          );
+        }, 5500);
       })();
 
       // ── Ultrapatch (local) notice — shows when local server is selected ──

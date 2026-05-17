@@ -662,7 +662,10 @@
         <div style="text-align:right;flex-shrink:0;">
           <span class="kb ${cls}">${lbl}</span>
           <div style="font-size:.68rem;color:#333;margin-top:3px;">${exp?'exp':dLeft+'d'}</div>
-          <button onclick="__cstRevoke(${i})" style="background:none;border:none;color:#2a2a2a;cursor:pointer;font-size:.66rem;margin-top:2px;padding:0;">revoke</button>
+          ${exp
+            ? `<button onclick="__cstDeleteKey(${i})" style="background:none;border:none;color:#663333;cursor:pointer;font-size:.68rem;margin-top:2px;padding:0;">× remove</button>`
+            : `<button onclick="__cstRevoke(${i})" style="background:none;border:none;color:#2a2a2a;cursor:pointer;font-size:.66rem;margin-top:2px;padding:0;">revoke</button>`
+          }
         </div>
       </div>`;
     }).join('');
@@ -671,6 +674,64 @@
   window.__cstRevoke = i => {
     const ks = loadKeys(); ks.splice(i, 1); saveKeys(ks); renderKeys();
     broadcastKeysToPartner();
+  };
+
+  window.__cstDeleteKey = i => {
+    const ks = loadKeys(); ks.splice(i, 1); saveKeys(ks); renderKeys();
+  };
+
+  function _adminEsc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  window.__cstAuthorize = id => {
+    const c = clients[id];
+    if (!c) return;
+    document.getElementById('cst-auth-modal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'cst-auth-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:2147483648;background:rgba(0,0,0,.75);' +
+      'display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;';
+    modal.innerHTML = `
+      <div style="background:#0d0d0d;border:1px solid #282828;border-radius:12px;padding:22px;min-width:290px;max-width:340px;">
+        <div style="font-size:.82rem;color:#555;margin-bottom:4px;">authorizing client</div>
+        <div style="font-size:.92rem;color:#aaa;margin-bottom:16px;font-weight:600;">${_adminEsc(c.name)}</div>
+        <label style="font-size:.74rem;color:#444;display:block;margin-bottom:4px;">display name</label>
+        <input id="cst-auth-name" value="${_adminEsc(c.name || '')}" placeholder="name"
+          style="width:100%;background:#111;border:1px solid #222;border-radius:6px;color:#ccc;
+          padding:7px 10px;font-size:.8rem;margin-bottom:10px;box-sizing:border-box;outline:none;" />
+        <label style="font-size:.74rem;color:#444;display:block;margin-bottom:4px;">access duration (days)</label>
+        <input id="cst-auth-days" type="number" value="7" min="1"
+          style="width:100%;background:#111;border:1px solid #222;border-radius:6px;color:#ccc;
+          padding:7px 10px;font-size:.8rem;margin-bottom:16px;box-sizing:border-box;outline:none;" />
+        <div style="display:flex;gap:8px;">
+          <button id="cst-auth-go" style="flex:1;background:#0d1f0d;border:1px solid #1e4a1e;border-radius:6px;
+            color:#44ff77;padding:9px;cursor:pointer;font-size:.8rem;font-weight:600;">✓ authorize</button>
+          <button id="cst-auth-cancel" style="background:none;border:1px solid #222;border-radius:6px;
+            color:#444;padding:9px 14px;cursor:pointer;font-size:.8rem;">cancel</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('#cst-auth-cancel').onclick = () => modal.remove();
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    modal.querySelector('#cst-auth-go').onclick = () => {
+      const name    = modal.querySelector('#cst-auth-name').value.trim() || c.name || 'user';
+      const days    = Math.max(1, parseInt(modal.querySelector('#cst-auth-days').value) || 7);
+      const now     = Date.now();
+      const expires = now + days * 86400000;
+      const uid     = c.uid || makeUID();
+      const key     = makeKey(name, days);
+      const ks      = loadKeys();
+      ks.push({ key, name, days, created: now, used: true, usedBy: name,
+                uid, expires, deviceId: c.deviceId || null, badges: [] });
+      saveKeys(ks);
+      sendTo(id, { type: 'key-approved', name, expires, created: now, uid, badges: [], autoLoaded: false });
+      c.approved = true; c.name = name;
+      modal.remove();
+      renderClients(); renderKeys();
+      showToast(`Authorized: ${name}`);
+      broadcastKeysToPartner();
+    };
+    // Focus name field
+    setTimeout(() => modal.querySelector('#cst-auth-name').focus(), 50);
   };
 
   // ─── hub (admin WebRTC) ──────────────────────────────────────
@@ -731,6 +792,8 @@
       c.url      = d.url || '—';
       c.name     = d.name || cid.slice(-6);
       c.approved = d.approved || false;
+      c.uid      = d.uid      || null;
+      c.deviceId = d.deviceId || null;
 
       // Auto-sync: reconnecting user with uid or deviceId matching a valid key
       if (d.uid || d.deviceId) {
@@ -859,6 +922,7 @@
           <div class="cm" style="margin-left:12px;">${status} · ${vp} · ${c.url}</div>
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0;align-items:center;">
+          ${!c.approved ? `<button class="cbtn" onclick="__cstAuthorize('${id}')" title="authorize this client" style="padding:5px 8px;font-size:.72rem;color:#44ff77;border-color:#1e4a1e;">authorize</button>` : ''}
           <button class="cbtn" onclick="__cstAnn1('${id}')" title="announce to this user" style="padding:5px 8px;font-size:.72rem;">📢</button>
           <button class="cbtn r" onclick="__cstNuke1('${id}')" title="nuke this client" style="padding:5px 8px;font-size:.72rem;">💥</button>
           <button class="cbtn r" onclick="__cstRemove('${id}')" style="flex-shrink:0;">remove</button>
