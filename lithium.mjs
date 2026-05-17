@@ -121,6 +121,9 @@ async function ensureScramjet() {
  * Reads from localStorage directly so it works before setTransport/setWisp are called.
  */
 async function _createBRCTransport() {
+	// Wait for the wisp connectivity test — if local wisp is down it will have
+	// already updated wispURL to the remote fallback before we reach here.
+	await _wispCheckPromise;
 	// Read wisp from localStorage — setWisp may not have been called yet
 	const savedWisp = localStorage.getItem("location") || "wss://celestial-wisp.onrender.com/";
 	const wisp = wispURL || (
@@ -421,18 +424,40 @@ async function ensureBRC() {
 	return _brcInitPromise;
 }
 
-// Pre-warm the wisp server immediately — Render free tier cold-starts in ~50 s,
-// so opening a throwaway WebSocket now means it's ready by the time the user clicks.
-(function _wispPing() {
-	try {
-		const saved = localStorage.getItem("location") || "wss://celestial-wisp.onrender.com/";
-		const url = (saved.startsWith("wss://") || saved.startsWith("ws://"))
-			? saved
-			: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + saved;
-		const ws = new WebSocket(url);
-		ws.onopen  = () => { console.log("lethal.js: wisp pre-warm ok"); ws.close(); };
-		ws.onerror = () => {};
-	} catch {}
+// Pre-warm the wisp server and auto-fallback if local server is unreachable.
+// Other devices don't run the local ultrapatch server, so ws://localhost:3001/ will
+// always fail for them (error code 7).  We detect this early and switch to the
+// remote wisp BEFORE the transport is created so no request ever sees the error.
+const _REMOTE_WISP = "wss://celestial-wisp.onrender.com/";
+const _wispCheckPromise = (async function _wispCheck() {
+	const saved = localStorage.getItem("location") || _REMOTE_WISP;
+	const url = (saved.startsWith("wss://") || saved.startsWith("ws://"))
+		? saved
+		: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + saved;
+	const isLocal = url.startsWith("ws://localhost") || url.startsWith("ws://127.");
+	const ok = await new Promise(resolve => {
+		try {
+			const ws = new WebSocket(url);
+			// Local connections refuse near-instantly; give remote servers more time.
+			const t = setTimeout(() => { try { ws.close(); } catch {} resolve(false); }, isLocal ? 1500 : 5000);
+			ws.onopen  = () => { clearTimeout(t); ws.close(); resolve(true); };
+			ws.onerror = () => { clearTimeout(t); resolve(false); };
+		} catch { resolve(false); }
+	});
+	if (ok) {
+		console.log("lethal.js: wisp pre-warm ok");
+	} else if (isLocal) {
+		// Local ultrapatch not running — transparently fall back to remote wisp
+		wispURL = _REMOTE_WISP;
+		localStorage.setItem("location", _REMOTE_WISP);
+		await updateBareMux();
+		console.warn("lethal.js: local wisp unreachable — fell back to remote server");
+		document.dispatchEvent(new CustomEvent("notify", { detail: {
+			type: "warning",
+			message: "local wisp server not found — switched to remote server automatically.",
+			duration: 8000
+		}}));
+	}
 })();
 
 registerSW()

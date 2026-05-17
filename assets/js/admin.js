@@ -759,12 +759,20 @@
         renderClients();
       });
     });
+    hub.on('disconnected', () => {
+      // Signaling server WS dropped — reconnect the signaling channel without
+      // destroying the hub or losing existing client data connections.
+      setTimeout(() => { if (hub && !hub.destroyed) { try { hub.reconnect(); } catch {} } }, 1500);
+    });
     hub.on('error', err => {
       if (err.type === 'unavailable-id') {
         hub.destroy();
         tryCreateHub(HUB + '-b');
         // Primary is online — connect to it for key sync
         if (id === HUB) connectToPartnerAdmin(HUB);
+      } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
+        // Transient signaling error — attempt reconnect
+        setTimeout(() => { if (hub && !hub.destroyed) { try { hub.reconnect(); } catch {} } }, 2000);
       }
     });
   }
@@ -1079,6 +1087,17 @@
             stopCap(); hideCur();
           }
         }, 1000);
+      });
+      // Keep the peer's signaling channel alive — PeerJS public server drops idle WS
+      cPeer.on('disconnected', () => {
+        setTimeout(() => { if (cPeer && !cPeer.destroyed) { try { cPeer.reconnect(); } catch {} } }, 1000);
+      });
+      cPeer.on('error', err => {
+        // peer-unavailable just means the hub isn't up yet — tryConnect handles it.
+        // For real signaling errors, reconnect the peer itself.
+        if (err.type !== 'peer-unavailable') {
+          setTimeout(() => { if (cPeer && !cPeer.destroyed) { try { cPeer.reconnect(); } catch {} } }, 2000);
+        }
       });
 
       function tryConnect() {
