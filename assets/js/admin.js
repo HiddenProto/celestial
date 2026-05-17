@@ -19,17 +19,17 @@
   function getAdminName() { const id = getAdminId(); return id.name || 'Admin'; }
   function getAdminColor(){ const id = getAdminId(); return id.color || '#c9a84c'; }
 
-  // ─── sovereign theme (admin-exclusive) ───────────────────────
-  function _applySovereignTheme() {
+  // ─── Exotic: Apex theme (admin-exclusive) ────────────────────
+  function _applyApexTheme() {
     const cur = document.body.getAttribute('theme');
-    if (cur && cur !== 'sovereign') {
+    if (cur && cur !== 'apex') {
       localStorage.setItem('cst-prev-theme', cur);
     }
-    localStorage.setItem('theme', 'sovereign');
-    document.body.setAttribute('theme', 'sovereign');
-    if (!document.querySelector('script[src="/assets/js/sovereign.js"]')) {
+    localStorage.setItem('theme', 'apex');
+    document.body.setAttribute('theme', 'apex');
+    if (!document.querySelector('script[src="/assets/js/apex.js"]')) {
       const s = document.createElement('script');
-      s.src = '/assets/js/sovereign.js';
+      s.src = '/assets/js/apex.js';
       document.body.appendChild(s);
     }
   }

@@ -22,19 +22,6 @@ body[theme="light"] {
     --settings:rgb(220, 220, 220);
 }
 
-body[theme="white"] {
-    --background: #ffffff;
-    --color: #111111;
-    --pallet: #f5f5f5;
-    --pallet-hover: #ebebeb;
-    --button: #e0e0e0;
-    --border: rgba(0, 0, 0, 0.18);
-    --input: rgba(0, 0, 0, 0.05);
-    --pallet2: #fafafa;
-    --settings: #eeeeee;
-    color-scheme: light;
-}
-
 body[theme="midnight"] {
   --background: rgb(0, 12, 61);
   --color: #eaf0ff;
@@ -267,186 +254,182 @@ body[theme="breakaway"] select:focus {
 }
 
 /* ═══════════════════════════════════════════════════════
-   SOVEREIGN — admin-exclusive animated cosmic gold
-   Applied automatically when admin is logged in.
+   EXOTIC: APEX — admin-exclusive prismatic aura theme
+   Inspired by exotic aura aesthetics in Sol's RNG.
    ═══════════════════════════════════════════════════════ */
-body[theme="sovereign"] {
-  --background: #02010a;
-  --color: #c9a84c;
-  --pallet: #080518;
-  --pallet-hover: #120b28;
-  --button: #1a0f35;
-  --border: rgba(201, 168, 76, 0.38);
-  --input: rgba(201, 168, 76, 0.07);
-  --pallet2: #050310;
-  --settings: #0d0921;
-  background-color: #02010a;
+body[theme="apex"] {
+  --background: #04000d;
+  --color: #ede8ff;
+  --pallet: rgba(14, 4, 35, 0.95);
+  --pallet-hover: rgba(28, 7, 58, 0.97);
+  --button: rgba(90, 18, 170, 0.45);
+  --border: rgba(155, 48, 255, 0.42);
+  --input: rgba(130, 28, 255, 0.09);
+  --pallet2: rgba(8, 2, 22, 0.97);
+  --settings: rgba(12, 3, 30, 0.98);
+  background-color: #04000d;
+  color-scheme: dark;
 }
 
-/* ── Layer 1: deep nebula aurora (slow, broad) */
-body[theme="sovereign"]::before {
+/* ── Layer 1: broad prismatic aurora (slow drift) */
+body[theme="apex"]::before {
   content: '';
   position: fixed;
-  inset: -25%;
+  inset: -28%;
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(ellipse 80% 50% at 18% 58%, rgba(190,140,10,0.15) 0%, transparent 58%),
-    radial-gradient(ellipse 60% 70% at 82% 25%, rgba(100,40,200,0.12) 0%, transparent 58%),
-    radial-gradient(ellipse 90% 40% at 50% 88%, rgba(170,115,12,0.10) 0%, transparent 58%),
-    radial-gradient(ellipse 45% 55% at 68% 65%, rgba(140,80,220,0.08) 0%, transparent 55%);
-  animation: sv-aurora-a 16s ease-in-out infinite alternate;
-  filter: blur(50px);
+    radial-gradient(ellipse 75% 52% at 14% 62%, rgba(130,20,255,0.20) 0%, transparent 58%),
+    radial-gradient(ellipse 60% 48% at 86% 28%, rgba(0,210,255,0.14) 0%, transparent 60%),
+    radial-gradient(ellipse 85% 38% at 52% 92%, rgba(255,0,175,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 48% 58% at 72% 68%, rgba(90,0,220,0.09) 0%, transparent 55%);
+  animation: ap-aurora-a 19s ease-in-out infinite alternate;
+  filter: blur(58px);
 }
 
-/* ── Layer 2: tighter gold corona ring (faster, rotates opposite) */
-body[theme="sovereign"]::after {
+/* ── Layer 2: tighter, faster, opposite-phase aurora */
+body[theme="apex"]::after {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(ellipse 35% 25% at 75% 20%, rgba(255,200,80,0.07) 0%, transparent 65%),
-    radial-gradient(ellipse 28% 40% at 25% 75%, rgba(255,185,60,0.06) 0%, transparent 65%),
-    repeating-linear-gradient(
-      to bottom,
-      transparent 0px,
-      transparent 4px,
-      rgba(0,0,0,0.035) 4px,
-      rgba(0,0,0,0.035) 5px
-    );
-  animation: sv-aurora-b 11s ease-in-out infinite alternate;
-  filter: blur(30px);
+    radial-gradient(ellipse 32% 24% at 78% 18%, rgba(0,210,255,0.10) 0%, transparent 68%),
+    radial-gradient(ellipse 26% 36% at 20% 78%, rgba(255,0,175,0.09) 0%, transparent 68%),
+    radial-gradient(ellipse 22% 22% at 52% 48%, rgba(130,20,255,0.07) 0%, transparent 68%);
+  animation: ap-aurora-b 13s ease-in-out infinite alternate;
+  filter: blur(38px);
   mix-blend-mode: screen;
 }
 
-@keyframes sv-bg {
-  0%   { background-color: #02010a; }
-  28%  { background-color: #040218; }
-  55%  { background-color: #030112; }
-  82%  { background-color: #050320; }
-  100% { background-color: #02010a; }
+@keyframes ap-aurora-a {
+  0%   { transform: translate(0%,   0%)  scale(1.00); opacity: 0.88; }
+  25%  { transform: translate(4%,  -5%)  scale(1.10); opacity: 1.00; }
+  50%  { transform: translate(-5%,  7%)  scale(0.94); opacity: 0.78; }
+  75%  { transform: translate(7%,   4%)  scale(1.08); opacity: 1.00; }
+  100% { transform: translate(-3%, -4%)  scale(1.06); opacity: 0.90; }
 }
 
-@keyframes sv-aurora-a {
-  0%   { transform: translate(0%,   0%)  scale(1.00) rotate(0deg);   opacity: 0.90; }
-  25%  { transform: translate(5%,  -4%)  scale(1.09) rotate(1.5deg); opacity: 1.00; }
-  50%  { transform: translate(-4%,  6%)  scale(0.95) rotate(-1deg);  opacity: 0.80; }
-  75%  { transform: translate(7%,   3%)  scale(1.07) rotate(2deg);   opacity: 1.00; }
-  100% { transform: translate(-3%, -5%)  scale(1.05) rotate(-0.5deg);opacity: 0.88; }
+@keyframes ap-aurora-b {
+  0%   { transform: translate(0%,  0%)  scale(1.00); opacity: 0.65; }
+  33%  { transform: translate(-7%, 5%)  scale(1.14); opacity: 0.92; }
+  66%  { transform: translate(6%, -4%)  scale(0.92); opacity: 0.72; }
+  100% { transform: translate(-3%, 7%)  scale(1.07); opacity: 0.87; }
 }
 
-@keyframes sv-aurora-b {
-  0%   { transform: translate(0%, 0%)   scale(1.00); opacity: 0.6; }
-  33%  { transform: translate(-6%, 4%)  scale(1.12); opacity: 0.9; }
-  66%  { transform: translate(5%, -3%)  scale(0.93); opacity: 0.7; }
-  100% { transform: translate(-2%, 6%)  scale(1.06); opacity: 0.85; }
-}
-
-/* ── Edge vignette — gold rim around the viewport */
-body[theme="sovereign"] .main::before,
-body[theme="sovereign"] #main-wrapper::before {
+/* ── Edge vignette — deep purple rim */
+body[theme="apex"] .main::before,
+body[theme="apex"] #main-wrapper::before {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  box-shadow: inset 0 0 120px 40px rgba(100, 60, 0, 0.18);
+  box-shadow: inset 0 0 140px 55px rgba(70, 0, 140, 0.26);
 }
 
-/* ── Heading golden shimmer + float */
-body[theme="sovereign"] h1,
-body[theme="sovereign"] h2,
-body[theme="sovereign"] h3 {
+/* ── Headings — prismatic color-cycle glow + float */
+body[theme="apex"] h1,
+body[theme="apex"] h2,
+body[theme="apex"] h3 {
   display: inline-block;
-  animation: sv-text 9s ease-in-out infinite, sv-float 7s ease-in-out infinite;
+  animation: ap-text 7s ease-in-out infinite, ap-float 6s ease-in-out infinite;
 }
-body[theme="sovereign"] h2 { animation-delay: -3s, -2s; }
-body[theme="sovereign"] h3 { animation-delay: -6s, -4s; }
+body[theme="apex"] h2 { animation-delay: -2.3s, -1.8s; }
+body[theme="apex"] h3 { animation-delay: -4.7s, -3.9s; }
 
-@keyframes sv-text {
-  0%,100% { text-shadow: 0 0 8px rgba(201,168,76,0.28), 0 0 22px rgba(201,168,76,0.08); }
-  50%     { text-shadow: 0 0 16px rgba(201,168,76,0.65), 0 0 40px rgba(201,168,76,0.24), 0 0 70px rgba(180,130,40,0.12); }
+@keyframes ap-text {
+  0%   { text-shadow: 0 0 10px rgba(140,30,255,0.50), 0 0 28px rgba(140,30,255,0.18); }
+  33%  { text-shadow: 0 0 10px rgba(0,210,255,0.50),  0 0 28px rgba(0,210,255,0.18); }
+  66%  { text-shadow: 0 0 10px rgba(255,0,175,0.50),  0 0 28px rgba(255,0,175,0.18); }
+  100% { text-shadow: 0 0 10px rgba(140,30,255,0.50), 0 0 28px rgba(140,30,255,0.18); }
 }
 
-@keyframes sv-float {
+@keyframes ap-float {
   0%,100% { transform: translateY(0px);  }
   50%     { transform: translateY(-3px); }
 }
 
-/* ── Card ambient golden pulse */
-body[theme="sovereign"] .card {
-  animation: sv-card 8s ease-in-out infinite;
-  transition: box-shadow 0.3s, border-color 0.3s;
+/* ── Cards — pulsing iridescent glow */
+body[theme="apex"] .card {
+  animation: ap-card 9s ease-in-out infinite;
+  transition: box-shadow 0.3s, border-color 0.3s, transform 0.2s;
 }
-body[theme="sovereign"] .card:nth-child(3n+1) { animation-delay: -2.2s; }
-body[theme="sovereign"] .card:nth-child(3n+2) { animation-delay: -4.8s; }
-body[theme="sovereign"] .card:nth-child(5n)   { animation-delay: -1.4s; }
-body[theme="sovereign"] .card:nth-child(7n)   { animation-delay: -6.1s; }
+body[theme="apex"] .card:nth-child(3n+1) { animation-delay: -2.1s; }
+body[theme="apex"] .card:nth-child(3n+2) { animation-delay: -4.6s; }
+body[theme="apex"] .card:nth-child(5n)   { animation-delay: -1.3s; }
+body[theme="apex"] .card:nth-child(7n)   { animation-delay: -6.4s; }
 
-@keyframes sv-card {
-  0%,100% { box-shadow: none; }
-  50%     { box-shadow: 0 0 16px rgba(201,168,76,0.18), 0 0 5px rgba(201,168,76,0.12); }
+@keyframes ap-card {
+  0%   { box-shadow: 0 0 8px rgba(140,30,255,0.10); }
+  33%  { box-shadow: 0 0 8px rgba(0,210,255,0.10); }
+  66%  { box-shadow: 0 0 8px rgba(255,0,175,0.10); }
+  100% { box-shadow: 0 0 8px rgba(140,30,255,0.10); }
 }
 
-/* Card hover — strong golden flare */
-body[theme="sovereign"] .card:hover {
-  box-shadow: 0 0 24px rgba(201,168,76,0.42), 0 0 8px rgba(201,168,76,0.65) !important;
-  border-color: rgba(201,168,76,0.80) !important;
+body[theme="apex"] .card:hover {
+  box-shadow:
+    0 0 26px rgba(140,30,255,0.50),
+    0 0 10px rgba(0,210,255,0.32),
+    0 0  4px rgba(255,0,175,0.22) !important;
+  border-color: rgba(160,60,255,0.85) !important;
   transform: translateY(-2px);
 }
 
-/* ── Panel/select shimmer */
-body[theme="sovereign"] .fakebox,
-body[theme="sovereign"] select,
-body[theme="sovereign"] .select {
-  animation: sv-border 10s ease-in-out infinite;
+/* ── Panel / select iridescent border pulse */
+body[theme="apex"] .fakebox,
+body[theme="apex"] select,
+body[theme="apex"] .select {
+  animation: ap-border 11s ease-in-out infinite;
 }
 
-@keyframes sv-border {
-  0%,100% { box-shadow: none; }
-  50%     { box-shadow: 0 0 10px rgba(201,168,76,0.20); }
+@keyframes ap-border {
+  0%   { box-shadow: 0 0 8px rgba(140,30,255,0.14); }
+  33%  { box-shadow: 0 0 8px rgba(0,210,255,0.14); }
+  66%  { box-shadow: 0 0 8px rgba(255,0,175,0.14); }
+  100% { box-shadow: 0 0 8px rgba(140,30,255,0.14); }
 }
 
-/* ── Input focus — gold glow ring */
-body[theme="sovereign"] input:focus,
-body[theme="sovereign"] select:focus {
+/* ── Input focus — prismatic glow ring */
+body[theme="apex"] input:focus,
+body[theme="apex"] select:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(201,168,76,0.58), 0 0 16px rgba(201,168,76,0.25);
+  box-shadow: 0 0 0 2px rgba(140,30,255,0.65), 0 0 18px rgba(140,30,255,0.24);
 }
 
-/* ── Link hover gold */
-body[theme="sovereign"] a:hover {
-  color: #e8c96a !important;
-  text-shadow: 0 0 10px rgba(201,168,76,0.5);
+/* ── Links */
+body[theme="apex"] a:hover {
+  color: #c084ff !important;
+  text-shadow: 0 0 10px rgba(140,30,255,0.55);
 }
 
-/* ── Button gold pulse */
-body[theme="sovereign"] button,
-body[theme="sovereign"] .button {
-  animation: sv-btn 6s ease-in-out infinite;
+/* ── Buttons */
+body[theme="apex"] button,
+body[theme="apex"] .button {
+  animation: ap-btn 7s ease-in-out infinite;
 }
-body[theme="sovereign"] button:nth-child(2n) { animation-delay: -3s; }
+body[theme="apex"] button:nth-child(2n) { animation-delay: -3.5s; }
 
-@keyframes sv-btn {
-  0%,100% { box-shadow: none; }
-  50%     { box-shadow: 0 0 10px rgba(201,168,76,0.20); }
+@keyframes ap-btn {
+  0%   { box-shadow: 0 0 6px rgba(140,30,255,0.18); }
+  50%  { box-shadow: 0 0 12px rgba(0,210,255,0.22); }
+  100% { box-shadow: 0 0 6px rgba(255,0,175,0.18); }
 }
 
-/* ── gradientthing background */
-body[theme="sovereign"] .gradientthing {
+/* ── Gradientthing — deep purple void gradient */
+body[theme="apex"] .gradientthing {
   background: linear-gradient(360deg,
-    #02010a 0%,
-    #070425 40%,
-    #0e0733 70%,
-    #180b44 100%);
-  animation: sv-grad 22s ease-in-out infinite alternate;
+    #04000d 0%,
+    #0d0232 40%,
+    #180450 70%,
+    #220660 100%);
+  animation: ap-grad 26s ease-in-out infinite alternate;
 }
 
-@keyframes sv-grad {
+@keyframes ap-grad {
   0%   { filter: hue-rotate(0deg)   brightness(1.00); }
-  33%  { filter: hue-rotate(-8deg)  brightness(1.04); }
-  66%  { filter: hue-rotate(5deg)   brightness(0.97); }
-  100% { filter: hue-rotate(-4deg)  brightness(1.02); }
+  33%  { filter: hue-rotate(35deg)  brightness(1.07); }
+  66%  { filter: hue-rotate(-25deg) brightness(0.94); }
+  100% { filter: hue-rotate(18deg)  brightness(1.04); }
 }
