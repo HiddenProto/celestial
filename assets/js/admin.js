@@ -11,15 +11,12 @@
   // Hub ID — site-specific so different deployments never conflict on the
   // public PeerJS cloud.  Override via localStorage('cst-hub-id') without
   // needing a code push (useful if the ID ever gets stale-locked again).
-  // Hub ID — 3 slots (A/B/C) so a stale-locked slot is skipped immediately
-  // instead of waiting 60+ s for peerjs-server's ALIVE_TIMEOUT.
-  // Admin cycles A→B→C on each unavailable-id; clients try all three in
-  // round-robin every second until one answers.
-  const HUB_BASE  = localStorage.getItem('cst-hub-id') ||
-    ('cst-hub-' + location.hostname.replace(/[^a-z0-9]/gi, '').slice(0, 14));
-  const HUB_SLOTS = [HUB_BASE, HUB_BASE + '-b', HUB_BASE + '-c'];
-  let   _hubSlot  = 0;                      // which slot admin hub is currently trying
-  function _hubId() { return HUB_SLOTS[_hubSlot]; }
+  // Hub uses a RANDOM PeerJS ID — no stale-locks ever.
+  // Clients discover the hub's current ID through the chat registry
+  // (same discovery path as the P2P mesh, which already works reliably).
+  // The registry ID formula is identical to chat.js so they share the same node.
+  const REGISTRY_ID = localStorage.getItem('cst-registry-id') ||
+    ('cst-registry-' + location.hostname.replace(/[^a-z0-9]/gi, '').slice(0, 12));
   const SEC  = 'Hr332941369';
 
   let isAdmin    = localStorage.getItem('cst-admin') === '1';
@@ -526,10 +523,10 @@
       <div class="cb">
         <h3>System</h3>
         <p style="font-size:.82rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          hub peer ID: <code id="cp-pid" style="color:#777;">connecting…</code>
+          hub peer: <code id="cp-pid" style="color:#777;">connecting…</code>
           <button id="cp-reconnect" class="cbtn" style="font-size:.7rem;padding:2px 10px;margin:0;">↺ reconnect</button>
         </p>
-        <p style="font-size:.82rem;">hub ID: <code id="cp-hub-id" style="color:#777;font-size:.72rem;word-break:break-all;"></code></p>
+        <p style="font-size:.82rem;">registry: <code id="cp-reg-id" style="color:#555;font-size:.72rem;word-break:break-all;"></code></p>
         <p style="font-size:.82rem;color:#444;">admin code: ← → ← → ↑ ↓ A B, then passcode</p>
       </div>
       <div class="cb">
@@ -563,9 +560,9 @@
     panelEl.querySelector('#cp-close').onclick     = () => panelEl.style.display = 'none';
     panelEl.querySelector('#cp-logout').onclick    = doLogout;
     panelEl.querySelector('#cp-reconnect').onclick = reconnectHub;
-    // Hub ID shown dynamically when onOpen fires; seed with current slot for now
-    var elHubId = panelEl.querySelector('#cp-hub-id');
-    if (elHubId) elHubId.textContent = _hubId();
+    // Registry ID is static — show it immediately
+    var elRegId = panelEl.querySelector('#cp-reg-id');
+    if (elRegId) elRegId.textContent = REGISTRY_ID;
     panelEl.querySelector('#ck-make').onclick   = doMakeKey;
     panelEl.querySelector('#ck-copy').onclick   = () =>
       navigator.clipboard?.writeText(document.getElementById('ck-val').textContent).catch(() => {});
@@ -883,21 +880,17 @@
   function startHub() {
     if (_hubMgr) return;
     loadPeerJS(function () {
-      _hubMgr = PeerMgr.connect(_hubId(), {
+      _hubMgr = PeerMgr.connect(undefined, {  // random ID — no stale-lock possible
 
         onOpen: function (peer, pid) {
           hub = peer;
-          // Remember the winning slot so clients start here on next load
-          localStorage.setItem('cst-hub-slot', String(_hubSlot));
 
           // ── UI ───────────────────────────────────────────────
-          var elHub    = document.getElementById('cp-hub');
-          var elPid    = document.getElementById('cp-pid');
-          var elHubId2 = document.getElementById('cp-hub-id');
+          var elHub = document.getElementById('cp-hub');
+          var elPid = document.getElementById('cp-pid');
           function _markOnline(id) {
             if (elHub) { elHub.textContent = 'hub online'; elHub.className = 'on'; }
             if (elPid && id) elPid.textContent = id;
-            if (elHubId2)    elHubId2.textContent = id;  // live slot ID
           }
           _markOnline(pid);
 
@@ -943,29 +936,9 @@
         },
 
         onUnavailable: function () {
-          // Hub slot is stale-locked (crashed tab didn't clean up) or held by
-          // another live admin session.  Rotate to the next slot immediately
-          // instead of waiting 60+ s for the lock to expire.
-          // After all 3 slots are tried (~900 ms), wait 15 s then retry from
-          // slot 0 (by then the stale lock will almost certainly have expired).
+          // Random IDs should never produce unavailable-id, but handle defensively.
           _hubMgr = null; hub = null;
-          const tried = (_hubSlot + 1) % HUB_SLOTS.length;
-          if (tried !== 0) {
-            // Still have untried slots — rotate and retry immediately
-            _hubSlot = tried;
-            var elHub = document.getElementById('cp-hub');
-            if (elHub) elHub.textContent = 'hub slot busy…';
-            setTimeout(startHub, 300);
-          } else {
-            // Exhausted all 3 slots — peerjs-server lock expires in ~60 s,
-            // but 15 s is usually enough since we spread 3 rotations across 3 s.
-            _hubSlot = 0;
-            window.notify && window.notify(
-              'All hub slots busy — retrying in 15 s…', 'warning', 20000);
-            var elHub2 = document.getElementById('cp-hub');
-            if (elHub2) elHub2.textContent = 'hub retrying…';
-            setTimeout(function () { if (!_hubMgr) startHub(); }, 15000);
-          }
+          setTimeout(function () { if (!_hubMgr) startHub(); }, 1000);
         },
 
       }); // end PeerMgr.connect
@@ -1290,27 +1263,58 @@
       let _tryConnTimer = null;
       let _capWatchdog  = null;
 
-      // Hub slot discovery — mirrors the admin-side HUB_SLOTS.
-      // Clients cycle through all three slots every second until one responds.
-      // localStorage('cst-hub-slot') is written by the admin on successful open,
-      // so returning clients start on the right slot immediately.
-      const _bHubSlots = [HUB_BASE, HUB_BASE + '-b', HUB_BASE + '-c'];
-      let   _bSlot     = parseInt(localStorage.getItem('cst-hub-slot') || '0') % 3;
-      function _bHubId() { return _bHubSlots[_bSlot % 3]; }
+      // Hub discovery via the chat registry.
+      // Admin hub uses a RANDOM peer ID each session (no stale-locks).
+      // We query the same registry that powers the chat mesh, look for the
+      // peer with isAdmin:true, and connect directly to its random ID.
+      // On disconnect the cached ID is cleared so the next attempt re-discovers.
+      let _adminPeerId  = null;   // admin's current random peer ID (null = unknown)
+      let _discovering  = false;  // guard: only one registry query at a time
+
+      function _discoverHub() {
+        if (_discovering || !cPeer || !cPeer.open) return;
+        _discovering = true;
+
+        const regConn = cPeer.connect(REGISTRY_ID, { reliable: true });
+        const t = setTimeout(function () {
+          _discovering = false;
+          try { regConn.close(); } catch {}
+        }, 4000);
+
+        regConn.on('open', function () {
+          // Lightweight mesh-join — just enough for the registry to send us
+          // the peer list.  We never become registry and never persist here.
+          const apprD = getApproval();
+          regConn.send({ type: 'mesh-join', id: cPeer.id,
+            name: apprD?.name || null, isAdmin: false });
+        });
+
+        regConn.on('data', function (d) {
+          clearTimeout(t);
+          _discovering = false;
+          try { regConn.close(); } catch {}
+          if (!d || d.type !== 'mesh-peers') return;
+          const adm = (d.peers || []).find(function (p) { return p.isAdmin; });
+          if (adm) _adminPeerId = adm.id;
+          // If no admin found, we'll retry on next tryConnect tick (1 s)
+        });
+
+        regConn.on('error',  function () { clearTimeout(t); _discovering = false; });
+        regConn.on('close',  function () { clearTimeout(t); _discovering = false; });
+      }
 
       PeerMgr.connect(undefined, {
         onOpen: function (peer) {
           cPeer = peer;
           // If the peer was recreated, any old adminConn is dead — reset.
-          if (adminConn && !adminConn.open) { adminConn = null; connecting = false; }
-          // Listen for peer-unavailable to advance to the next hub slot.
-          // PeerMgr silently swallows these; we add a second listener here.
+          if (adminConn && !adminConn.open) { adminConn = null; connecting = false; _adminPeerId = null; }
+          // peer-unavailable means the cached admin peer ID is stale (admin reconnected).
+          // Clear it so the next tryConnect re-discovers via registry.
           peer.on('error', function (err) {
             if (err.type !== 'peer-unavailable') return;
-            // Hub not on this slot — advance and let tryConnect retry next tick
-            _bSlot = (_bSlot + 1) % _bHubSlots.length;
-            connecting = false;
-            adminConn  = null;
+            _adminPeerId = null;
+            connecting   = false;
+            adminConn    = null;
           });
           // Start intervals only once (survives peer recreation).
           if (!_tryConnTimer) _tryConnTimer = setInterval(tryConnect, 1000);
@@ -1323,35 +1327,36 @@
 
       function tryConnect() {
         if (adminConn && adminConn.open) {
-          // If there's a pending key and we're connected, register it
           if (window.__cstPendingKey) {
             adminConn.send({ type: 'register-key', key: window.__cstPendingKey });
           }
           return;
         }
-        // Guard: don't create multiple simultaneous connection attempts
         if (connecting) return;
+
+        if (!_adminPeerId) {
+          _discoverHub();   // async — sets _adminPeerId, picked up next tick
+          return;
+        }
+
         connecting = true;
         try {
-          const conn = cPeer.connect(_bHubId(), { reliable: true });
+          const conn = cPeer.connect(_adminPeerId, { reliable: true });
           adminConn = conn;
           conn.on('open', () => {
             if (adminConn !== conn) { try { conn.close(); } catch {} return; }
             connecting = false;
-            // Remember this winning slot for fast reconnect
-            localStorage.setItem('cst-hub-slot', String(_bSlot % _bHubSlots.length));
             const appr = getApproval();
             conn.send({
               type:       'hello',
               vp:         { w: innerWidth, h: innerHeight },
               url:        location.hostname,
-              name:       appr?.name       || null,
+              name:       appr?.name    || null,
               approved:   isApproved(),
-              uid:        appr?.uid        || null,
+              uid:        appr?.uid     || null,
               deviceId:   getDeviceId(),
-              keyExpires: appr?.expires    || null,  // lets admin detect offline expiry changes
+              keyExpires: appr?.expires || null,
             });
-            // If gate is waiting for admin, send register request now
             if (window.__cstPendingKey) {
               conn.send({ type: 'register-key', key: window.__cstPendingKey, deviceId: getDeviceId() });
             }
@@ -1359,9 +1364,10 @@
           conn.on('data',  onAdminMsg);
           conn.on('close', () => {
             if (adminConn === conn) {
-              adminConn = null; connecting = false; stopCap(); hideCur();
-              // Hub may have rotated slots — try next slot on reconnect
-              _bSlot = (_bSlot + 1) % _bHubSlots.length;
+              adminConn    = null;
+              connecting   = false;
+              _adminPeerId = null;  // admin reconnected with new random ID — re-discover
+              stopCap(); hideCur();
             }
           });
           conn.on('error', () => {
