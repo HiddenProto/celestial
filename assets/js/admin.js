@@ -1492,12 +1492,15 @@
         }
       }
 
-      // Derive one of 6 color variant names from the current cursor color hex.
+      // Derive one of 8 color variant names from the current cursor color hex.
       function _getVariant() {
         const hex = cursorColor || '#ff3232';
         const r = parseInt(hex.slice(1, 3) || 'ff', 16);
         const g = parseInt(hex.slice(3, 5) || '32', 16);
         const b = parseInt(hex.slice(5, 7) || '32', 16);
+        // White / black checked first — they'd otherwise match channel checks
+        if (r > 200 && g > 200 && b > 200)  return 'white';
+        if (r < 55  && g < 55  && b < 55)   return 'black';
         if (g > r * 1.25 && g > b * 1.25 && g > 80)  return 'green';
         if (b > r * 1.25 && b > g * 1.25 && b > 80)  return 'blue';
         if (r > 140 && g > 80  && g < r   && b < 90)  return 'orange';
@@ -1561,7 +1564,7 @@
 @keyframes cst-fall{to{transform:translateY(110vh) rotate(var(--r));opacity:0}}
 @keyframes cst-blink{0%,49%{opacity:1}50%,100%{opacity:0}}
 .cst-ch{display:inline-block;animation:cst-fall var(--d) ease-in var(--dl) both;}
-/* ── cursor hover text effects (6 color variants) ─────────────── */
+/* ── cursor hover text effects (8 color variants) ─────────────── */
 .cst-cur-txt{transition:color .18s,text-shadow .18s;}
 .cst-cur-txt[data-cst-v="green"]{color:#44ff88!important;text-shadow:0 0 9px #44ff8860!important;}
 .cst-cur-txt[data-cst-v="green"]::after{content:'|';color:#44ff88;animation:cst-blink .65s step-start infinite;margin-left:1px;font-weight:300;}
@@ -1570,6 +1573,10 @@
 .cst-cur-txt[data-cst-v="red"]{color:#ff5555!important;text-shadow:0 0 9px #ff555560!important;}
 .cst-cur-txt[data-cst-v="purple"]{color:#cc55ff!important;text-shadow:0 0 9px #cc55ff60!important;}
 .cst-cur-txt[data-cst-v="gold"]{color:#ffd700!important;text-shadow:0 0 9px #ffd70060!important;}
+.cst-cur-txt[data-cst-v="white"]{color:#ffffff!important;text-shadow:0 0 9px rgba(255,255,255,.45)!important;}
+.cst-cur-txt[data-cst-v="white"]::after{content:'|';color:#fff;animation:cst-blink .65s step-start infinite;margin-left:1px;font-weight:300;}
+.cst-cur-txt[data-cst-v="black"]{color:#1a1a1a!important;text-shadow:none!important;-webkit-text-stroke:.4px #888;}
+.cst-cur-txt[data-cst-v="black"]::after{content:'|';color:#666;animation:cst-blink .65s step-start infinite;margin-left:1px;font-weight:300;}
 /* ── cursor hover input effects ─────────────────────────────── */
 .cst-cur-inp{transition:border-color .18s,box-shadow .18s;}
 .cst-cur-inp[data-cst-v="green"]{border-color:#44ff88!important;box-shadow:0 0 7px #44ff8840!important;}
@@ -1579,6 +1586,8 @@
 .cst-cur-inp[data-cst-v="red"]{border-color:#ff5555!important;box-shadow:0 0 7px #ff555540!important;}
 .cst-cur-inp[data-cst-v="purple"]{border-color:#cc55ff!important;box-shadow:0 0 7px #cc55ff40!important;}
 .cst-cur-inp[data-cst-v="gold"]{border-color:#ffd700!important;box-shadow:0 0 7px #ffd70040!important;}
+.cst-cur-inp[data-cst-v="white"]{border-color:#fff!important;box-shadow:0 0 7px rgba(255,255,255,.2)!important;}
+.cst-cur-inp[data-cst-v="black"]{border-color:#555!important;box-shadow:inset 0 0 6px rgba(0,0,0,.7)!important;}
 /* ── cursor hover button effects ────────────────────────────── */
 .cst-cur-btn{transition:box-shadow .18s;}
 .cst-cur-btn[data-cst-v="green"]{box-shadow:0 0 10px #44ff8870!important;}
@@ -1586,7 +1595,9 @@
 .cst-cur-btn[data-cst-v="blue"]{box-shadow:0 0 10px #44aaff70!important;}
 .cst-cur-btn[data-cst-v="red"]{box-shadow:0 0 10px #ff555570!important;}
 .cst-cur-btn[data-cst-v="purple"]{box-shadow:0 0 10px #cc55ff70!important;}
-.cst-cur-btn[data-cst-v="gold"]{box-shadow:0 0 10px #ffd70070!important;}`;
+.cst-cur-btn[data-cst-v="gold"]{box-shadow:0 0 10px #ffd70070!important;}
+.cst-cur-btn[data-cst-v="white"]{box-shadow:0 0 10px rgba(255,255,255,.5)!important;}
+.cst-cur-btn[data-cst-v="black"]{box-shadow:0 0 10px rgba(0,0,0,.9),inset 0 0 5px rgba(0,0,0,.6)!important;}`;
           document.head.appendChild(st);
         }
         return msgLayer;
