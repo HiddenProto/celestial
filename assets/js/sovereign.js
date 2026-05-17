@@ -4,7 +4,7 @@
 
   /* ── Canvas setup ──────────────────────────────────────────────────────── */
   const canvas = document.createElement('canvas');
-  canvas.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:1;';
+  canvas.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:0;';
   document.body.appendChild(canvas);
   const ctx = canvas.getContext('2d');
   let W, H;

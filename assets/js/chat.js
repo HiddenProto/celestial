@@ -261,7 +261,13 @@
 
   // ── online list ───────────────────────────────────────────────
   function updateOnline(users) {
-    onlineList = users.filter(u => u.name);
+    const seen = new Set();
+    onlineList = users.filter(u => {
+      if (!u.name) return false;
+      const key = u.name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
     const cnt = document.getElementById('cst-chat-online-cnt');
     if (cnt) cnt.textContent = onlineList.length;
     const tip = document.getElementById('cst-chat-online-tip');
@@ -366,7 +372,7 @@
       <span style="font-size:.68rem;cursor:help;">ⓘ</span>
       <div id="cst-chat-online-tip"></div>
     </div>
-    <button onclick="document.getElementById('cst-chat-panel').style.display='none';window._cstChatOpen=false;"
+    <button id="cst-chat-close"
       style="background:none;border:none;color:#333;cursor:pointer;font-size:1rem;padding:0;margin-left:6px;">✕</button>
   </div>
   <div id="cst-chat-msgs"></div>
@@ -386,6 +392,11 @@
     new MutationObserver(origUpdate).observe(orig, { childList: true, characterData: true, subtree: true });
 
     widgetEl.querySelector('#cst-chat-bubble').onclick = togglePanel;
+    widgetEl.querySelector('#cst-chat-close').onclick = () => {
+      const p = document.getElementById('cst-chat-panel');
+      if (p) p.style.display = 'none';
+      chatOpen = false;
+    };
     const inp  = widgetEl.querySelector('#cst-chat-inp');
     const send = widgetEl.querySelector('#cst-chat-send');
     const chars = widgetEl.querySelector('#cst-chat-chars');

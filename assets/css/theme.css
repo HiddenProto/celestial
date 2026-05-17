@@ -22,6 +22,19 @@ body[theme="light"] {
     --settings:rgb(220, 220, 220);
 }
 
+body[theme="white"] {
+    --background: #ffffff;
+    --color: #111111;
+    --pallet: #f5f5f5;
+    --pallet-hover: #ebebeb;
+    --button: #e0e0e0;
+    --border: rgba(0, 0, 0, 0.18);
+    --input: rgba(0, 0, 0, 0.05);
+    --pallet2: #fafafa;
+    --settings: #eeeeee;
+    color-scheme: light;
+}
+
 body[theme="midnight"] {
   --background: rgb(0, 12, 61);
   --color: #eaf0ff;
@@ -267,7 +280,7 @@ body[theme="sovereign"] {
   --input: rgba(201, 168, 76, 0.07);
   --pallet2: #050310;
   --settings: #0d0921;
-  animation: sv-bg 20s ease-in-out infinite alternate;
+  background-color: #02010a;
 }
 
 /* ── Layer 1: deep nebula aurora (slow, broad) */
