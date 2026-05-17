@@ -42,10 +42,17 @@
 
   // ── PeerJS loader ─────────────────────────────────────────────
   function loadPeerJS(cb) {
-    if (window.Peer) { cb(); return; }
+    function _loadPeer() {
+      if (window.Peer) { cb(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js';
+      s.onload = cb; s.onerror = () => {}; document.head.appendChild(s);
+    }
+    if (window.PeerMgr) { _loadPeer(); return; }
     const s = document.createElement('script');
-    s.src = 'https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js';
-    s.onload = cb; s.onerror = () => {}; document.head.appendChild(s);
+    s.src = '/assets/js/peer-mgr.js';
+    s.onload = _loadPeer; s.onerror = _loadPeer;
+    document.head.appendChild(s);
   }
 
   // ── mesh state ────────────────────────────────────────────────

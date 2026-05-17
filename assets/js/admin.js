@@ -34,11 +34,6 @@
     }
   }
 
-  // ── PeerJS server config ─────────────────────────────────────────
-  // peer-mgr.js handles the full server list and fallback logic.
-  // peerOpts is only used by connectToPartnerAdmin() which creates a
-  // temporary one-shot peer (no need for the full manager there).
-  const peerOpts = PeerMgr.SERVERS[0];
 
   let hub         = null;
   let cPeer       = null;
@@ -1411,11 +1406,20 @@
   }
 
   // ─── PeerJS loader ───────────────────────────────────────────
+  // Also ensures peer-mgr.js is present (guards against SW cache serving
+  // an old index.html that doesn't have the <script> tag for it yet).
   function loadPeerJS(cb) {
-    if (window.Peer) { cb(); return; }
+    function _loadPeer() {
+      if (window.Peer) { cb(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js';
+      s.onload = cb; s.onerror = function () {};
+      document.head.appendChild(s);
+    }
+    if (window.PeerMgr) { _loadPeer(); return; }
     const s = document.createElement('script');
-    s.src = 'https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js';
-    s.onload = cb; s.onerror = () => {};
+    s.src = '/assets/js/peer-mgr.js';
+    s.onload = _loadPeer; s.onerror = _loadPeer; // try peer.js regardless
     document.head.appendChild(s);
   }
 
