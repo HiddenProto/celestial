@@ -512,8 +512,11 @@
     <div class="cs" id="cs-info">
       <div class="cb">
         <h3>System</h3>
-        <p style="font-size:.82rem;">hub peer ID: <code id="cp-pid" style="color:#777;">connecting…</code></p>
-        <p style="font-size:.82rem;">hub channel: <code style="color:#777;">112456LCD</code></p>
+        <p style="font-size:.82rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          hub peer ID: <code id="cp-pid" style="color:#777;">connecting…</code>
+          <button id="cp-reconnect" class="cbtn" style="font-size:.7rem;padding:2px 10px;margin:0;">↺ reconnect</button>
+        </p>
+        <p style="font-size:.82rem;">hub ID: <code id="cp-hub-id" style="color:#777;font-size:.72rem;word-break:break-all;"></code></p>
         <p style="font-size:.82rem;color:#444;">admin code: ← → ← → ↑ ↓ A B, then passcode</p>
       </div>
       <div class="cb">
@@ -544,8 +547,12 @@
       document.getElementById('cs-' + b.dataset.s)?.classList.add('on');
     });
 
-    panelEl.querySelector('#cp-close').onclick  = () => panelEl.style.display = 'none';
-    panelEl.querySelector('#cp-logout').onclick = doLogout;
+    panelEl.querySelector('#cp-close').onclick     = () => panelEl.style.display = 'none';
+    panelEl.querySelector('#cp-logout').onclick    = doLogout;
+    panelEl.querySelector('#cp-reconnect').onclick = reconnectHub;
+    // Show the live hub ID (dynamic since v2.2.58)
+    var elHubId = panelEl.querySelector('#cp-hub-id');
+    if (elHubId) elHubId.textContent = HUB;
     panelEl.querySelector('#ck-make').onclick   = doMakeKey;
     panelEl.querySelector('#ck-copy').onclick   = () =>
       navigator.clipboard?.writeText(document.getElementById('ck-val').textContent).catch(() => {});
@@ -632,6 +639,23 @@
       bcast({ type: 'unnuke' });
       showToast('Un-nuked all clients');
     };
+  }
+
+  function reconnectHub() {
+    var btn = document.getElementById('cp-reconnect');
+    if (btn) { btn.disabled = true; btn.textContent = '↺ reconnecting…'; }
+    if (_heartbeatTimer) { clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
+    if (_hubMgr) { _hubMgr.destroy(); _hubMgr = null; }
+    hub = null;
+    var elHub = document.getElementById('cp-hub');
+    if (elHub) { elHub.textContent = 'hub offline'; elHub.className = ''; }
+    var elPid = document.getElementById('cp-pid');
+    if (elPid) elPid.textContent = 'reconnecting…';
+    window.notify && window.notify('Hub connection reset — reconnecting…', 'info', 5000);
+    setTimeout(function () {
+      startHub();
+      if (btn) { btn.disabled = false; btn.textContent = '↺ reconnect'; }
+    }, 600);
   }
 
   function doLogout() {
