@@ -112,13 +112,17 @@
    * Returns  – { peer, open, destroy() }
    */
   function connect(peerId, handlers) {
-    var h         = handlers || {};
-    var peer      = null;
-    var sIdx      = 0;
-    var watchdog  = null;
-    var retryTmr  = null;
-    var notifyTmr = null;   // delayed "waking up…" banner for slow-start servers
-    var dead      = false;
+    var h            = handlers || {};
+    var peer         = null;
+    var sIdx         = 0;
+    var failCount    = 0;       // total consecutive failures across all servers
+    var retryDelay   = RETRY_DELAY;
+    var firstFail    = 0;       // timestamp of first failure in this streak
+    var notifiedFail = false;   // have we shown the "can't connect" banner yet?
+    var watchdog     = null;
+    var retryTmr     = null;
+    var notifyTmr    = null;    // delayed banner for slow-start servers
+    var dead         = false;
 
     function cleanup() {
       clearTimeout(watchdog);  watchdog  = null;
@@ -130,6 +134,10 @@
       if (p && !p.destroyed) { try { p.destroy(); } catch (e) {} }
     }
 
+    function _notify(msg, type, dur) {
+      if (typeof window.notify === 'function') window.notify(msg, type, dur);
+    }
+
     function attempt() {
       if (dead) return;
       cleanup();
@@ -137,20 +145,22 @@
       var s       = SERVERS[sIdx % SERVERS.length];
       var timeout = s.slowStart ? SLOW_OPEN_TIMEOUT : OPEN_TIMEOUT;
 
-      // Re-ping slow-start servers right before connecting
+      // Re-ping slow-start (Render) servers right before attempting WS.
       _wake(s);
 
-      // For Render / slow-start servers: if the peer isn't open after 3 s,
-      // Render is probably sleeping — show a notification so the user knows
-      // to wait rather than thinking the site is broken.
-      // The timer is cleared by cleanup() the moment the peer opens or fails.
+      // Slow-start banner: if still not open after 3 s, Render is sleeping.
       if (s.slowStart) {
         notifyTmr = setTimeout(function () {
           notifyTmr = null;
-          if (typeof window.notify === 'function') {
-            window.notify('Waking signaling server up, please wait…', 'info', 38000);
-          }
+          _notify('Waking signaling server up, please wait…', 'info', 40000);
         }, 3000);
+      }
+
+      // Generic failure banner: if we've been failing for > 10 s total and
+      // haven't shown anything yet, let the user know rather than silent retries.
+      if (failCount > 0 && !notifiedFail && (Date.now() - firstFail) > 10000) {
+        notifiedFail = true;
+        _notify('Signaling server unavailable, retrying…', 'warning', 30000);
       }
 
       var p = new Peer(peerId != null ? peerId : undefined, {
@@ -162,19 +172,24 @@
       });
       peer = p;
 
-      // Watchdog: bail if 'open' doesn't fire within the timeout window
+      // Watchdog: bail if 'open' doesn't fire within the timeout window.
       watchdog = setTimeout(function () {
         if (p === peer && p && !p.open && !p.destroyed) {
           kill(p); peer = null;
           sIdx++;
-          retryTmr = setTimeout(attempt, RETRY_DELAY);
+          retryTmr = setTimeout(attempt, retryDelay);
         }
       }, timeout);
 
       p.on('open', function (id) {
         if (p !== peer) return;
         cleanup();
-        sIdx = 0; // success — reset to primary for next time
+        // Reset failure state on success.
+        sIdx         = 0;
+        failCount    = 0;
+        retryDelay   = RETRY_DELAY;
+        firstFail    = 0;
+        notifiedFail = false;
         h.onOpen && h.onOpen(p, id);
       });
 
@@ -183,7 +198,7 @@
       p.on('disconnected', function () {
         if (p !== peer || p.destroyed) return;
         // Previously-open peer: reconnect() keeps data connections alive.
-        // Never-opened peer: reconnect() is a no-op — destroy+recreate instead.
+        // Never-opened peer: reconnect() is a no-op — destroy+recreate.
         if (p._lastServerId) {
           retryTmr = setTimeout(function () {
             if (p === peer && p && !p.destroyed) {
@@ -202,14 +217,13 @@
         if (err.type === 'unavailable-id') {
           kill(p); peer = null;
           h.onUnavailable && h.onUnavailable();
-          return; // do NOT retry — caller decides what to do
+          return;
         }
 
         if (err.type === 'peer-unavailable') {
-          return; // hub is offline — caller's retry loop handles it
+          return; // hub offline — caller's retry loop handles it
         }
 
-        // Any other error — fail over to next server
         fail(p);
       });
     }
@@ -217,8 +231,16 @@
     function fail(p) {
       cleanup();
       kill(p); peer = null;
+
+      failCount++;
+      if (!firstFail) firstFail = Date.now();
+
+      // Exponential backoff: 2 s → 4 → 8 → 16 → 30 s max.
+      // Keeps the server cycling but stops hammering every 2 s forever.
+      retryDelay = Math.min(retryDelay * (failCount > 1 ? 2 : 1), 30000);
+
       sIdx++;
-      retryTmr = setTimeout(attempt, RETRY_DELAY);
+      retryTmr = setTimeout(attempt, retryDelay);
     }
 
     attempt();
