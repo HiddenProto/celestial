@@ -8,7 +8,11 @@
 (function () {
   'use strict';
 
-  const REGISTRY_ID = 'celestial-chat-hub-v1';
+  // Site-specific registry ID so different deployments don't collide on
+  // the public PeerJS cloud, and stale locks from other sites don't block us.
+  // Override via localStorage('cst-registry-id') without a code push.
+  const REGISTRY_ID = localStorage.getItem('cst-registry-id') ||
+    ('cst-registry-' + location.hostname.replace(/[^a-z0-9]/gi, '').slice(0, 12));
   const APPEAR_KEY  = 'cst-appearance';
   const MAX_CHARS   = 400;
   const COOLDOWN    = 1000;
@@ -65,10 +69,12 @@
   let isRegistry    = false;
   const seenMsgs    = new Map();   // msgId → timestamp (dedup)
 
-  let onlineList = [];
-  let lastSent   = 0;
-  let unread     = 0;
-  let chatOpen   = false;
+  let onlineList      = [];
+  let lastSent        = 0;
+  let unread          = 0;
+  let chatOpen        = false;
+  let _zombieInterval = null;   // periodic dead-connection cleanup
+  let _chatUnloadHooked = false;
 
   // ── notification ──────────────────────────────────────────────
   function maybeShowNotif() {
@@ -139,6 +145,34 @@
     } else {
       myPeer.on('connection', handleIncoming);
     }
+
+    // Clean shutdown on tab close: send WS close frames so the registry ID
+    // is freed immediately on the signaling server (not after 60 s expiry).
+    if (!_chatUnloadHooked) {
+      _chatUnloadHooked = true;
+      window.addEventListener('beforeunload', function () {
+        if (registryMgr) { registryMgr.destroy(); registryMgr = null; }
+        meshPeers.forEach(function (p) { try { p.conn.close(); } catch {} });
+        meshPeers.clear();
+      });
+    }
+
+    // Zombie cleanup: poll for WebRTC connections that silently died.
+    // Ungraceful closes (crash/network drop) take 30+ s for ICE to propagate;
+    // checking connectionState every 5 s catches them much faster.
+    if (_zombieInterval) clearInterval(_zombieInterval);
+    _zombieInterval = setInterval(function () {
+      var removed = false;
+      meshPeers.forEach(function (p, pid) {
+        var pc = p.conn && p.conn.peerConnection;
+        if (pc && (pc.connectionState === 'failed' || pc.connectionState === 'closed')) {
+          meshPeers.delete(pid);
+          removed = true;
+        }
+      });
+      if (removed) updateOnline();
+    }, 5000);
+
     renderWidget();
     joinMesh();
   }
@@ -592,6 +626,7 @@
 
   // ── teardown ──────────────────────────────────────────────────
   function teardownChat() {
+    if (_zombieInterval) { clearInterval(_zombieInterval); _zombieInterval = null; }
     if (registryConn) { try { registryConn.close(); } catch {} registryConn = null; }
     if (registryMgr)  { registryMgr.destroy(); registryMgr = null; }
     registryPeer = null;
