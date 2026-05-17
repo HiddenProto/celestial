@@ -1,18 +1,20 @@
 /* ============================================================
-   CELESTIAL CHAT v1
-   Peer-to-peer chat via PeerJS hub election.
-   Only available to verified users (cst-approved) and admins.
-   Settings stored under cst-appearance.chat in localStorage.
+   CELESTIAL CHAT v2 — Full mesh P2P
+   Every peer connects directly to every other peer.
+   The "registry" is directory-only (no relay) — if it leaves,
+   existing connections are unaffected; a new one is elected.
+   Admin reuses the admin hub's PeerJS instance via admin.js.
    ============================================================ */
 (function () {
   'use strict';
 
-  const HUB_ID     = 'celestial-chat-hub-v1';
-  const APPEAR_KEY = 'cst-appearance';
-  const MAX_CHARS  = 400;
-  const COOLDOWN   = 1000;
+  const REGISTRY_ID = 'celestial-chat-hub-v1';
+  const APPEAR_KEY  = 'cst-appearance';
+  const MAX_CHARS   = 400;
+  const COOLDOWN    = 1000;
+  const SEEN_TTL    = 30000; // dedup window (ms)
 
-  // Same self-hosted PeerJS server as admin.js — no more 0.peerjs.com
+  // Same peerOpts source as admin.js — no more 0.peerjs.com
   const _cph = localStorage.getItem('cst-peer-host') || 'celestial-wisp.onrender.com';
   const chatPeerOpts = {
     host:   _cph,
@@ -22,26 +24,28 @@
     debug:  0,
   };
 
-  function getAdminId()   { try { return JSON.parse(localStorage.getItem('cst-admin-id')||'{}'); } catch { return {}; } }
-  function getAdminChatName()  { const id = getAdminId(); return id.name || 'Admin'; }
+  function getAdminId()        { try { return JSON.parse(localStorage.getItem('cst-admin-id')||'{}'); } catch { return {}; } }
+  function getAdminChatName()  { const id = getAdminId(); return id.name  || 'Admin'; }
   function getAdminChatColor() { const id = getAdminId(); return id.color || '#c9a84c'; }
 
   // ── helpers ───────────────────────────────────────────────────
-  function getAppear()  { try { return JSON.parse(localStorage.getItem(APPEAR_KEY) || '{}'); } catch { return {}; } }
-  function setAppear(o) { localStorage.setItem(APPEAR_KEY, JSON.stringify(o)); }
-  function isChatOn()   { return getAppear().chat === true; }
-  function setChatOn(v) { const a = getAppear(); a.chat = v; setAppear(a); }
+  function getAppear()    { try { return JSON.parse(localStorage.getItem(APPEAR_KEY) || '{}'); } catch { return {}; } }
+  function setAppear(o)   { localStorage.setItem(APPEAR_KEY, JSON.stringify(o)); }
+  function isChatOn()     { return getAppear().chat === true; }
+  function setChatOn(v)   { const a = getAppear(); a.chat = v; setAppear(a); }
   function isNotifsOn()   { return getAppear().chatNotifs !== false; }
   function setNotifsOn(v) { const a = getAppear(); a.chatNotifs = v; setAppear(a); }
 
   function amAdmin()   { return localStorage.getItem('cst-admin') === '1'; }
   function getMyName() {
-    if (amAdmin()) {
-      return getAdminChatName();
-    }
+    if (amAdmin()) return getAdminChatName();
     try { return JSON.parse(localStorage.getItem('cst-approved'))?.name || null; } catch { return null; }
   }
   function canChat() { return !!(amAdmin() || getMyName()); }
+
+  function getMyInfo() {
+    return { name: getMyName(), isAdmin: amAdmin(), adminColor: amAdmin() ? getAdminChatColor() : undefined };
+  }
 
   // ── PeerJS loader ─────────────────────────────────────────────
   function loadPeerJS(cb) {
@@ -51,13 +55,16 @@
     s.onload = cb; s.onerror = () => {}; document.head.appendChild(s);
   }
 
-  // ── state ─────────────────────────────────────────────────────
-  let chatPeer   = null;
-  let hubConn    = null;   // client → hub connection
-  let hubPeer    = null;   // when this peer IS the hub
-  let isHubMode  = false;
-  let hubClients = {};     // hub only: cid → { conn, name, isAdmin }
-  let onlineList = [];     // all peers (name + isAdmin)
+  // ── mesh state ────────────────────────────────────────────────
+  let myPeer        = null;        // this peer's PeerJS instance
+  let myId          = null;        // this peer's PeerJS ID
+  let meshPeers     = new Map();   // peerId → { conn, name, isAdmin, adminColor }
+  let registryPeer  = null;        // new Peer(REGISTRY_ID) when WE are the registry
+  let registryConn  = null;        // our connection TO the registry
+  let isRegistry    = false;
+  const seenMsgs    = new Map();   // msgId → timestamp (dedup)
+
+  let onlineList = [];
   let lastSent   = 0;
   let unread     = 0;
   let chatOpen   = false;
@@ -70,8 +77,8 @@
       window.notifyOption?.('✦ Test Chat App?',
         'Chat with other verified users in real time. Beta feature.',
         [
-          { label: 'Enable',       info: 'Turn on real-time chat with other verified users.', onClick: enableChat },
-          { label: 'Maybe later',  info: 'Dismiss — the option stays in Appearance settings.', className: 'opt-skip', onClick: () => {} },
+          { label: 'Enable',      info: 'Turn on real-time chat with other verified users.', onClick: enableChat },
+          { label: 'Maybe later', info: 'Dismiss — the option stays in Appearance settings.', className: 'opt-skip', onClick: () => {} },
         ]
       );
     }, 3500);
@@ -85,170 +92,184 @@
     window.notify?.('To disable: ⋮ → Appearance → toggle ✦ Chat off', 'info', 7000);
   }
 
-  // ── hub election ──────────────────────────────────────────────
+  // ── init ──────────────────────────────────────────────────────
   function initChat() {
-    if (chatPeer) return;
+    if (myPeer) return;
     loadPeerJS(() => {
-      chatPeer = new Peer(undefined, chatPeerOpts);
-      chatPeer.on('open', () => connectToHub());
-      chatPeer.on('error', () => {});
+      if (amAdmin()) {
+        // Admin: reuse the hub peer from admin.js so there's only ONE PeerJS
+        // instance for both control and chat.
+        if (window.__cstHubPeer && !window.__cstHubPeer.destroyed) {
+          _bootMesh(window.__cstHubPeer, window.__cstHubPeerId);
+        } else {
+          // Hub not ready yet — wait for the event admin.js fires
+          window.addEventListener('cst-hub-ready', () => {
+            if (!myPeer) _bootMesh(window.__cstHubPeer, window.__cstHubPeerId);
+          }, { once: true });
+        }
+      } else {
+        // Regular user: own ephemeral peer
+        const peer = new Peer(undefined, chatPeerOpts);
+        peer.on('open', id => _bootMesh(peer, id));
+        peer.on('error', () => {});
+        peer.on('disconnected', () => {
+          setTimeout(() => { if (peer && !peer.destroyed) { try { peer.reconnect(); } catch {} } }, 1500);
+        });
+      }
     });
   }
 
-  function connectToHub() {
-    if (!chatPeer) return;
-    const conn = chatPeer.connect(HUB_ID, { reliable: true });
-    let opened = false;
-    const timeout = setTimeout(() => { if (!opened) becomeHub(); }, 4000);
+  // Called once we have a ready peer ID
+  function _bootMesh(peer, id) {
+    myPeer = peer;
+    myId   = id;
+    if (amAdmin()) {
+      // Admin.js routes incoming mesh-hello connections here
+      window.__cstChatIncoming = handleIncoming;
+    } else {
+      myPeer.on('connection', handleIncoming);
+    }
+    renderWidget();
+    joinMesh();
+  }
+
+  // ── join the mesh ─────────────────────────────────────────────
+  function joinMesh() {
+    if (!myPeer || !myId) return;
+
+    const conn    = myPeer.connect(REGISTRY_ID, { reliable: true });
+    let   opened  = false;
+    const timeout = setTimeout(() => { if (!opened) becomeRegistry(); }, 4000);
+
     conn.on('open', () => {
       clearTimeout(timeout);
-      opened   = true;
-      hubConn  = conn;
-      isHubMode = false;
-      conn.send({ type: 'join', name: getMyName(), isAdmin: amAdmin() });
-      // Request current online list explicitly after a short delay — ensures hub's
-      // data channel is fully flushed before we expect a response (late-join fix)
-      setTimeout(() => { if (conn.open) conn.send({ type: 'get-online' }); }, 600);
+      opened       = true;
+      registryConn = conn;
+      isRegistry   = false;
+      conn.send({ type: 'mesh-join', id: myId, ...getMyInfo() });
     });
-    conn.on('data', onHubMsg);
+
+    conn.on('data', d => {
+      if (!d || d.type !== 'mesh-peers') return;
+      // Registry sent us the current peer list — connect to each directly
+      (d.peers || []).forEach(p => {
+        if (p.id !== myId && !meshPeers.has(p.id)) connectToPeer(p.id, p);
+      });
+      updateOnline();
+    });
+
     conn.on('close', () => {
-      hubConn = null;
-      setTimeout(connectToHub, 2000);
+      registryConn = null;
+      // Registry left — existing P2P connections are fine; re-elect registry
+      setTimeout(joinMesh, 1500);
     });
     conn.on('error', () => {
       clearTimeout(timeout);
-      if (!opened) becomeHub();
+      if (!opened) becomeRegistry();
     });
   }
 
-  function becomeHub() {
-    isHubMode = true;
-    hubPeer = new Peer(HUB_ID, chatPeerOpts);
-    hubPeer.on('open', () => {
-      updateOnline([{ name: getMyName(), isAdmin: amAdmin() }]);
-      renderWidget();
+  // ── become the registry (directory only, no relay) ────────────
+  function becomeRegistry() {
+    isRegistry = true;
+    const rp   = new Peer(REGISTRY_ID, chatPeerOpts);
+    registryPeer = rp;
+
+    rp.on('open', updateOnline);
+
+    rp.on('connection', conn => {
+      conn.on('data', d => {
+        if (!d || d.type !== 'mesh-join') return;
+        // Build peer list for the new joiner (everyone except themselves)
+        const list = [
+          { id: myId, ...getMyInfo() },
+          ...Array.from(meshPeers.entries())
+            .filter(([, p]) => p.name)
+            .map(([pid, p]) => ({ id: pid, name: p.name, isAdmin: p.isAdmin, adminColor: p.adminColor })),
+        ].filter(p => p.id !== d.id);
+        try { conn.send({ type: 'mesh-peers', peers: list }); } catch {}
+        // New joiner will initiate direct connections to everyone on the list
+      });
     });
-    hubPeer.on('connection', conn => {
-      const cid = conn.peer;
-      hubClients[cid] = { conn, name: null, isAdmin: false };
-      conn.on('open', () => {});
-      conn.on('data', d => onClientMsg(cid, d));
-      conn.on('close', () => { delete hubClients[cid]; broadcastOnline(); });
-      conn.on('error', () => { delete hubClients[cid]; broadcastOnline(); });
-    });
-    hubPeer.on('error', err => {
-      if (err.type === 'unavailable-id') { isHubMode = false; connectToHub(); }
+
+    rp.on('error', err => {
+      if (err.type === 'unavailable-id') {
+        // Someone beat us to it — join as regular member
+        isRegistry   = false;
+        registryPeer = null;
+        setTimeout(joinMesh, 500);
+      }
     });
   }
 
-  // ── hub-side: relay messages + manage online list ─────────────
-  function onClientMsg(cid, d) {
-    if (!d || typeof d !== 'object') return;
-    const c = hubClients[cid];
-    if (!c) return;
-    if (d.type === 'join') {
-      c.name    = d.name;
-      c.isAdmin = !!d.isAdmin;
-      // Send current online list directly to this new client first (belt-and-suspenders for late joiners)
-      const curUsers = [
-        { name: getMyName(), isAdmin: amAdmin() },
-        ...Object.values(hubClients).filter(x => x.name).map(x => ({ name: x.name, isAdmin: x.isAdmin })),
-      ];
-      try { c.conn.send({ type: 'online', users: curUsers }); } catch {}
-      broadcastOnline();
-    }
-    if (d.type === 'get-online') {
-      // Client explicitly requested the online list — send directly to them
-      const curUsers = [
-        { name: getMyName(), isAdmin: amAdmin() },
-        ...Object.values(hubClients).filter(x => x.name).map(x => ({ name: x.name, isAdmin: x.isAdmin })),
-      ];
-      try { c.conn.send({ type: 'online', users: curUsers }); } catch {}
-    }
-    if (d.type === 'msg') {
-      const msg = { type: 'msg', name: d.name, text: (d.text || '').slice(0, MAX_CHARS), isAdmin: !!d.isAdmin, adminColor: d.adminColor || undefined, mentions: d.mentions || undefined, ts: Date.now() };
-      relayMsg(cid, msg);
-      appendMsg(msg);
-      // Hub: check if the hub user themselves is mentioned
-      const hubName = getMyName();
-      if (hubName && msg.mentions && msg.mentions.some(n => n.toLowerCase() === hubName.toLowerCase()) && isNotifsOn()) {
-        window.notify?.(`📣 ${msg.name || 'someone'} mentioned you: ${msg.text.slice(0,80)}`, 'info', 9000);
+  // ── connect directly to a peer ────────────────────────────────
+  function connectToPeer(peerId, info) {
+    if (!myPeer || meshPeers.has(peerId) || peerId === myId) return;
+    const conn = myPeer.connect(peerId, { reliable: true });
+    meshPeers.set(peerId, { conn, name: info?.name || null, isAdmin: !!info?.isAdmin, adminColor: info?.adminColor });
+    conn.on('open', () => {
+      try { conn.send({ type: 'mesh-hello', id: myId, ...getMyInfo() }); } catch {}
+      updateOnline();
+    });
+    conn.on('data',  d  => handlePeerMsg(peerId, d));
+    conn.on('close', () => { meshPeers.delete(peerId); updateOnline(); });
+    conn.on('error', () => { meshPeers.delete(peerId); updateOnline(); });
+  }
+
+  // ── accept an incoming direct connection ──────────────────────
+  // Also called by admin.js when it routes a mesh-hello to us.
+  function handleIncoming(conn, firstMsg) {
+    const peerId = conn.peer;
+    if (!meshPeers.has(peerId)) meshPeers.set(peerId, { conn, name: null, isAdmin: false });
+
+    function onData(d) {
+      if (d && d.type === 'mesh-hello') {
+        const prev = meshPeers.get(peerId) || {};
+        meshPeers.set(peerId, { ...prev, conn, name: d.name, isAdmin: !!d.isAdmin, adminColor: d.adminColor });
+        updateOnline();
+      } else {
+        handlePeerMsg(peerId, d);
       }
     }
-    if (d.type === 'notif-off') {
-      // Relay feedback to pinger (forName)
-      const pinger = Object.entries(hubClients).find(([,v]) => v.name === d.forName);
-      if (pinger) try { pinger[1].conn.send({ type: 'notif-feedback', from: d.myName, feedback: 'notifs-off' }); } catch {}
-      if (getMyName() === d.forName) window.notify?.(`${d.myName} has notifications turned off`, 'info', 5000);
-    }
+
+    conn.on('data',  onData);
+    conn.on('close', () => { meshPeers.delete(peerId); updateOnline(); });
+    conn.on('error', () => { meshPeers.delete(peerId); updateOnline(); });
+
+    if (firstMsg) onData(firstMsg); // admin.js already consumed the first message for routing
   }
 
-  function relayMsg(fromCid, msg) {
-    Object.keys(hubClients).forEach(id => {
-      if (id !== fromCid) try { hubClients[id].conn.send(msg); } catch {}
-    });
-  }
-
-  function broadcastOnline() {
-    const users = [
-      { name: getMyName(), isAdmin: amAdmin() },
-      ...Object.values(hubClients).filter(c => c.name).map(c => ({ name: c.name, isAdmin: c.isAdmin })),
-    ];
-    const msg = { type: 'online', users };
-    Object.keys(hubClients).forEach(id => { try { hubClients[id].conn.send(msg); } catch {} });
-    updateOnline(users);
-  }
-
-  // ── client-side: receive from hub ─────────────────────────────
-  function onHubMsg(d) {
+  // ── receive a message from a direct peer connection ───────────
+  function handlePeerMsg(peerId, d) {
     if (!d || typeof d !== 'object') return;
-    if (d.type === 'online') updateOnline(d.users || []);
-    if (d.type === 'notif-feedback') {
-      if (d.feedback === 'notifs-off') window.notify?.(`${d.from} has notifications turned off`, 'info', 6000);
+
+    // Dedup by msgId (prevents double-display if somehow seen twice)
+    if (d.msgId) {
+      if (seenMsgs.has(d.msgId)) return;
+      seenMsgs.set(d.msgId, Date.now());
+      const now = Date.now();
+      for (const [id, ts] of seenMsgs) if (now - ts > SEEN_TTL) seenMsgs.delete(id);
     }
+
     if (d.type === 'msg') {
       appendMsg(d);
       const myName = getMyName();
-      const mentioned = myName && d.mentions && d.mentions.some(n =>
-        n.toLowerCase() === myName.toLowerCase());
-      const notifsOn = isNotifsOn();
-      // "Seeing" the chat = tab is visible AND chat panel is open
-      const isSeeingChat = !document.hidden && chatOpen;
-      if (!isSeeingChat) {
-        unread++;
-        updateBubble();
-        if (notifsOn) {
-          if (mentioned) {
-            window.notify?.(`📣 ${d.name || 'someone'} mentioned you: ${d.text.slice(0,80)}`, 'info', 9000);
-          } else {
-            window.notify?.(`${d.name || '?'}: ${d.text.slice(0,60)}`, 'info', 5000);
-          }
-        } else if (mentioned) {
-          // Notifs off but was pinged — tell the pinger
-          _sendNotifOff(d.name);
-        }
+      const mentioned = myName && d.mentions && d.mentions.some(n => n.toLowerCase() === myName.toLowerCase());
+      const seeing    = !document.hidden && chatOpen;
+      if (!seeing) {
+        unread++; updateBubble();
+        if (isNotifsOn()) {
+          if (mentioned) window.notify?.(`📣 ${d.name || 'someone'} mentioned you: ${d.text.slice(0,80)}`, 'info', 9000);
+          else           window.notify?.(`${d.name || '?'}: ${d.text.slice(0,60)}`, 'info', 5000);
+        } else if (mentioned) { _sendNotifOff(d.name, peerId); }
       } else if (mentioned) {
-        if (notifsOn) {
-          window.notify?.(`📣 ${d.name || 'someone'} mentioned you`, 'info', 5000);
-        } else {
-          _sendNotifOff(d.name);
-        }
+        if (isNotifsOn()) window.notify?.(`📣 ${d.name || 'someone'} mentioned you`, 'info', 5000);
+        else _sendNotifOff(d.name, peerId);
       }
     }
-  }
 
-  function _sendNotifOff(pingerName) {
-    const myName = getMyName();
-    if (!myName) return;
-    const msg = { type: 'notif-off', forName: pingerName, myName };
-    if (isHubMode) {
-      // We ARE hub: find the pinger directly
-      const pinger = Object.entries(hubClients).find(([,c]) => c.name === pingerName);
-      if (pinger) try { pinger[1].conn.send({ type: 'notif-feedback', from: myName, feedback: 'notifs-off' }); } catch {}
-      // Also check if hub itself is the pinger
-      if (getMyName() === pingerName) window.notify?.(`${myName} has notifications turned off`, 'info', 5000);
-    } else if (hubConn && hubConn.open) {
-      hubConn.send(msg);
+    if (d.type === 'notif-feedback' && d.feedback === 'notifs-off') {
+      window.notify?.(`${d.from} has notifications turned off`, 'info', 6000);
     }
   }
 
@@ -258,25 +279,41 @@
     if (!text) return;
     const now = Date.now();
     if (now - lastSent < COOLDOWN) {
-      const left = Math.ceil((COOLDOWN - (now - lastSent)) / 1000);
-      flashCooldown(`slow down — ${left}s`);
+      flashCooldown(`slow down — ${Math.ceil((COOLDOWN - (now - lastSent)) / 1000)}s`);
       return;
     }
     lastSent = now;
     const mentions = parseMentions(text);
-    const msg = { type: 'msg', name: getMyName(), text, isAdmin: amAdmin(), adminColor: amAdmin() ? getAdminChatColor() : undefined, mentions: mentions.length ? mentions : undefined, ts: now };
-    if (isHubMode) { relayMsg(null, msg); appendMsg(msg); }
-    else if (hubConn && hubConn.open) { hubConn.send(msg); appendMsg(msg); }
+    const info     = getMyInfo();
+    const msg = {
+      type: 'msg', msgId: Math.random().toString(36).slice(2),
+      name: info.name, text, isAdmin: info.isAdmin,
+      adminColor: info.adminColor, mentions: mentions.length ? mentions : undefined, ts: now,
+    };
+    seenMsgs.set(msg.msgId, now); // prevent echo
+    meshPeers.forEach(({ conn }) => { try { if (conn.open) conn.send(msg); } catch {} });
+    appendMsg(msg);
+  }
+
+  function _sendNotifOff(pingerName, fromPeerId) {
+    const myName = getMyName();
+    if (!myName) return;
+    const send = p => { try { p.conn.send({ type: 'notif-feedback', from: myName, feedback: 'notifs-off' }); } catch {} };
+    if (fromPeerId && meshPeers.has(fromPeerId)) { send(meshPeers.get(fromPeerId)); return; }
+    for (const p of meshPeers.values()) { if (p.name === pingerName) { send(p); return; } }
   }
 
   // ── online list ───────────────────────────────────────────────
-  function updateOnline(users) {
+  function updateOnline() {
     const seen = new Set();
-    onlineList = users.filter(u => {
+    onlineList = [
+      { name: getMyName(), isAdmin: amAdmin() },
+      ...Array.from(meshPeers.values()).filter(p => p.name).map(p => ({ name: p.name, isAdmin: p.isAdmin })),
+    ].filter(u => {
       if (!u.name) return false;
-      const key = u.name.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key); return true;
+      const k = u.name.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k); return true;
     });
     const cnt = document.getElementById('cst-chat-online-cnt');
     if (cnt) cnt.textContent = onlineList.length;
@@ -294,9 +331,7 @@
     'font-weight:700;background-size:200%;animation:cst-admname 2.5s linear infinite;';
 
   function adminNameStyle(inline, color) {
-    if (color && color !== '#c9a84c') {
-      return `color:${color};font-weight:700;`;
-    }
+    if (color && color !== '#c9a84c') return `color:${color};font-weight:700;`;
     return inline
       ? 'background:linear-gradient(90deg,#c9a84c,#ffe082,#c9a84c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700;'
       : ADMIN_GRADIENT;
@@ -305,9 +340,7 @@
   function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   function parseMentions(text) {
-    const out = [];
-    // Combined: @[name with spaces] and plain @word
-    const re = /\@\[([^\]]{1,40})\]|@([\w\-\.]{1,40})/g;
+    const out = [], re = /\@\[([^\]]{1,40})\]|@([\w\-\.]{1,40})/g;
     let m;
     while ((m = re.exec(text)) !== null) {
       const name = (m[1] || m[2]).trim();
@@ -395,11 +428,11 @@
 </div>`;
     document.body.appendChild(widgetEl);
 
-    // sync both online count displays
+    // keep both online-count displays in sync
     const cnt2 = widgetEl.querySelector('#cst-chat-online-cnt2');
     const orig  = widgetEl.querySelector('#cst-chat-online-cnt');
-    const origUpdate = () => { if (cnt2) cnt2.textContent = orig.textContent; };
-    new MutationObserver(origUpdate).observe(orig, { childList: true, characterData: true, subtree: true });
+    new MutationObserver(() => { if (cnt2) cnt2.textContent = orig.textContent; })
+      .observe(orig, { childList: true, characterData: true, subtree: true });
 
     widgetEl.querySelector('#cst-chat-bubble').onclick = togglePanel;
     widgetEl.querySelector('#cst-chat-close').onclick = () => {
@@ -407,6 +440,7 @@
       if (p) p.style.display = 'none';
       chatOpen = false;
     };
+
     const inp  = widgetEl.querySelector('#cst-chat-inp');
     const send = widgetEl.querySelector('#cst-chat-send');
     const chars = widgetEl.querySelector('#cst-chat-chars');
@@ -467,36 +501,34 @@
       chars.textContent = `${inp.value.length} / ${MAX_CHARS}`;
       inp.style.height = '34px';
       inp.style.height = Math.min(inp.scrollHeight, 80) + 'px';
-      // @[name] autocomplete trigger
       const val = inp.value, cur = inp.selectionStart;
       const atPos = val.lastIndexOf('@', cur - 1);
       if (atPos !== -1) {
         const frag = val.slice(atPos + 1, cur);
         if (!frag.includes('[') && !frag.includes(']') && !frag.includes('@') && frag.length <= 32) {
-          _atStart = atPos;
-          _atShow(frag);
+          _atStart = atPos; _atShow(frag);
         } else { _atHide(); }
       } else { _atHide(); }
     });
     inp.addEventListener('keydown', e => {
       if (_atEl && _atEl.style.display !== 'none') {
-        if (e.key === 'Tab') { e.preventDefault(); _atAccept(_atSel); return; }
-        if (e.key === 'ArrowDown') { e.preventDefault(); _atSel = Math.min(_atSel + 1, _atList.length - 1); _atHighlight(); return; }
-        if (e.key === 'ArrowUp')   { e.preventDefault(); _atSel = Math.max(_atSel - 1, 0); _atHighlight(); return; }
-        if (e.key === 'Escape')    { e.preventDefault(); _atHide(); return; }
+        if (e.key === 'Tab')        { e.preventDefault(); _atAccept(_atSel); return; }
+        if (e.key === 'ArrowDown')  { e.preventDefault(); _atSel = Math.min(_atSel + 1, _atList.length - 1); _atHighlight(); return; }
+        if (e.key === 'ArrowUp')    { e.preventDefault(); _atSel = Math.max(_atSel - 1, 0); _atHighlight(); return; }
+        if (e.key === 'Escape')     { e.preventDefault(); _atHide(); return; }
       }
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
     });
-    inp.addEventListener('blur', () => { setTimeout(_atHide, 150); });
+    inp.addEventListener('blur', () => setTimeout(_atHide, 150));
     send.onclick = doSend;
 
     function doSend() {
       sendMsg(inp.value);
-      inp.value = '';
-      chars.textContent = `0 / ${MAX_CHARS}`;
-      inp.style.height = '34px';
-      _atHide();
+      inp.value = ''; chars.textContent = `0 / ${MAX_CHARS}`;
+      inp.style.height = '34px'; _atHide();
     }
+
+    updateOnline(); // populate list immediately
   }
 
   function togglePanel() {
@@ -518,15 +550,14 @@
     const box = document.getElementById('cst-chat-msgs');
     if (!box) return;
     const mine = msg.name === getMyName();
-    const d = document.createElement('div');
+    const d    = document.createElement('div');
     d.className = 'cst-msg' + (mine ? ' cst-msg-me' : '');
     const nameStyle = msg.isAdmin ? adminNameStyle(false, msg.adminColor) : 'color:#555;';
     const nameHtml  = msg.name
       ? `<div class="cst-msg-name" style="${nameStyle}">${esc(msg.name)}</div>`
       : '';
-    // Render @mentions with a highlight span — single pass handles both @[name] and plain @word
-    const bodyHtml = esc(msg.text).replace(/\@\[([^\]]+)\]|@([\w\-\.]{1,40})/g, (full, bracketN, plainN) => {
-      const n = bracketN !== undefined ? bracketN : plainN;
+    const bodyHtml = esc(msg.text).replace(/\@\[([^\]]+)\]|@([\w\-\.]{1,40})/g, (full, bN, pN) => {
+      const n = bN !== undefined ? bN : pN;
       return `<span style="color:#7eb8ff;font-weight:600;">@${esc(n)}</span>`;
     });
     d.innerHTML = `${nameHtml}<div class="cst-msg-body">${bodyHtml}</div>`;
@@ -546,6 +577,20 @@
     setTimeout(() => { el.style.display = 'none'; }, 2200);
   }
 
+  // ── teardown ──────────────────────────────────────────────────
+  function teardownChat() {
+    if (registryConn)  { try { registryConn.close();    } catch {} registryConn = null; }
+    if (registryPeer)  { try { registryPeer.destroy();  } catch {} registryPeer = null; }
+    meshPeers.forEach(({ conn }) => { try { conn.close(); } catch {} });
+    meshPeers.clear();
+    if (!amAdmin() && myPeer) { try { myPeer.destroy(); } catch {} }
+    // Admin: do NOT destroy myPeer — it's the admin hub, admin.js owns it
+    myPeer = null; myId = null; isRegistry = false;
+    if (amAdmin()) window.__cstChatIncoming = null;
+    widgetEl?.remove(); widgetEl = null;
+    onlineList = []; unread = 0; chatOpen = false;
+  }
+
   // ── appearance toggle wiring ───────────────────────────────────
   function wireChatToggle() {
     const tog = document.getElementById('chatTog');
@@ -553,22 +598,14 @@
     tog.checked = isChatOn();
     tog.addEventListener('change', () => {
       setChatOn(tog.checked);
-      if (tog.checked) { initChat(); }
-      else {
-        // tear down (user disabled chat)
-        if (hubConn) { try { hubConn.close(); } catch {} hubConn = null; }
-        if (hubPeer) { try { hubPeer.destroy(); } catch {} hubPeer = null; }
-        if (chatPeer) { try { chatPeer.destroy(); } catch {} chatPeer = null; }
-        widgetEl?.remove(); widgetEl = null;
-        isHubMode = false;
-      }
+      if (tog.checked) initChat();
+      else teardownChat();
     });
   }
 
   // ── init ──────────────────────────────────────────────────────
   function init() {
     wireChatToggle();
-    // Wire chat notifications toggle
     const notifTog = document.getElementById('chatNotifTog');
     if (notifTog) {
       notifTog.checked = isNotifsOn();
@@ -577,7 +614,6 @@
     maybeShowNotif();
     if (isChatOn() && canChat()) {
       initChat();
-      // widget rendered after peer opens; render stub immediately
       if (document.readyState !== 'loading') renderWidget();
       else document.addEventListener('DOMContentLoaded', renderWidget);
     }

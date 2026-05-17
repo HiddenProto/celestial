@@ -762,14 +762,28 @@
       setInterval(() => {
         bcast({ type: 'admin-pulse', viewing: viewTarget !== null });
       }, 1000);
+      // Expose hub peer to chat.js so it can reuse the same PeerJS instance
+      window.__cstHubPeer   = hub;
+      window.__cstHubPeerId = pid;
+      window.dispatchEvent(new CustomEvent('cst-hub-ready'));
     });
     hub.on('connection', conn => {
       conn.on('open', () => {
-        const cid = conn.peer;
-        clients[cid] = { conn, vp: null, url: '—', name: cid.slice(-6), approved: false };
-        conn.on('data',  d => onClientData(cid, d));
-        conn.on('close', () => { delete clients[cid]; renderClients(); if (viewTarget === cid) stopView(); });
-        renderClients();
+        // Read first message to route: mesh-hello → chat, anything else → control
+        conn.once('data', d => {
+          if (d && d.type === 'mesh-hello') {
+            // Chat mesh connection — hand off to chat.js
+            window.__cstChatIncoming?.(conn, d);
+          } else {
+            // Control connection (beacon client, partner admin)
+            const cid = conn.peer;
+            clients[cid] = { conn, vp: null, url: '—', name: cid.slice(-6), approved: false };
+            conn.on('data', d2 => onClientData(cid, d2));
+            conn.on('close', () => { delete clients[cid]; renderClients(); if (viewTarget === cid) stopView(); });
+            renderClients();
+            if (d) onClientData(cid, d); // process the first non-mesh message
+          }
+        });
       });
     });
     hub.on('disconnected', () => {
