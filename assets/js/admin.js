@@ -766,10 +766,13 @@
     });
     hub.on('error', err => {
       if (err.type === 'unavailable-id') {
-        hub.destroy();
-        tryCreateHub(HUB + '-b');
-        // Primary is online — connect to it for key sync
-        if (id === HUB) connectToPartnerAdmin(HUB);
+        // Another admin session already holds this ID.
+        // Connect as a partner for key sync while we wait for the stale
+        // session to expire, then retry the SAME primary ID so clients
+        // polling every 1 s can always find it.
+        hub.destroy(); hub = null;
+        connectToPartnerAdmin(HUB);
+        setTimeout(() => { if (!hub) startHub(); }, 7000);
       } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
         // Transient signaling error — attempt reconnect
         setTimeout(() => { if (hub && !hub.destroyed) { try { hub.reconnect(); } catch {} } }, 2000);
