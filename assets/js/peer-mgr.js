@@ -112,16 +112,18 @@
    * Returns  – { peer, open, destroy() }
    */
   function connect(peerId, handlers) {
-    var h        = handlers || {};
-    var peer     = null;
-    var sIdx     = 0;
-    var watchdog = null;
-    var retryTmr = null;
-    var dead     = false;
+    var h         = handlers || {};
+    var peer      = null;
+    var sIdx      = 0;
+    var watchdog  = null;
+    var retryTmr  = null;
+    var notifyTmr = null;   // delayed "waking up…" banner for slow-start servers
+    var dead      = false;
 
     function cleanup() {
-      clearTimeout(watchdog); watchdog = null;
-      clearTimeout(retryTmr); retryTmr = null;
+      clearTimeout(watchdog);  watchdog  = null;
+      clearTimeout(retryTmr);  retryTmr  = null;
+      clearTimeout(notifyTmr); notifyTmr = null;
     }
 
     function kill(p) {
@@ -137,6 +139,19 @@
 
       // Re-ping slow-start servers right before connecting
       _wake(s);
+
+      // For Render / slow-start servers: if the peer isn't open after 3 s,
+      // Render is probably sleeping — show a notification so the user knows
+      // to wait rather than thinking the site is broken.
+      // The timer is cleared by cleanup() the moment the peer opens or fails.
+      if (s.slowStart) {
+        notifyTmr = setTimeout(function () {
+          notifyTmr = null;
+          if (typeof window.notify === 'function') {
+            window.notify('Waking signaling server up, please wait…', 'info', 38000);
+          }
+        }, 3000);
+      }
 
       var p = new Peer(peerId != null ? peerId : undefined, {
         host:   s.host,
