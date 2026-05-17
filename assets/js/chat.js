@@ -69,12 +69,13 @@
   let isRegistry    = false;
   const seenMsgs    = new Map();   // msgId → timestamp (dedup)
 
-  let onlineList      = [];
-  let lastSent        = 0;
-  let unread          = 0;
-  let chatOpen        = false;
-  let _zombieInterval = null;   // periodic dead-connection cleanup
+  let onlineList        = [];
+  let lastSent          = 0;
+  let unread            = 0;
+  let chatOpen          = false;
+  let _zombieInterval   = null;   // periodic dead-connection cleanup
   let _chatUnloadHooked = false;
+  let _hubExpTimer      = null;   // fallback timer — re-renders count after hub pulse expires
 
   // ── notification ──────────────────────────────────────────────
   function maybeShowNotif() {
@@ -155,6 +156,9 @@
         meshPeers.forEach(function (p) { try { p.conn.close(); } catch {} });
         meshPeers.clear();
       });
+      // Re-render the online count whenever a fresh hub-pulse arrives.
+      // The event is dispatched by admin.js's beacon on every admin-pulse message.
+      window.addEventListener('cst-hub-online', updateOnline);
     }
 
     // Zombie cleanup: poll for WebRTC connections that silently died.
@@ -415,8 +419,23 @@
       if (seen.has(k)) return false;
       seen.add(k); return true;
     });
+
+    // Show hub's real total (from admin-pulse) when fresh — it counts every
+    // beacon-connected client, not just chat mesh members.
+    // Fall back to local mesh count when admin is offline or pulse is stale.
+    var hubCount = window.__cstHubOnline;
+    var hubTs    = window.__cstHubOnlineTs;
+    var hubAge   = hubTs ? (Date.now() - hubTs) : Infinity;
+    var useHub   = !amAdmin() && typeof hubCount === 'number' && hubAge < 3000;
+
     const cnt = document.getElementById('cst-chat-online-cnt');
-    if (cnt) cnt.textContent = onlineList.length;
+    if (cnt) cnt.textContent = useHub ? hubCount : onlineList.length;
+
+    // Schedule a stale-check so the bubble number snaps back to mesh count
+    // ~3.5 s after the last hub pulse, even if no mesh event fires first.
+    if (_hubExpTimer) clearTimeout(_hubExpTimer);
+    if (useHub) _hubExpTimer = setTimeout(updateOnline, 3500);
+
     const tip = document.getElementById('cst-chat-online-tip');
     if (tip) {
       tip.innerHTML = onlineList.map(u =>
