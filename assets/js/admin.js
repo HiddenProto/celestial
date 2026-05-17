@@ -752,7 +752,17 @@
 
   function tryCreateHub(id) {
     hub = new Peer(id, peerOpts);
+
+    // Watchdog: if hub doesn't come online within 5 s (e.g. Render cold-start
+    // kills the WS before PeerJS fires 'open'), destroy and retry.
+    // This covers the case where PeerJS is in !disconnected && !open state and
+    // hub.reconnect() would be a silent no-op.
+    let _watchdog = setTimeout(() => {
+      if (hub && !hub.open && !hub.destroyed) { hub.destroy(); hub = null; setTimeout(startHub, 500); }
+    }, 5000);
+
     hub.on('open', pid => {
+      clearTimeout(_watchdog);
       const el = document.getElementById('cp-hub');
       if (el) { el.textContent = 'hub online'; el.className = 'on'; }
       const pi = document.getElementById('cp-pid');
@@ -787,8 +797,8 @@
       });
     });
     hub.on('disconnected', () => {
-      // Signaling server WS dropped — reconnect the signaling channel without
-      // destroying the hub or losing existing client data connections.
+      // Signaling server WS dropped after a successful open — reconnect the
+      // signaling channel without destroying the hub or losing data connections.
       setTimeout(() => { if (hub && !hub.destroyed) { try { hub.reconnect(); } catch {} } }, 1500);
     });
     hub.on('error', err => {
@@ -797,12 +807,21 @@
         // Connect as partner for key sync while we wait for the other
         // session to clear (near-instant on our own server), then retry
         // the SAME primary ID — clients polling every 1 s will find it.
+        clearTimeout(_watchdog);
         hub.destroy(); hub = null;
         connectToPartnerAdmin(HUB);
         setTimeout(() => { if (!hub) startHub(); }, 3000);
       } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
-        // Transient signaling error — attempt reconnect
-        setTimeout(() => { if (hub && !hub.destroyed) { try { hub.reconnect(); } catch {} } }, 2000);
+        // If the hub never successfully opened (e.g. Render cold-start dropped
+        // the WS before PeerJS finished handshaking), hub.reconnect() is a
+        // no-op — destroy and create a fresh Peer instead.
+        clearTimeout(_watchdog);
+        if (hub && !hub.open) {
+          hub.destroy(); hub = null;
+          setTimeout(startHub, 2000);
+        } else {
+          setTimeout(() => { if (hub && !hub.destroyed) { try { hub.reconnect(); } catch {} } }, 2000);
+        }
       }
     });
   }
