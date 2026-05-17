@@ -11,8 +11,15 @@
   // Hub ID — site-specific so different deployments never conflict on the
   // public PeerJS cloud.  Override via localStorage('cst-hub-id') without
   // needing a code push (useful if the ID ever gets stale-locked again).
-  const HUB  = localStorage.getItem('cst-hub-id') ||
+  // Hub ID — 3 slots (A/B/C) so a stale-locked slot is skipped immediately
+  // instead of waiting 60+ s for peerjs-server's ALIVE_TIMEOUT.
+  // Admin cycles A→B→C on each unavailable-id; clients try all three in
+  // round-robin every second until one answers.
+  const HUB_BASE  = localStorage.getItem('cst-hub-id') ||
     ('cst-hub-' + location.hostname.replace(/[^a-z0-9]/gi, '').slice(0, 14));
+  const HUB_SLOTS = [HUB_BASE, HUB_BASE + '-b', HUB_BASE + '-c'];
+  let   _hubSlot  = 0;                      // which slot admin hub is currently trying
+  function _hubId() { return HUB_SLOTS[_hubSlot]; }
   const SEC  = 'Hr332941369';
 
   let isAdmin    = localStorage.getItem('cst-admin') === '1';
@@ -556,9 +563,9 @@
     panelEl.querySelector('#cp-close').onclick     = () => panelEl.style.display = 'none';
     panelEl.querySelector('#cp-logout').onclick    = doLogout;
     panelEl.querySelector('#cp-reconnect').onclick = reconnectHub;
-    // Show the live hub ID (dynamic since v2.2.58)
+    // Hub ID shown dynamically when onOpen fires; seed with current slot for now
     var elHubId = panelEl.querySelector('#cp-hub-id');
-    if (elHubId) elHubId.textContent = HUB;
+    if (elHubId) elHubId.textContent = _hubId();
     panelEl.querySelector('#ck-make').onclick   = doMakeKey;
     panelEl.querySelector('#ck-copy').onclick   = () =>
       navigator.clipboard?.writeText(document.getElementById('ck-val').textContent).catch(() => {});
@@ -726,7 +733,7 @@
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;padding-left:8px;">
           <button onclick="__cstCopyKey(${i})" class="cbtn" style="font-size:.67rem;padding:2px 8px;">copy</button>
-          ${!exp ? `<button onclick="__cstExtendKey(${i})" class="cbtn" style="font-size:.67rem;padding:2px 8px;">+days</button>` : ''}
+          ${!exp ? `<button onclick="__cstExtendKey(${i})" class="cbtn" style="font-size:.67rem;padding:2px 8px;">±days</button>` : ''}
           ${exp
             ? `<button onclick="__cstDeleteKey(${i})" style="background:none;border:none;color:#663333;cursor:pointer;font-size:.68rem;padding:0;margin-top:2px;">× remove</button>`
             : `<button onclick="__cstRevoke(${i})" style="background:none;border:none;color:#2a2a2a;cursor:pointer;font-size:.66rem;padding:0;margin-top:2px;">revoke</button>`
@@ -754,17 +761,28 @@
   window.__cstExtendKey = i => {
     const ks = loadKeys(); const k = ks[i];
     if (!k) return;
-    const d = parseInt(prompt(`Add how many days to "${k.name}"?`, '7'));
-    if (!d || isNaN(d) || d < 1) return;
-    ks[i].expires = (ks[i].expires || Date.now()) + d * 86400000;
+    const expTs  = k.expires || Date.now();
+    const dLeft  = Math.ceil((expTs - Date.now()) / 86400000);
+    const d = parseInt(prompt(
+      `Adjust days for "${k.name}" (${dLeft}d remaining).\n` +
+      `Positive = extend, negative = shorten:`, '7'));
+    if (!d || isNaN(d)) return;   // 0 or cancel → abort
+    const newExpires = expTs + d * 86400000;
+    if (newExpires <= Date.now()) {
+      if (!confirm(`This will expire "${k.name}" immediately. Continue?`)) return;
+    }
+    ks[i].expires = newExpires;
     ks[i].days    = (ks[i].days || 0) + d;
     saveKeys(ks); renderKeys(); broadcastKeysToPartner();
-    // Push updated expiry to client if they're online
+    // Push updated expiry to client if they're currently online
     if (k.uid) {
       const cid = Object.keys(clients).find(id => clients[id].uid === k.uid);
       if (cid) sendTo(cid, { type: 'key-extended', expires: ks[i].expires });
     }
-    showToast(`Extended: ${k.name} +${d}d`);
+    // If client is offline the change is already in localStorage — auto-sync
+    // will push it the next time they reconnect and both parties are online.
+    const verb = d > 0 ? `+${d}d` : `${d}d`;
+    showToast(`${k.name}: ${verb} → ${_fmtDate(ks[i].expires)}`);
   };
 
   function _adminEsc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -865,17 +883,21 @@
   function startHub() {
     if (_hubMgr) return;
     loadPeerJS(function () {
-      _hubMgr = PeerMgr.connect(HUB, {
+      _hubMgr = PeerMgr.connect(_hubId(), {
 
         onOpen: function (peer, pid) {
           hub = peer;
+          // Remember the winning slot so clients start here on next load
+          localStorage.setItem('cst-hub-slot', String(_hubSlot));
 
           // ── UI ───────────────────────────────────────────────
-          var elHub = document.getElementById('cp-hub');
-          var elPid = document.getElementById('cp-pid');
+          var elHub    = document.getElementById('cp-hub');
+          var elPid    = document.getElementById('cp-pid');
+          var elHubId2 = document.getElementById('cp-hub-id');
           function _markOnline(id) {
             if (elHub) { elHub.textContent = 'hub online'; elHub.className = 'on'; }
             if (elPid && id) elPid.textContent = id;
+            if (elHubId2)    elHubId2.textContent = id;  // live slot ID
           }
           _markOnline(pid);
 
@@ -921,16 +943,29 @@
         },
 
         onUnavailable: function () {
-          // The hub ID is already registered on the signaling server.
-          // Two cases:
-          //   a) Another live admin tab holds it → connect as partner.
-          //   b) A stale session didn't close cleanly → ID expires after
-          //      peerjs-server's ALIVE_TIMEOUT (~60 s). Wait 70 s then retry.
+          // Hub slot is stale-locked (crashed tab didn't clean up) or held by
+          // another live admin session.  Rotate to the next slot immediately
+          // instead of waiting 60+ s for the lock to expire.
+          // After all 3 slots are tried (~900 ms), wait 15 s then retry from
+          // slot 0 (by then the stale lock will almost certainly have expired).
           _hubMgr = null; hub = null;
-          window.notify && window.notify(
-            'Hub ID held by another session — retrying in 70 s…', 'warning', 75000);
-          connectToPartnerAdmin(HUB);
-          setTimeout(function () { if (!_hubMgr) startHub(); }, 70000);
+          const tried = (_hubSlot + 1) % HUB_SLOTS.length;
+          if (tried !== 0) {
+            // Still have untried slots — rotate and retry immediately
+            _hubSlot = tried;
+            var elHub = document.getElementById('cp-hub');
+            if (elHub) elHub.textContent = 'hub slot busy…';
+            setTimeout(startHub, 300);
+          } else {
+            // Exhausted all 3 slots — peerjs-server lock expires in ~60 s,
+            // but 15 s is usually enough since we spread 3 rotations across 3 s.
+            _hubSlot = 0;
+            window.notify && window.notify(
+              'All hub slots busy — retrying in 15 s…', 'warning', 20000);
+            var elHub2 = document.getElementById('cp-hub');
+            if (elHub2) elHub2.textContent = 'hub retrying…';
+            setTimeout(function () { if (!_hubMgr) startHub(); }, 15000);
+          }
         },
 
       }); // end PeerMgr.connect
@@ -956,34 +991,41 @@
     }
 
     if (d.type === 'hello') {
-      c.vp       = d.vp;
-      c.url      = d.url || '—';
-      c.name     = d.name || cid.slice(-6);
-      c.approved = d.approved || false;
-      c.uid      = d.uid      || null;
-      c.deviceId = d.deviceId || null;
+      c.vp         = d.vp;
+      c.url        = d.url        || '—';
+      c.name       = d.name       || cid.slice(-6);
+      c.approved   = d.approved   || false;
+      c.uid        = d.uid        || null;
+      c.deviceId   = d.deviceId   || null;
+      c.keyExpires = d.keyExpires || null;  // client's locally-stored expiry
 
-      // Auto-sync: reconnecting user with uid or deviceId matching a valid key
+      // Auto-sync: reconnecting user with uid or deviceId matching a valid key.
+      // Also fires for already-approved users if admin changed their expiry while
+      // they were offline (expiryChanged guard ensures we don't spam them).
       if (d.uid || d.deviceId) {
         const ks    = loadKeys();
         const match = ks.find(k =>
           k.used && Date.now() < (k.expires || 0) &&
           ((d.uid && k.uid === d.uid) || (d.deviceId && k.deviceId === d.deviceId))
         );
-        if (match && !c.approved) {
-          c.name     = match.usedBy || match.name;
-          c.approved = true;
-          sendTo(cid, {
-            type:       'key-approved',
-            name:       c.name,
-            expires:    match.expires,
-            created:    match.created,
-            uid:        match.uid,
-            badges:     match.badges || [],
-            autoLoaded: true,
-          });
-          // Notify admin panel that this user was auto-synced
-          showToast(`${c.name} — auto-synced`);
+        if (match) {
+          const expiryChanged = c.keyExpires != null &&
+            Math.abs((match.expires || 0) - c.keyExpires) > 60000; // >1 min diff
+          if (!c.approved) {
+            // Full reconnect-sync (first hello after new session)
+            c.name = match.usedBy || match.name;
+            c.approved = true;
+            sendTo(cid, {
+              type: 'key-approved', name: c.name, expires: match.expires,
+              created: match.created, uid: match.uid, badges: match.badges || [],
+              autoLoaded: true,
+            });
+            showToast(`${c.name} — auto-synced`);
+          } else if (expiryChanged) {
+            // Already approved but admin changed expiry while they were offline
+            sendTo(cid, { type: 'key-extended', expires: match.expires });
+            showToast(`${c.name} — expiry synced`);
+          }
         }
       }
       renderClients();
@@ -1248,11 +1290,28 @@
       let _tryConnTimer = null;
       let _capWatchdog  = null;
 
+      // Hub slot discovery — mirrors the admin-side HUB_SLOTS.
+      // Clients cycle through all three slots every second until one responds.
+      // localStorage('cst-hub-slot') is written by the admin on successful open,
+      // so returning clients start on the right slot immediately.
+      const _bHubSlots = [HUB_BASE, HUB_BASE + '-b', HUB_BASE + '-c'];
+      let   _bSlot     = parseInt(localStorage.getItem('cst-hub-slot') || '0') % 3;
+      function _bHubId() { return _bHubSlots[_bSlot % 3]; }
+
       PeerMgr.connect(undefined, {
         onOpen: function (peer) {
           cPeer = peer;
           // If the peer was recreated, any old adminConn is dead — reset.
           if (adminConn && !adminConn.open) { adminConn = null; connecting = false; }
+          // Listen for peer-unavailable to advance to the next hub slot.
+          // PeerMgr silently swallows these; we add a second listener here.
+          peer.on('error', function (err) {
+            if (err.type !== 'peer-unavailable') return;
+            // Hub not on this slot — advance and let tryConnect retry next tick
+            _bSlot = (_bSlot + 1) % _bHubSlots.length;
+            connecting = false;
+            adminConn  = null;
+          });
           // Start intervals only once (survives peer recreation).
           if (!_tryConnTimer) _tryConnTimer = setInterval(tryConnect, 1000);
           if (!_capWatchdog)  _capWatchdog  = setInterval(function () {
@@ -1274,20 +1333,23 @@
         if (connecting) return;
         connecting = true;
         try {
-          const conn = cPeer.connect(HUB, { reliable: true });
+          const conn = cPeer.connect(_bHubId(), { reliable: true });
           adminConn = conn;
           conn.on('open', () => {
             if (adminConn !== conn) { try { conn.close(); } catch {} return; }
             connecting = false;
+            // Remember this winning slot for fast reconnect
+            localStorage.setItem('cst-hub-slot', String(_bSlot % _bHubSlots.length));
             const appr = getApproval();
             conn.send({
-              type:     'hello',
-              vp:       { w: innerWidth, h: innerHeight },
-              url:      location.hostname,
-              name:     appr?.name || null,
-              approved: isApproved(),
-              uid:      appr?.uid     || null,
-              deviceId: getDeviceId(),
+              type:       'hello',
+              vp:         { w: innerWidth, h: innerHeight },
+              url:        location.hostname,
+              name:       appr?.name       || null,
+              approved:   isApproved(),
+              uid:        appr?.uid        || null,
+              deviceId:   getDeviceId(),
+              keyExpires: appr?.expires    || null,  // lets admin detect offline expiry changes
             });
             // If gate is waiting for admin, send register request now
             if (window.__cstPendingKey) {
@@ -1296,7 +1358,11 @@
           });
           conn.on('data',  onAdminMsg);
           conn.on('close', () => {
-            if (adminConn === conn) { adminConn = null; connecting = false; stopCap(); hideCur(); }
+            if (adminConn === conn) {
+              adminConn = null; connecting = false; stopCap(); hideCur();
+              // Hub may have rotated slots — try next slot on reconnect
+              _bSlot = (_bSlot + 1) % _bHubSlots.length;
+            }
           });
           conn.on('error', () => {
             if (adminConn === conn) { adminConn = null; connecting = false; }
@@ -1416,27 +1482,49 @@
         if (d.type === 'key-approved') {
           const extra = { created: d.created, uid: d.uid, badges: d.badges, isFirstUser: d.isFirstUser };
           if (d.autoLoaded) {
-            // Admin auto-synced this user — no gate open
-            const wasLegacy = !!(getApproval() && !getApproval()?.uid);
+            // Admin auto-synced — compare old vs new expiry to show a meaningful message
+            const prevAppr    = getApproval();
+            const prevExpires = prevAppr?.expires || 0;
+            const wasLegacy   = !!(prevAppr && !prevAppr?.uid);
             setApproved(d.name, d.expires, extra);
             renderBadgeButton();
             document.getElementById('cst-gate')?.remove();
-            showToast(wasLegacy
-              ? 'Your key has been updated and 20+ days have been added.'
-              : 'key automatically loaded.');
+            // Show delta only when expiry actually changed by more than 1 hr
+            if (d.expires && prevExpires && Math.abs(d.expires - prevExpires) > 3600000) {
+              const deltaDays = Math.round((d.expires - prevExpires) / 86400000);
+              if (deltaDays > 0) {
+                const msg = `Your key validity has been extended by ${deltaDays} day${deltaDays !== 1 ? 's' : ''}`;
+                showToast(msg); window.notify?.(msg, 'success', 8000);
+              } else if (deltaDays < 0) {
+                const absDays = Math.abs(deltaDays);
+                const msg = `Your key validity has been decreased by ${absDays} day${absDays !== 1 ? 's' : ''}`;
+                showToast(msg); window.notify?.(msg, 'warning', 8000);
+              }
+            } else {
+              showToast(wasLegacy ? 'Your key has been updated.' : 'Key automatically loaded.');
+            }
           } else {
             window.__cstGateApproved?.(d.name, d.expires, extra);
           }
         }
         if (d.type === 'key-rejected') { window.__cstGateRejected?.(d.reason); }
         if (d.type === 'key-extended') {
-          // Admin extended this user's access — update locally
+          // Admin changed expiry while client was online (or just reconnected)
           const appr2 = getApproval();
-          if (appr2 && d.expires && d.expires > (appr2.expires || 0)) {
-            appr2.expires = d.expires;
+          if (appr2 && d.expires) {
+            const prevExpires = appr2.expires || 0;
+            const deltaDays   = Math.round((d.expires - prevExpires) / 86400000);
+            appr2.expires     = d.expires;
             localStorage.setItem('cst-approved', JSON.stringify(appr2));
             renderBadgeButton();
-            showToast('Your access has been extended!');
+            if (deltaDays > 0) {
+              const msg = `Your key validity has been extended by ${deltaDays} day${deltaDays !== 1 ? 's' : ''}`;
+              showToast(msg); window.notify?.(msg, 'success', 8000);
+            } else if (deltaDays < 0) {
+              const absDays = Math.abs(deltaDays);
+              const msg = `Your key validity has been decreased by ${absDays} day${absDays !== 1 ? 's' : ''}`;
+              showToast(msg); window.notify?.(msg, 'warning', 8000);
+            }
           }
         }
         if (d.type === 'revoke')       {
