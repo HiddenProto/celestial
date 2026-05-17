@@ -8,7 +8,11 @@
 
   const SEQ  = ['ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','b'];
   const PASS = 'Hr332941369';
-  const HUB  = 'celestial-hub-112456LCD';
+  // Hub ID — site-specific so different deployments never conflict on the
+  // public PeerJS cloud.  Override via localStorage('cst-hub-id') without
+  // needing a code push (useful if the ID ever gets stale-locked again).
+  const HUB  = localStorage.getItem('cst-hub-id') ||
+    ('cst-hub-' + location.hostname.replace(/[^a-z0-9]/gi, '').slice(0, 14));
   const SEC  = 'Hr332941369';
 
   let isAdmin    = localStorage.getItem('cst-admin') === '1';
@@ -325,8 +329,20 @@
   }
 
   // ─── admin panel ─────────────────────────────────────────────
+  var _unloadHooked = false;
   function openPanel() {
     if (panelEl) { panelEl.style.display = 'flex'; return; }
+
+    // Destroy hub peer cleanly when admin closes/navigates the tab.
+    // Without this, the ID stays registered on peerjs-server for up to 60 s,
+    // blocking the next session from claiming it.
+    if (!_unloadHooked) {
+      _unloadHooked = true;
+      window.addEventListener('beforeunload', function () {
+        if (_hubMgr) { _hubMgr.destroy(); _hubMgr = null; hub = null; }
+      });
+    }
+
     buildPanel(); startHub();
   }
 
@@ -800,11 +816,16 @@
         },
 
         onUnavailable: function () {
-          // Another admin session already holds the hub ID.
-          // Connect as partner for key sync; retry hub after 3 s.
+          // The hub ID is already registered on the signaling server.
+          // Two cases:
+          //   a) Another live admin tab holds it → connect as partner.
+          //   b) A stale session didn't close cleanly → ID expires after
+          //      peerjs-server's ALIVE_TIMEOUT (~60 s). Wait 70 s then retry.
           _hubMgr = null; hub = null;
+          window.notify && window.notify(
+            'Hub ID held by another session — retrying in 70 s…', 'warning', 75000);
           connectToPartnerAdmin(HUB);
-          setTimeout(function () { if (!_hubMgr) startHub(); }, 3000);
+          setTimeout(function () { if (!_hubMgr) startHub(); }, 70000);
         },
 
       }); // end PeerMgr.connect
