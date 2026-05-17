@@ -12,6 +12,16 @@
   const MAX_CHARS  = 400;
   const COOLDOWN   = 1000;
 
+  // Same self-hosted PeerJS server as admin.js — no more 0.peerjs.com
+  const _cph = localStorage.getItem('cst-peer-host') || 'celestial-wisp.onrender.com';
+  const chatPeerOpts = {
+    host:   _cph,
+    port:   _cph === 'localhost' ? parseInt(localStorage.getItem('cst-peer-port') || '3001') : 443,
+    path:   '/peerjs',
+    secure: _cph !== 'localhost',
+    debug:  0,
+  };
+
   function getAdminId()   { try { return JSON.parse(localStorage.getItem('cst-admin-id')||'{}'); } catch { return {}; } }
   function getAdminChatName()  { const id = getAdminId(); return id.name || 'Admin'; }
   function getAdminChatColor() { const id = getAdminId(); return id.color || '#c9a84c'; }
@@ -79,7 +89,7 @@
   function initChat() {
     if (chatPeer) return;
     loadPeerJS(() => {
-      chatPeer = new Peer(undefined, { debug: 0 });
+      chatPeer = new Peer(undefined, chatPeerOpts);
       chatPeer.on('open', () => connectToHub());
       chatPeer.on('error', () => {});
     });
@@ -113,7 +123,7 @@
 
   function becomeHub() {
     isHubMode = true;
-    hubPeer = new Peer(HUB_ID, { debug: 0 });
+    hubPeer = new Peer(HUB_ID, chatPeerOpts);
     hubPeer.on('open', () => {
       updateOnline([{ name: getMyName(), isAdmin: amAdmin() }]);
       renderWidget();
