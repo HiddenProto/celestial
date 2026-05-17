@@ -26,5 +26,8 @@
     "@mercuryworkshop/scramjet": "^1.1.0",
     "@titaniumnetwork-dev/ultraviolet": "^3.2.10",
     "youtubei.js": "^17.0.1"
+  },
+  "devDependencies": {
+    "ws": "^8.20.1"
   }
 }
