@@ -177,6 +177,44 @@
     joinMesh();
   }
 
+  // ── resilience helpers ────────────────────────────────────────
+
+  // Returns how long THIS peer should wait before attempting registry
+  // election, based on lexicographic sort of all known peer IDs.
+  // Smallest ID → 0 ms, next → 250 ms, next → 500 ms, etc.
+  // Prevents simultaneous conflicting becomeRegistry() calls.
+  function _electDelay() {
+    var allIds = [myId].concat(Array.from(meshPeers.keys())).sort();
+    return Math.max(0, allIds.indexOf(myId)) * 250;
+  }
+
+  // Schedules a registry re-election if we don't currently have one.
+  // Called whenever the registry connection drops or a mesh peer departs.
+  function _maybeElectRegistry() {
+    if (isRegistry || registryConn || !myId) return;
+    setTimeout(function () {
+      if (!isRegistry && !registryConn) joinMesh();
+    }, _electDelay());
+  }
+
+  // Attaches an iceconnectionstatechange listener so we detect ungraceful
+  // disconnects instantly (ICE → failed) instead of waiting for the 5 s
+  // zombie-cleanup poll or the 30+ s PeerJS close-event timeout.
+  function _watchICE(conn, peerId) {
+    conn.on('open', function () {
+      var pc = conn.peerConnection;
+      if (!pc) return;
+      pc.addEventListener('iceconnectionstatechange', function () {
+        var s = pc.iceConnectionState;
+        if ((s === 'failed' || s === 'closed') && meshPeers.has(peerId)) {
+          meshPeers.delete(peerId);
+          updateOnline();
+          _maybeElectRegistry(); // re-elect if this was the last registry candidate
+        }
+      });
+    });
+  }
+
   // ── join the mesh ─────────────────────────────────────────────
   function joinMesh() {
     if (!myPeer || !myId) return;
@@ -204,8 +242,10 @@
 
     conn.on('close', () => {
       registryConn = null;
-      // Registry left — existing P2P connections are fine; re-elect registry
-      setTimeout(joinMesh, 1500);
+      // Registry left — existing P2P connections are fine.
+      // Use deterministic delay so the smallest-ID peer becomes registry
+      // first and others back off cleanly instead of all racing at once.
+      _maybeElectRegistry();
     });
     conn.on('error', () => {
       clearTimeout(timeout);
@@ -259,8 +299,9 @@
       updateOnline();
     });
     conn.on('data',  d  => handlePeerMsg(peerId, d));
-    conn.on('close', () => { meshPeers.delete(peerId); updateOnline(); });
-    conn.on('error', () => { meshPeers.delete(peerId); updateOnline(); });
+    conn.on('close', () => { meshPeers.delete(peerId); updateOnline(); _maybeElectRegistry(); });
+    conn.on('error', () => { meshPeers.delete(peerId); updateOnline(); _maybeElectRegistry(); });
+    _watchICE(conn, peerId); // instant ICE failure detection
   }
 
   // ── accept an incoming direct connection ──────────────────────
@@ -274,14 +315,26 @@
         const prev = meshPeers.get(peerId) || {};
         meshPeers.set(peerId, { ...prev, conn, name: d.name, isAdmin: !!d.isAdmin, adminColor: d.adminColor });
         updateOnline();
+
+        // Redundant peer list — send our known peers to the new arrival so
+        // they can build a complete mesh even if the registry is temporarily
+        // down or still being elected.  connectToPeer() deduplicates, so
+        // receiving this from multiple existing peers is harmless.
+        var roster = Array.from(meshPeers.entries())
+          .filter(function (e) { return e[0] !== peerId && e[1].name; })
+          .map(function (e) { return { id: e[0], name: e[1].name, isAdmin: e[1].isAdmin, adminColor: e[1].adminColor }; });
+        if (roster.length > 0) {
+          try { conn.send({ type: 'mesh-peers', peers: roster }); } catch {}
+        }
       } else {
         handlePeerMsg(peerId, d);
       }
     }
 
     conn.on('data',  onData);
-    conn.on('close', () => { meshPeers.delete(peerId); updateOnline(); });
-    conn.on('error', () => { meshPeers.delete(peerId); updateOnline(); });
+    conn.on('close', () => { meshPeers.delete(peerId); updateOnline(); _maybeElectRegistry(); });
+    conn.on('error', () => { meshPeers.delete(peerId); updateOnline(); _maybeElectRegistry(); });
+    _watchICE(conn, peerId); // instant ICE failure detection
 
     if (firstMsg) onData(firstMsg); // admin.js already consumed the first message for routing
   }
