@@ -34,6 +34,19 @@
     }
   }
 
+  // ── PeerJS server config ─────────────────────────────────────────
+  // Self-hosted on celestial-wisp (Render.com) so we're not at the mercy
+  // of the unreliable 0.peerjs.com public cloud. Override host via
+  // localStorage key "cst-peer-host" (e.g. for local ngrok testing).
+  const _ph = localStorage.getItem('cst-peer-host') || 'celestial-wisp.onrender.com';
+  const peerOpts = {
+    host:   _ph,
+    port:   _ph === 'localhost' ? parseInt(localStorage.getItem('cst-peer-port') || '3001') : 443,
+    path:   '/peerjs',
+    secure: _ph !== 'localhost',
+    debug:  0,
+  };
+
   let hub        = null;
   let cPeer      = null;
   let clients    = {};
@@ -738,7 +751,7 @@
   function startHub() { if (hub) return; loadPeerJS(() => tryCreateHub(HUB)); }
 
   function tryCreateHub(id) {
-    hub = new Peer(id, { debug: 0 });
+    hub = new Peer(id, peerOpts);
     hub.on('open', pid => {
       const el = document.getElementById('cp-hub');
       if (el) { el.textContent = 'hub online'; el.className = 'on'; }
@@ -767,12 +780,12 @@
     hub.on('error', err => {
       if (err.type === 'unavailable-id') {
         // Another admin session already holds this ID.
-        // Connect as a partner for key sync while we wait for the stale
-        // session to expire, then retry the SAME primary ID so clients
-        // polling every 1 s can always find it.
+        // Connect as partner for key sync while we wait for the other
+        // session to clear (near-instant on our own server), then retry
+        // the SAME primary ID — clients polling every 1 s will find it.
         hub.destroy(); hub = null;
         connectToPartnerAdmin(HUB);
-        setTimeout(() => { if (!hub) startHub(); }, 7000);
+        setTimeout(() => { if (!hub) startHub(); }, 3000);
       } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
         // Transient signaling error — attempt reconnect
         setTimeout(() => { if (hub && !hub.destroyed) { try { hub.reconnect(); } catch {} } }, 2000);
@@ -1039,7 +1052,7 @@
 
   function connectToPartnerAdmin(targetId) {
     loadPeerJS(() => {
-      const tmp = new Peer(undefined, { debug: 0 });
+      const tmp = new Peer(undefined, peerOpts);
       tmp.on('open', () => {
         const conn = tmp.connect(targetId, { reliable: true });
         partnerConn = conn;
@@ -1065,7 +1078,7 @@
   // ─── client beacon ───────────────────────────────────────────
   function startBeacon() {
     loadPeerJS(() => {
-      cPeer = new Peer(undefined, { debug: 0 });
+      cPeer = new Peer(undefined, peerOpts);
       let adminConn  = null;
       let connecting = false;
       let capturing  = false;
