@@ -25,6 +25,12 @@
 (function (root) {
   'use strict';
 
+  /* ── production peer server ─────────────────────────────── */
+  // Set this to the hostname of your deployed PeerJS server (peerserver/).
+  // After deploying to Fly.io: 'celestial-peer.fly.dev'   (or your app name)
+  // Leave as '' to use 0.peerjs.com only (less reliable — no SLA).
+  const PROD_PEER = '';
+
   /* ── server list ────────────────────────────────────────── */
   const _locHost = localStorage.getItem('cst-peer-host');
   const _locPort = parseInt(localStorage.getItem('cst-peer-port') || '0');
@@ -34,24 +40,30 @@
   // Chrome allows ws://localhost from https://localhost pages because localhost
   // is a "potentially trustworthy" origin — no extra cert bypass needed.
   const _isLocal = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
-  const _localPeer = { host: 'localhost', port: _locPort || 9001, path: '/', secure: false, debug: 0 };
+  const _localPeer  = { host: 'localhost',  port: _locPort || 9001, path: '/', secure: false, debug: 0 };
+  const _prodPeer   = PROD_PEER ? { host: PROD_PEER, port: 443, path: '/', secure: true, debug: 0 } : null;
+  const _cloudPeer  = { host: '0.peerjs.com', port: 443, path: '/', secure: true, debug: 0 };
 
-  // Cloud servers (used when not local, or as fallbacks)
-  const _cloudPeer = { host: '0.peerjs.com', port: 443, path: '/', secure: true, debug: 0 };
+  // Priority order:
+  //   local dev   → localhost:9001  →  PROD_PEER (if set)  →  0.peerjs.com
+  //   production  → PROD_PEER (if set)  →  0.peerjs.com
+  //   localStorage override → custom host  →  PROD_PEER  →  0.peerjs.com
+  function _buildServers() {
+    // Manual localStorage override always wins
+    if (_locHost) {
+      if (_locHost === 'localhost')
+        return [{ host: 'localhost', port: _locPort || 9001, path: '/', secure: false, debug: 0 }];
+      const custom = { host: _locHost, port: _locPort || 443, path: '/peerjs', secure: true, debug: 0 };
+      return _prodPeer ? [custom, _prodPeer, _cloudPeer] : [custom, _cloudPeer];
+    }
+    // Local dev: local first, then prod, then cloud
+    if (_isLocal)
+      return _prodPeer ? [_localPeer, _prodPeer, _cloudPeer] : [_localPeer, _cloudPeer];
+    // Production: self-hosted first, cloud fallback
+    return _prodPeer ? [_prodPeer, _cloudPeer] : [_cloudPeer];
+  }
 
-  // Allow devs to override via localStorage('cst-peer-host').
-  // 'localhost' → local-only mode (single server, no public-cloud fallback).
-  // any other custom host → try it first, then fall back to cloud.
-  const SERVERS = _locHost
-    ? (_locHost === 'localhost'
-        ? [{ host: 'localhost', port: _locPort || 9001, path: '/', secure: false, debug: 0 }]
-        : [
-            { host: _locHost,   port: _locPort || 443, path: '/peerjs', secure: true, debug: 0 },
-            _cloudPeer,
-          ])
-    : _isLocal
-      ? [ _localPeer, _cloudPeer ]   // local dev: local server first, cloud fallback
-      : [ _cloudPeer ];              // production: cloud only
+  const SERVERS = _buildServers();
 
   const OPEN_TIMEOUT = 6000;  // ms to wait for 'open' before trying next server
   const RETRY_DELAY  = 2000;  // ms between attempts

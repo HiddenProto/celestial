@@ -1,0 +1,22 @@
+# Fly.io deployment config for Celestial PeerJS signaling server
+# Deploy with: fly launch  (first time)  or  fly deploy  (updates)
+#
+# Change the app name below — it must be globally unique on Fly.io.
+# After deploying, the WS endpoint is: wss://<app>.fly.dev/peerjs
+
+app            = "celestial-peer"
+primary_region = "lax"
+
+[build]
+
+[http_service]
+  internal_port       = 9000
+  force_https         = true
+  auto_stop_machines  = false   # NEVER put the machine to sleep
+  auto_start_machines = true
+  min_machines_running = 1      # always keep at least 1 machine running
+
+[[vm]]
+  memory   = "256mb"
+  cpu_kind = "shared"
+  cpus     = 1
