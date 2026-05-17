@@ -35,23 +35,18 @@
   }
 
   // ── PeerJS server config ─────────────────────────────────────────
-  // Self-hosted on celestial-wisp (Render.com) so we're not at the mercy
-  // of the unreliable 0.peerjs.com public cloud. Override host via
-  // localStorage key "cst-peer-host" (e.g. for local ngrok testing).
-  const _ph = localStorage.getItem('cst-peer-host') || 'celestial-wisp.onrender.com';
-  const peerOpts = {
-    host:   _ph,
-    port:   _ph === 'localhost' ? parseInt(localStorage.getItem('cst-peer-port') || '3001') : 443,
-    path:   '/peerjs',
-    secure: _ph !== 'localhost',
-    debug:  0,
-  };
+  // peer-mgr.js handles the full server list and fallback logic.
+  // peerOpts is only used by connectToPartnerAdmin() which creates a
+  // temporary one-shot peer (no need for the full manager there).
+  const peerOpts = PeerMgr.SERVERS[0];
 
-  let hub        = null;
-  let cPeer      = null;
-  let clients    = {};
+  let hub         = null;
+  let cPeer       = null;
+  let clients     = {};
   let partnerConn = null;
-  let viewTarget = null;
+  let viewTarget  = null;
+  let _hubMgr         = null;   // PeerMgr handle for the admin hub
+  let _heartbeatTimer = null;   // hub heartbeat interval
   let admCX = 50, admCY = 50;
   let viewStream = null;
   let panelEl    = null;
@@ -631,7 +626,9 @@
   function doLogout() {
     isAdmin = false;
     localStorage.removeItem('cst-admin');
-    if (hub) { hub.destroy(); hub = null; }
+    if (_heartbeatTimer) { clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
+    if (_hubMgr) { _hubMgr.destroy(); _hubMgr = null; }
+    hub = null;
     panelEl?.remove(); panelEl = null;
   }
 
@@ -748,82 +745,75 @@
   };
 
   // ─── hub (admin WebRTC) ──────────────────────────────────────
-  function startHub() { if (hub) return; loadPeerJS(() => tryCreateHub(HUB)); }
+  // PeerMgr handles all reconnect / fallback logic automatically.
+  function startHub() {
+    if (_hubMgr) return;
+    loadPeerJS(function () {
+      _hubMgr = PeerMgr.connect(HUB, {
 
-  function tryCreateHub(id) {
-    hub = new Peer(id, peerOpts);
+        onOpen: function (peer, pid) {
+          hub = peer;
 
-    // Watchdog: if hub doesn't come online within 5 s (e.g. Render cold-start
-    // kills the WS before PeerJS fires 'open'), destroy and retry.
-    // This covers the case where PeerJS is in !disconnected && !open state and
-    // hub.reconnect() would be a silent no-op.
-    let _watchdog = setTimeout(() => {
-      if (hub && !hub.open && !hub.destroyed) { hub.destroy(); hub = null; setTimeout(startHub, 500); }
-    }, 5000);
-
-    hub.on('open', pid => {
-      clearTimeout(_watchdog);
-      const el = document.getElementById('cp-hub');
-      if (el) { el.textContent = 'hub online'; el.className = 'on'; }
-      const pi = document.getElementById('cp-pid');
-      if (pi) pi.textContent = pid;
-      // Heartbeat: broadcast presence + viewing state every 1s so clients
-      // detect when admin disconnects and stop streaming immediately.
-      setInterval(() => {
-        bcast({ type: 'admin-pulse', viewing: viewTarget !== null });
-      }, 1000);
-      // Expose hub peer to chat.js so it can reuse the same PeerJS instance
-      window.__cstHubPeer   = hub;
-      window.__cstHubPeerId = pid;
-      window.dispatchEvent(new CustomEvent('cst-hub-ready'));
-    });
-    hub.on('connection', conn => {
-      conn.on('open', () => {
-        // Read first message to route: mesh-hello → chat, anything else → control
-        conn.once('data', d => {
-          if (d && d.type === 'mesh-hello') {
-            // Chat mesh connection — hand off to chat.js
-            window.__cstChatIncoming?.(conn, d);
-          } else {
-            // Control connection (beacon client, partner admin)
-            const cid = conn.peer;
-            clients[cid] = { conn, vp: null, url: '—', name: cid.slice(-6), approved: false };
-            conn.on('data', d2 => onClientData(cid, d2));
-            conn.on('close', () => { delete clients[cid]; renderClients(); if (viewTarget === cid) stopView(); });
-            renderClients();
-            if (d) onClientData(cid, d); // process the first non-mesh message
+          // ── UI ───────────────────────────────────────────────
+          var elHub = document.getElementById('cp-hub');
+          var elPid = document.getElementById('cp-pid');
+          function _markOnline(id) {
+            if (elHub) { elHub.textContent = 'hub online'; elHub.className = 'on'; }
+            if (elPid && id) elPid.textContent = id;
           }
-        });
-      });
-    });
-    hub.on('disconnected', () => {
-      // Signaling server WS dropped after a successful open — reconnect the
-      // signaling channel without destroying the hub or losing data connections.
-      setTimeout(() => { if (hub && !hub.destroyed) { try { hub.reconnect(); } catch {} } }, 1500);
-    });
-    hub.on('error', err => {
-      if (err.type === 'unavailable-id') {
-        // Another admin session already holds this ID.
-        // Connect as partner for key sync while we wait for the other
-        // session to clear (near-instant on our own server), then retry
-        // the SAME primary ID — clients polling every 1 s will find it.
-        clearTimeout(_watchdog);
-        hub.destroy(); hub = null;
-        connectToPartnerAdmin(HUB);
-        setTimeout(() => { if (!hub) startHub(); }, 3000);
-      } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
-        // If the hub never successfully opened (e.g. Render cold-start dropped
-        // the WS before PeerJS finished handshaking), hub.reconnect() is a
-        // no-op — destroy and create a fresh Peer instead.
-        clearTimeout(_watchdog);
-        if (hub && !hub.open) {
-          hub.destroy(); hub = null;
-          setTimeout(startHub, 2000);
-        } else {
-          setTimeout(() => { if (hub && !hub.destroyed) { try { hub.reconnect(); } catch {} } }, 2000);
-        }
-      }
-    });
+          _markOnline(pid);
+
+          // Show "reconnecting…" when signaling WS drops, then online again
+          // when peer.reconnect() re-establishes it.  These listeners stay
+          // attached to this specific peer object for its lifetime.
+          peer.on('disconnected', function () {
+            if (peer === hub && elHub) { elHub.textContent = 'hub reconnecting…'; elHub.className = ''; }
+          });
+          peer.on('open', function (id) {
+            if (peer === hub) _markOnline(id);
+          });
+
+          // ── Heartbeat ─────────────────────────────────────────
+          if (_heartbeatTimer) clearInterval(_heartbeatTimer);
+          _heartbeatTimer = setInterval(function () {
+            bcast({ type: 'admin-pulse', viewing: viewTarget !== null });
+          }, 1000);
+
+          // ── Expose hub to chat.js ─────────────────────────────
+          window.__cstHubPeer   = hub;
+          window.__cstHubPeerId = pid;
+          window.dispatchEvent(new CustomEvent('cst-hub-ready'));
+
+          // ── Route incoming connections ─────────────────────────
+          // First message determines type: mesh-hello → chat, else → control.
+          peer.on('connection', function (conn) {
+            conn.on('open', function () {
+              conn.once('data', function (d) {
+                if (d && d.type === 'mesh-hello') {
+                  window.__cstChatIncoming && window.__cstChatIncoming(conn, d);
+                } else {
+                  var cid = conn.peer;
+                  clients[cid] = { conn: conn, vp: null, url: '—', name: cid.slice(-6), approved: false };
+                  conn.on('data',  function (d2) { onClientData(cid, d2); });
+                  conn.on('close', function () { delete clients[cid]; renderClients(); if (viewTarget === cid) stopView(); });
+                  renderClients();
+                  if (d) onClientData(cid, d);
+                }
+              });
+            });
+          });
+        },
+
+        onUnavailable: function () {
+          // Another admin session already holds the hub ID.
+          // Connect as partner for key sync; retry hub after 3 s.
+          _hubMgr = null; hub = null;
+          connectToPartnerAdmin(HUB);
+          setTimeout(function () { if (!_hubMgr) startHub(); }, 3000);
+        },
+
+      }); // end PeerMgr.connect
+    }); // end loadPeerJS
   }
 
   function onClientData(cid, d) {
@@ -1084,18 +1074,19 @@
   }
 
   function connectToPartnerAdmin(targetId) {
-    loadPeerJS(() => {
-      const tmp = new Peer(undefined, peerOpts);
-      tmp.on('open', () => {
-        const conn = tmp.connect(targetId, { reliable: true });
-        partnerConn = conn;
-        conn.on('open', () => conn.send({ type: 'admin-hello', sec: SEC, keys: loadKeys() }));
-        conn.on('data', d => {
-          if (!d || typeof d !== 'object') return;
-          if (d.type === 'admin-keys' || d.type === 'admin-key-update') mergeAdminKeys(d.keys || []);
-        });
-        conn.on('close', () => { partnerConn = null; });
-        conn.on('error', () => { partnerConn = null; });
+    loadPeerJS(function () {
+      var _partnerMgr = PeerMgr.connect(undefined, {
+        onOpen: function (tmp) {
+          var conn = tmp.connect(targetId, { reliable: true });
+          partnerConn = conn;
+          conn.on('open', function () { conn.send({ type: 'admin-hello', sec: SEC, keys: loadKeys() }); });
+          conn.on('data', function (d) {
+            if (!d || typeof d !== 'object') return;
+            if (d.type === 'admin-keys' || d.type === 'admin-key-update') mergeAdminKeys(d.keys || []);
+          });
+          conn.on('close', function () { partnerConn = null; _partnerMgr.destroy(); });
+          conn.on('error', function () { partnerConn = null; _partnerMgr.destroy(); });
+        },
       });
     });
   }
@@ -1111,11 +1102,12 @@
   // ─── client beacon ───────────────────────────────────────────
   function startBeacon() {
     loadPeerJS(() => {
-      cPeer = new Peer(undefined, peerOpts);
-      let adminConn  = null;
-      let connecting = false;
-      let capturing  = false;
-      let capTimer   = null;
+      // PeerMgr creates the peer with multi-server fallback and handles all
+      // reconnect / recreate logic.  We just update cPeer when it gives us one.
+      let adminConn   = null;
+      let connecting  = false;
+      let capturing   = false;
+      let capTimer    = null;
       let displayStream = null;
       let srcVid  = null;
       let capCv   = null;
@@ -1127,26 +1119,22 @@
       let cursorColor = '#ff3232';
       let lastPulse  = 0;
 
-      cPeer.on('open', () => {
-        tryConnect();
-        setInterval(tryConnect, 1000);
-        // Watchdog: if pulse goes silent for 3s while capturing, stop stream
-        setInterval(() => {
-          if (capturing && lastPulse && Date.now() - lastPulse > 3000) {
-            stopCap(); hideCur();
-          }
-        }, 1000);
-      });
-      // Keep the peer's signaling channel alive — PeerJS public server drops idle WS
-      cPeer.on('disconnected', () => {
-        setTimeout(() => { if (cPeer && !cPeer.destroyed) { try { cPeer.reconnect(); } catch {} } }, 1000);
-      });
-      cPeer.on('error', err => {
-        // peer-unavailable just means the hub isn't up yet — tryConnect handles it.
-        // For real signaling errors, reconnect the peer itself.
-        if (err.type !== 'peer-unavailable') {
-          setTimeout(() => { if (cPeer && !cPeer.destroyed) { try { cPeer.reconnect(); } catch {} } }, 2000);
-        }
+      // Intervals are created once; cPeer is updated if the peer is recreated.
+      let _tryConnTimer = null;
+      let _capWatchdog  = null;
+
+      PeerMgr.connect(undefined, {
+        onOpen: function (peer) {
+          cPeer = peer;
+          // If the peer was recreated, any old adminConn is dead — reset.
+          if (adminConn && !adminConn.open) { adminConn = null; connecting = false; }
+          // Start intervals only once (survives peer recreation).
+          if (!_tryConnTimer) _tryConnTimer = setInterval(tryConnect, 1000);
+          if (!_capWatchdog)  _capWatchdog  = setInterval(function () {
+            if (capturing && lastPulse && Date.now() - lastPulse > 3000) { stopCap(); hideCur(); }
+          }, 1000);
+          tryConnect(); // immediate attempt on open / reopen
+        },
       });
 
       function tryConnect() {

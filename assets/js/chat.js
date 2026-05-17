@@ -14,15 +14,8 @@
   const COOLDOWN    = 1000;
   const SEEN_TTL    = 30000; // dedup window (ms)
 
-  // Same peerOpts source as admin.js — no more 0.peerjs.com
-  const _cph = localStorage.getItem('cst-peer-host') || 'celestial-wisp.onrender.com';
-  const chatPeerOpts = {
-    host:   _cph,
-    port:   _cph === 'localhost' ? parseInt(localStorage.getItem('cst-peer-port') || '3001') : 443,
-    path:   '/peerjs',
-    secure: _cph !== 'localhost',
-    debug:  0,
-  };
+  // Server config is managed by peer-mgr.js (PeerMgr.SERVERS).
+  // No local peerOpts needed — PeerMgr handles server selection and fallback.
 
   function getAdminId()        { try { return JSON.parse(localStorage.getItem('cst-admin-id')||'{}'); } catch { return {}; } }
   function getAdminChatName()  { const id = getAdminId(); return id.name  || 'Admin'; }
@@ -59,7 +52,8 @@
   let myPeer        = null;        // this peer's PeerJS instance
   let myId          = null;        // this peer's PeerJS ID
   let meshPeers     = new Map();   // peerId → { conn, name, isAdmin, adminColor }
-  let registryPeer  = null;        // new Peer(REGISTRY_ID) when WE are the registry
+  let registryPeer  = null;        // Peer(REGISTRY_ID) when WE are the registry
+  let registryMgr   = null;        // PeerMgr handle for registry peer
   let registryConn  = null;        // our connection TO the registry
   let isRegistry    = false;
   const seenMsgs    = new Map();   // msgId → timestamp (dedup)
@@ -108,12 +102,21 @@
           }, { once: true });
         }
       } else {
-        // Regular user: own ephemeral peer
-        const peer = new Peer(undefined, chatPeerOpts);
-        peer.on('open', id => _bootMesh(peer, id));
-        peer.on('error', () => {});
-        peer.on('disconnected', () => {
-          setTimeout(() => { if (peer && !peer.destroyed) { try { peer.reconnect(); } catch {} } }, 1500);
+        // Regular user: own ephemeral peer via PeerMgr (handles reconnect/fallback)
+        PeerMgr.connect(undefined, {
+          onOpen: function (peer, id) {
+            // If the peer was recreated (e.g. server fallback), re-boot the mesh.
+            // _bootMesh sets myPeer, so compare against the new peer.
+            if (myPeer && myPeer !== peer) {
+              // Tear down old mesh connections (don't destroy myPeer — PeerMgr owns it)
+              if (registryConn)  { try { registryConn.close();   } catch {} registryConn = null; }
+              if (registryMgr)   { registryMgr.destroy(); registryMgr = null; }
+              registryPeer = null; isRegistry = false;
+              meshPeers.forEach(function (p) { try { p.conn.close(); } catch {} });
+              meshPeers.clear();
+            }
+            _bootMesh(peer, id);
+          },
         });
       }
     });
@@ -172,33 +175,36 @@
   // ── become the registry (directory only, no relay) ────────────
   function becomeRegistry() {
     isRegistry = true;
-    const rp   = new Peer(REGISTRY_ID, chatPeerOpts);
-    registryPeer = rp;
+    registryMgr = PeerMgr.connect(REGISTRY_ID, {
 
-    rp.on('open', updateOnline);
+      onOpen: function (rp) {
+        registryPeer = rp;
+        updateOnline();
+      },
 
-    rp.on('connection', conn => {
-      conn.on('data', d => {
-        if (!d || d.type !== 'mesh-join') return;
-        // Build peer list for the new joiner (everyone except themselves)
-        const list = [
-          { id: myId, ...getMyInfo() },
-          ...Array.from(meshPeers.entries())
-            .filter(([, p]) => p.name)
-            .map(([pid, p]) => ({ id: pid, name: p.name, isAdmin: p.isAdmin, adminColor: p.adminColor })),
-        ].filter(p => p.id !== d.id);
-        try { conn.send({ type: 'mesh-peers', peers: list }); } catch {}
-        // New joiner will initiate direct connections to everyone on the list
-      });
-    });
+      onConnection: function (conn) {
+        conn.on('data', function (d) {
+          if (!d || d.type !== 'mesh-join') return;
+          // Build peer list for the new joiner (everyone except themselves)
+          var list = [
+            Object.assign({ id: myId }, getMyInfo()),
+          ].concat(
+            Array.from(meshPeers.entries())
+              .filter(function (e) { return e[1].name; })
+              .map(function (e) { return { id: e[0], name: e[1].name, isAdmin: e[1].isAdmin, adminColor: e[1].adminColor }; })
+          ).filter(function (p) { return p.id !== d.id; });
+          try { conn.send({ type: 'mesh-peers', peers: list }); } catch (e) {}
+        });
+      },
 
-    rp.on('error', err => {
-      if (err.type === 'unavailable-id') {
-        // Someone beat us to it — join as regular member
+      onUnavailable: function () {
+        // Someone else became registry first — join as regular member
         isRegistry   = false;
+        registryMgr  = null;
         registryPeer = null;
         setTimeout(joinMesh, 500);
-      }
+      },
+
     });
   }
 
@@ -579,15 +585,16 @@
 
   // ── teardown ──────────────────────────────────────────────────
   function teardownChat() {
-    if (registryConn)  { try { registryConn.close();    } catch {} registryConn = null; }
-    if (registryPeer)  { try { registryPeer.destroy();  } catch {} registryPeer = null; }
-    meshPeers.forEach(({ conn }) => { try { conn.close(); } catch {} });
+    if (registryConn) { try { registryConn.close(); } catch {} registryConn = null; }
+    if (registryMgr)  { registryMgr.destroy(); registryMgr = null; }
+    registryPeer = null;
+    meshPeers.forEach(function (p) { try { p.conn.close(); } catch {} });
     meshPeers.clear();
+    // Admin: do NOT destroy myPeer — it's the admin hub, admin.js owns its lifetime
     if (!amAdmin() && myPeer) { try { myPeer.destroy(); } catch {} }
-    // Admin: do NOT destroy myPeer — it's the admin hub, admin.js owns it
     myPeer = null; myId = null; isRegistry = false;
     if (amAdmin()) window.__cstChatIncoming = null;
-    widgetEl?.remove(); widgetEl = null;
+    if (widgetEl) { widgetEl.remove(); widgetEl = null; }
     onlineList = []; unread = 0; chatOpen = false;
   }
 
