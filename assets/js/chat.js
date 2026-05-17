@@ -422,11 +422,13 @@
 
     // Show hub's real total (from admin-pulse) when fresh — it counts every
     // beacon-connected client, not just chat mesh members.
+    // For admin, the hub heartbeat updates window.__cstHubOnline directly so
+    // admin also gets the accurate total without needing to receive a pulse.
     // Fall back to local mesh count when admin is offline or pulse is stale.
     var hubCount = window.__cstHubOnline;
     var hubTs    = window.__cstHubOnlineTs;
     var hubAge   = hubTs ? (Date.now() - hubTs) : Infinity;
-    var useHub   = !amAdmin() && typeof hubCount === 'number' && hubAge < 3000;
+    var useHub   = typeof hubCount === 'number' && hubAge < 3000;
 
     const cnt = document.getElementById('cst-chat-online-cnt');
     if (cnt) cnt.textContent = useHub ? hubCount : onlineList.length;

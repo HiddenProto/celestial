@@ -943,12 +943,15 @@
           if (_heartbeatTimer) clearInterval(_heartbeatTimer);
           _heartbeatTimer = setInterval(function () {
             // Real site-wide online count: all beacon clients + 1 for admin.
-            // Sent to every client so the chat widget can show the true total
-            // instead of just the chat-mesh subset.
+            // Broadcast to clients AND update window.__cstHubOnline on THIS page
+            // so the admin's own chat widget also gets the correct total.
             var realCount = 1 + Object.keys(clients).filter(function (id) {
               return !clients[id].isAdminPeer;
             }).length;
             bcast({ type: 'admin-pulse', viewing: viewTarget !== null, onlineCount: realCount });
+            window.__cstHubOnline   = realCount;
+            window.__cstHubOnlineTs = Date.now();
+            window.dispatchEvent(new CustomEvent('cst-hub-online'));
           }, 1000);
 
           // ── Expose hub to chat.js ─────────────────────────────
@@ -1371,7 +1374,21 @@
           // Start intervals only once (survives peer recreation).
           if (!_tryConnTimer) _tryConnTimer = setInterval(tryConnect, 1000);
           if (!_capWatchdog)  _capWatchdog  = setInterval(function () {
-            if (capturing && lastPulse && Date.now() - lastPulse > 3000) { stopCap(); hideCur(); }
+            var now = Date.now();
+            // Stop capture if admin stops pulsing (existing behaviour)
+            if (capturing && lastPulse && now - lastPulse > 3000) { stopCap(); hideCur(); }
+            // Zombie-connection detection: WebRTC conn.open stays true for 20-30 s
+            // after the remote peer vanishes (ICE keepalive timeout).  If we have a
+            // connection that appears open but admin hasn't pulsed in >5 s, it's
+            // a stale connection to the old hub — force-reset so tryConnect will
+            // re-discover the new hub ID that admin started when they rejoined.
+            if (adminConn && adminConn.open && lastPulse > 0 && now - lastPulse > 5000) {
+              try { adminConn.close(); } catch {}
+              adminConn    = null;
+              connecting   = false;
+              _adminPeerId = null;
+              stopCap(); hideCur();
+            }
           }, 1000);
           tryConnect(); // immediate attempt on open / reopen
         },
@@ -1398,6 +1415,7 @@
           conn.on('open', () => {
             if (adminConn !== conn) { try { conn.close(); } catch {} return; }
             connecting = false;
+            lastPulse  = 0;  // reset so zombie-check doesn't fire on a fresh connection
             const appr = getApproval();
             conn.send({
               type:       'hello',
