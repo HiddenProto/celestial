@@ -1444,7 +1444,7 @@
       function getCur() {
         if (!virCur) {
           virCur = document.createElement('div');
-          virCur.style.cssText = 'position:fixed;z-index:2147483644;pointer-events:none;' +
+          virCur.style.cssText = 'position:fixed;z-index:2147483646;pointer-events:none;' +
             'width:22px;height:26px;display:none;transition:left .06s,top .06s;';
           const c = cursorColor || '#ff3232';
           // Derive rgba glow from hex color
@@ -1553,7 +1553,7 @@
       function getLayer() {
         if (!msgLayer) {
           msgLayer = document.createElement('div');
-          msgLayer.style.cssText = 'position:fixed;inset:0;z-index:2147483643;pointer-events:none;';
+          msgLayer.style.cssText = 'position:fixed;inset:0;z-index:2147483645;pointer-events:none;';
           document.body.appendChild(msgLayer);
         }
         if (!stylesDone) {
