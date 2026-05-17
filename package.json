@@ -28,6 +28,7 @@
     "youtubei.js": "^17.0.1"
   },
   "devDependencies": {
+    "peer": "^1.0.2",
     "ws": "^8.20.1"
   }
 }

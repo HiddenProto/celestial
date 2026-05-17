@@ -1,8 +1,12 @@
-// serve.js — Celestial local HTTPS + Wisp dev server
+// serve.js — Celestial local HTTPS + Wisp + PeerJS dev server
 // Run: node serve.js
 //
 // Certs are generated ONCE and stored in ./certs/ — never regenerated on
 // subsequent runs.  Delete ./certs/ to force a fresh certificate.
+//
+// PeerJS signaling runs on a separate plain-HTTP port (default 9001).
+// Chrome allows ws://localhost from https://localhost pages (localhost is
+// always a trusted origin), so no second cert bypass is needed.
 'use strict';
 
 const https  = require('https');
@@ -16,7 +20,8 @@ const ROOT  = __dirname;
 const CERTS = path.join(ROOT, 'certs');
 const CERT  = path.join(CERTS, 'cert.pem');
 const KEY   = path.join(CERTS, 'key.pem');
-const PORT  = Number(process.env.PORT) || 8443;
+const PORT      = Number(process.env.PORT)      || 8443;
+const PEER_PORT = Number(process.env.PEER_PORT) || 9001;
 const BUF   = 1 << 24; // 16 MB flow-control window
 
 // ── Persistent self-signed certificate ──────────────────────────────────────
@@ -192,11 +197,46 @@ wispWss.on('connection', ws => {
   ws.on('error', cleanup);
 });
 
+// ── PeerJS signaling server ───────────────────────────────────────────────────
+// Runs on plain HTTP so no second cert bypass is needed in the browser.
+// Chrome (and all Chromium browsers) always allow ws://localhost from HTTPS pages
+// because localhost is treated as a "potentially trustworthy" origin.
+function startPeerServer() {
+  try {
+    const { PeerServer } = require('peer');
+    const peerServer = PeerServer({
+      port:            PEER_PORT,
+      path:            '/',          // WS endpoint → ws://localhost:PORT/peerjs
+      allow_discovery: false,        // don't expose /peers list to clients
+    });
+
+    peerServer.on('connection', client => {
+      console.log(`[peer] + ${client.getId()}`);
+    });
+    peerServer.on('disconnect', client => {
+      console.log(`[peer] - ${client.getId()}`);
+    });
+
+    return true;
+  } catch (e) {
+    console.warn(`[peer] Could not start PeerJS server: ${e.message}`);
+    console.warn('[peer] The site will fall back to 0.peerjs.com for signaling.');
+    return false;
+  }
+}
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 server.listen(PORT, () => {
+  const peerOk = startPeerServer();
+
   console.log('\n✦  Celestial local dev server');
   console.log(`   HTTPS  →  https://localhost:${PORT}`);
   console.log(`   Wisp   →  wss://localhost:${PORT}/wisp/`);
+  if (peerOk) {
+    console.log(`   PeerJS →  ws://localhost:${PEER_PORT}/peerjs  (local signaling — always-on)`);
+  } else {
+    console.log('   PeerJS →  0.peerjs.com (local server unavailable)');
+  }
   console.log();
   console.log('   Cert warning? Click anywhere on the Chrome page and type: thisisunsafe');
   console.log('   Or permanently trust: certs/cert.pem in your OS certificate store.\n');

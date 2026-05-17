@@ -1,9 +1,9 @@
 /* ============================================================
    peer-mgr.js  —  Reliable PeerJS connection manager
    ─────────────────────────────────────────────────────────
-   Primary: 0.peerjs.com (official cloud — always-on, no cold
-            starts, supports custom fixed IDs).
-   Fallback: celestial-wisp (self-hosted, may sleep on Render).
+   Local dev  : ws://localhost:9001  (serve.js built-in, never sleeps)
+   Production : 0.peerjs.com (official cloud — no cold starts)
+   Auto-switch: checks location.hostname; localhost → local first.
 
    Handles:
    • Open watchdog — if 'open' never fires within OPEN_TIMEOUT ms,
@@ -27,22 +27,31 @@
 
   /* ── server list ────────────────────────────────────────── */
   const _locHost = localStorage.getItem('cst-peer-host');
-  const _locPort = parseInt(localStorage.getItem('cst-peer-port') || '3001');
+  const _locPort = parseInt(localStorage.getItem('cst-peer-port') || '0');
+
+  // When the page is served from localhost (via serve.js), the local PeerJS
+  // server on port 9001 is always available and never cold-starts.
+  // Chrome allows ws://localhost from https://localhost pages because localhost
+  // is a "potentially trustworthy" origin — no extra cert bypass needed.
+  const _isLocal = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+  const _localPeer = { host: 'localhost', port: _locPort || 9001, path: '/', secure: false, debug: 0 };
+
+  // Cloud servers (used when not local, or as fallbacks)
+  const _cloudPeer = { host: '0.peerjs.com', port: 443, path: '/', secure: true, debug: 0 };
 
   // Allow devs to override via localStorage('cst-peer-host').
-  // 'localhost' → single-server mode (no public-cloud fallback).
+  // 'localhost' → local-only mode (single server, no public-cloud fallback).
   // any other custom host → try it first, then fall back to cloud.
   const SERVERS = _locHost
     ? (_locHost === 'localhost'
-        ? [{ host: 'localhost', port: _locPort, path: '/peerjs', secure: false, debug: 0 }]
+        ? [{ host: 'localhost', port: _locPort || 9001, path: '/', secure: false, debug: 0 }]
         : [
-            { host: _locHost,        port: 443, path: '/peerjs', secure: true, debug: 0 },
-            { host: '0.peerjs.com',  port: 443, path: '/',       secure: true, debug: 0 },
+            { host: _locHost,   port: _locPort || 443, path: '/peerjs', secure: true, debug: 0 },
+            _cloudPeer,
           ])
-    : [
-        { host: '0.peerjs.com',                port: 443, path: '/',       secure: true, debug: 0 },
-        { host: 'celestial-wisp.onrender.com', port: 443, path: '/peerjs', secure: true, debug: 0 },
-      ];
+    : _isLocal
+      ? [ _localPeer, _cloudPeer ]   // local dev: local server first, cloud fallback
+      : [ _cloudPeer ];              // production: cloud only
 
   const OPEN_TIMEOUT = 6000;  // ms to wait for 'open' before trying next server
   const RETRY_DELAY  = 2000;  // ms between attempts
