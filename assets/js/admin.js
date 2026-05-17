@@ -442,7 +442,13 @@
         </div>
       </div>
       <div class="cb">
-        <h3>Keys <span id="ck-cnt" style="color:#444;font-size:.75rem;font-weight:normal;"></span></h3>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          <h3 style="margin:0;">Keys <span id="ck-cnt" style="color:#444;font-size:.75rem;font-weight:normal;"></span></h3>
+          <div style="margin-left:auto;display:flex;gap:6px;">
+            <button class="cbtn" id="ck-import" style="font-size:.71rem;">↑ import</button>
+            <button class="cbtn" id="ck-export" style="font-size:.71rem;">↓ export</button>
+          </div>
+        </div>
         <div id="ck-list"></div>
       </div>
     </div>
@@ -593,6 +599,8 @@
     });
 
     renderKeys();
+    panelEl.querySelector('#ck-export').onclick = doExportKeys;
+    panelEl.querySelector('#ck-import').onclick = doImportKeys;
 
     // ── identity panel ──
     const caName = panelEl.querySelector('#ca-name');
@@ -694,22 +702,34 @@
     if (cnt) cnt.textContent = `(${ks.length})`;
     if (!ks.length) { list.innerHTML = '<p style="color:#333;font-size:.8rem;">no keys yet.</p>'; return; }
     list.innerHTML = ks.slice().reverse().map((k, ri) => {
-      const i     = ks.length - 1 - ri;
-      const dLeft = Math.ceil((k.created + k.days * 86400000 - Date.now()) / 86400000);
-      const exp   = dLeft <= 0;
-      const cls   = exp ? 'ke' : (k.used ? 'ka' : 'kw');
-      const lbl   = exp ? 'expired' : (k.used ? `in use${k.usedBy ? ' ('+k.usedBy+')' : ''}` : 'waiting');
+      const i      = ks.length - 1 - ri;
+      const expTs  = k.expires || (k.created + (k.days || 7) * 86400000);
+      const dLeft  = Math.ceil((expTs - Date.now()) / 86400000);
+      const exp    = dLeft <= 0;
+      const cls    = exp ? 'ke' : (k.used ? 'ka' : 'kw');
+      const lbl    = exp ? 'expired' : (k.used ? 'active' : 'pending');
+      const meta   = [
+        `exp ${exp ? 'expired' : _fmtDate(expTs)}`,
+        k.used && k.usedBy ? k.usedBy : null,
+        k.uid        ? '· ' + k.uid.slice(-6)       : null,
+        k.deviceId   ? '· dev …' + k.deviceId.slice(-6) : null,
+      ].filter(Boolean).join('  ');
       return `<div class="ck">
         <div style="flex:1;min-width:0;">
-          <div style="font-size:.8rem;color:#aaa;margin-bottom:3px;">${k.name}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;">
+            <span style="font-size:.8rem;color:#aaa;font-weight:600;">${_adminEsc(k.name)}</span>
+            <span class="kb ${cls}">${lbl}</span>
+            ${!exp ? `<span style="font-size:.68rem;color:#2a2a2a;">${dLeft}d left</span>` : ''}
+          </div>
           <div class="ck-code">${k.key}</div>
+          <div style="font-size:.67rem;color:#2a2a2a;margin-top:3px;">${meta}</div>
         </div>
-        <div style="text-align:right;flex-shrink:0;">
-          <span class="kb ${cls}">${lbl}</span>
-          <div style="font-size:.68rem;color:#333;margin-top:3px;">${exp?'exp':dLeft+'d'}</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;padding-left:8px;">
+          <button onclick="__cstCopyKey(${i})" class="cbtn" style="font-size:.67rem;padding:2px 8px;">copy</button>
+          ${!exp ? `<button onclick="__cstExtendKey(${i})" class="cbtn" style="font-size:.67rem;padding:2px 8px;">+days</button>` : ''}
           ${exp
-            ? `<button onclick="__cstDeleteKey(${i})" style="background:none;border:none;color:#663333;cursor:pointer;font-size:.68rem;margin-top:2px;padding:0;">× remove</button>`
-            : `<button onclick="__cstRevoke(${i})" style="background:none;border:none;color:#2a2a2a;cursor:pointer;font-size:.66rem;margin-top:2px;padding:0;">revoke</button>`
+            ? `<button onclick="__cstDeleteKey(${i})" style="background:none;border:none;color:#663333;cursor:pointer;font-size:.68rem;padding:0;margin-top:2px;">× remove</button>`
+            : `<button onclick="__cstRevoke(${i})" style="background:none;border:none;color:#2a2a2a;cursor:pointer;font-size:.66rem;padding:0;margin-top:2px;">revoke</button>`
           }
         </div>
       </div>`;
@@ -725,7 +745,34 @@
     const ks = loadKeys(); ks.splice(i, 1); saveKeys(ks); renderKeys();
   };
 
+  window.__cstCopyKey = i => {
+    const ks = loadKeys(); const k = ks[i];
+    if (!k) return;
+    navigator.clipboard?.writeText(k.key).then(() => showToast('Key copied')).catch(() => {});
+  };
+
+  window.__cstExtendKey = i => {
+    const ks = loadKeys(); const k = ks[i];
+    if (!k) return;
+    const d = parseInt(prompt(`Add how many days to "${k.name}"?`, '7'));
+    if (!d || isNaN(d) || d < 1) return;
+    ks[i].expires = (ks[i].expires || Date.now()) + d * 86400000;
+    ks[i].days    = (ks[i].days || 0) + d;
+    saveKeys(ks); renderKeys(); broadcastKeysToPartner();
+    // Push updated expiry to client if they're online
+    if (k.uid) {
+      const cid = Object.keys(clients).find(id => clients[id].uid === k.uid);
+      if (cid) sendTo(cid, { type: 'key-extended', expires: ks[i].expires });
+    }
+    showToast(`Extended: ${k.name} +${d}d`);
+  };
+
   function _adminEsc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function _fmtDate(ts) {
+    const d = new Date(ts);
+    const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return mo[d.getMonth()] + ' ' + d.getDate() + ' ' + d.getFullYear();
+  }
 
   window.__cstAuthorize = id => {
     const c = clients[id];
@@ -778,6 +825,40 @@
     // Focus name field
     setTimeout(() => modal.querySelector('#cst-auth-name').focus(), 50);
   };
+
+  // ─── key export / import ─────────────────────────────────────
+  function doExportKeys() {
+    const ks   = loadKeys();
+    const blob = new Blob([JSON.stringify(ks, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = 'celestial-keys-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Exported ${ks.length} key(s)`);
+  }
+
+  function doImportKeys() {
+    const inp = document.createElement('input');
+    inp.type   = 'file';
+    inp.accept = '.json,application/json';
+    inp.onchange = e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const imported = JSON.parse(ev.target.result);
+          if (!Array.isArray(imported)) { showToast('Invalid key file'); return; }
+          mergeAdminKeys(imported);
+          showToast(`Imported ${imported.length} key(s)`);
+        } catch { showToast('Failed to parse key file'); }
+      };
+      reader.readAsText(file);
+    };
+    inp.click();
+  }
 
   // ─── hub (admin WebRTC) ──────────────────────────────────────
   // PeerMgr handles all reconnect / fallback logic automatically.
@@ -947,7 +1028,11 @@
         isFirstUser,
       });
       broadcastKeysToPartner();
-      document.getElementById('ck-wait').style.display = 'none';
+      // Notify admin that a key was just activated
+      window.notify && window.notify('🔑 Key activated: ' + kv.name, 'success', 6000);
+      showToast('Key activated: ' + kv.name);
+      const ckWait = document.getElementById('ck-wait');
+      if (ckWait) { ckWait.style.display = 'inline'; ckWait.style.color = '#44ff77'; ckWait.textContent = '✓ activated by ' + kv.name; }
       renderKeys();
       renderClients();
     }
@@ -1344,6 +1429,16 @@
           }
         }
         if (d.type === 'key-rejected') { window.__cstGateRejected?.(d.reason); }
+        if (d.type === 'key-extended') {
+          // Admin extended this user's access — update locally
+          const appr2 = getApproval();
+          if (appr2 && d.expires && d.expires > (appr2.expires || 0)) {
+            appr2.expires = d.expires;
+            localStorage.setItem('cst-approved', JSON.stringify(appr2));
+            renderBadgeButton();
+            showToast('Your access has been extended!');
+          }
+        }
         if (d.type === 'revoke')       {
           clearApproval();
           bc?.postMessage('revoked');
