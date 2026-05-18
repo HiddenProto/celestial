@@ -635,8 +635,8 @@
       <div class="cb">
         <h3>Connected Clients</h3>
         <p style="font-size:.76rem;color:#444;margin:0 0 10px;">
-          clients auto-connect to hub <code style="color:#666">112456LCD</code> every second.
-          click a client to view their screen. remove disconnects and revokes their access.
+          clients auto-connect to hub <code id="cp-clist-pid" style="color:#666">—</code> every second.
+          click a client to view their screen via a dedicated WebRTC media connection. remove disconnects and revokes their access.
         </p>
         <div id="cp-clist"><p style="color:#333;font-size:.82rem;">no clients connected.</p></div>
       </div>
@@ -938,8 +938,10 @@
     if (hub && !hub.destroyed) {
       var _h0 = document.getElementById('cp-hub');
       var _p0 = document.getElementById('cp-pid');
+      var _lp0 = document.getElementById('cp-clist-pid');
       if (_h0) { _h0.textContent = 'hub online'; _h0.className = 'on'; }
       if (_p0 && _hubOnlinePid) _p0.textContent = _hubOnlinePid;
+      if (_lp0 && _hubOnlinePid) _lp0.textContent = _hubOnlinePid;
     }
 
     // ── global actions ──
@@ -1243,8 +1245,10 @@
             _hubOnlinePid = id;
             var _h = document.getElementById('cp-hub');
             var _p = document.getElementById('cp-pid');
+            var _lp = document.getElementById('cp-clist-pid');
             if (_h) { _h.textContent = 'hub online'; _h.className = 'on'; }
             if (_p && id) _p.textContent = id;
+            if (_lp && id) _lp.textContent = id;
           }
           _markOnline(pid);
 
