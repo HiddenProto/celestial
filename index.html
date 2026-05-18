@@ -174,6 +174,12 @@
     var _cstIsLocal = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
     window._cstIsLocal = _cstIsLocal;
 
+    // bumblcat ultrapatch — the local Wisp server exposed publicly via localtunnel.
+    // All proxy traffic routes through this; static assets (JS/CSS/WASM) load from
+    // whatever fast host the user navigated to, keeping latency low.
+    var _ULTRAPATCH_WISP = 'wss://cst-celestial.loca.lt/wisp/';
+    window._ULTRAPATCH_WISP = _ULTRAPATCH_WISP;
+
     // ── Auto-import sync data from regular site (local instance only) ─────────
     // Regular site encodes settings into the URL hash when opening local server.
     // We apply silently here before anything else runs, then reload once.
@@ -217,15 +223,17 @@
       }
       localStorage.setItem('cst-wisp-migrated-v2', '1');
     })();
-    // Default Wisp = same-origin /wisp/ — serve.js hosts both the site and Wisp
-    // on the same port, so wss://[current host]/wisp/ is always correct whether
-    // running on localhost:58443 or cst-celestial.loca.lt.
-    var _wispOrigin = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wisp/';
-    const _wispLoc = localStorage.getItem('location') || _wispOrigin;
+    // Default Wisp: same-origin on localhost (direct, no internet roundtrip);
+    // bumblcat ultrapatch for everyone else (routes through cst-celestial.loca.lt).
+    // Only proxy WebSocket traffic uses the tunnel — celestial assets keep loading
+    // from the fast regular host the user navigated to.
+    var _wispOrigin  = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wisp/';
+    var _wispDefault = _cstIsLocal ? _wispOrigin : _ULTRAPATCH_WISP;
+    const _wispLoc = localStorage.getItem('location') || _wispDefault;
     setWisp(
       (_wispLoc.startsWith('wss://') || _wispLoc.startsWith('ws://'))
         ? _wispLoc
-        : _wispOrigin
+        : _wispDefault
     );
 
     setTransport(localStorage.getItem("transportz") || "libcurl");
@@ -465,10 +473,10 @@
               </select>
             </div>
             <div class="box">
-              <h3>Wisp Server <span class="info-icon"><span class="tip">The backend WebSocket server that relays your proxy traffic. Required for the proxy to work.<br><br><b>bumblcat (this server)</b> — default. Same server you loaded the site from. Best performance, uses the host's residential IP. Type: <b>private server</b>.<br><br><b>mercury workshop</b> — public community server. May trigger Google CAPTCHA due to shared IP. Type: <b>public server</b>.<br><br><b>custom</b> — enter your own wisp server URL. Type: <b>self-hosted server</b>.</span></span></h3>
+              <h3>Wisp Server <span class="info-icon"><span class="tip">The backend WebSocket server that relays your proxy traffic. Required for the proxy to work.<br><br><b>bumblcat ultrapatch</b> — default. Tunnels Wisp through cst-celestial.loca.lt (bumblcat's local server). Only proxy traffic uses the tunnel; page assets still load from wherever you opened the site. Uses a residential IP. Type: <b>private server</b>.<br><br><b>mercury workshop</b> — public community server. May trigger Google CAPTCHA due to shared IP. Type: <b>public server</b>.<br><br><b>custom</b> — enter your own wisp server URL. Type: <b>self-hosted server</b>.</span></span></h3>
               <p class="desc">the server that routes your proxied traffic</p>
               <select class="select" id="wispSelect">
-                <option value="__origin__">bumblcat ultrapatch</option>
+                <option value="wss://cst-celestial.loca.lt/wisp/">bumblcat ultrapatch</option>
                 <option value="wss://celestial-wisp.onrender.com/">bumblcat's server</option>
                 <option value="wss://wisp.mercurywork.shop/">mercury workshop</option>
                 <option value="wss://anura.pro/wisp/">anura (free)</option>
@@ -476,7 +484,7 @@
                 <option value="custom">custom server...</option>
               </select>
               <button onclick="__testWisp()" style="margin-top:6px;" class="button">test &amp; auto-pick fastest</button>
-              <button id="cst-open-local-btn" onclick="window._cstOpenLocalServer&&window._cstOpenLocalServer()" style="margin-top:6px;display:none;" class="button">open local server version</button>
+              <button id="cst-open-local-btn" onclick="window._cstOpenLocalServer&&window._cstOpenLocalServer()" style="margin-top:6px;display:none;" class="button">use bumblcat ultrapatch</button>
               <p id="wisp-test-out" style="font-size:.75rem;color:#666;margin:6px 0 0;min-height:14px;"></p>
               <input id="wispCustom" class="select" placeholder="wss://your-server/" style="display:none;" />
             </div>
@@ -1260,7 +1268,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.89";
+      var SITE_VER = "2.2.90";
 
       /**
        * Show a notification toast.
@@ -1449,7 +1457,6 @@
                 dismissFn();
                 localStorage.setItem("proxy-config-seen", String(PROXY_CFG_INTERNAL));
                 window._cstOpenLocalServer && window._cstOpenLocalServer();
-                window.notify("opening local server…", "info", 4000);
                 return;
               }
               if (btn._wsReady) {
@@ -1457,7 +1464,7 @@
                 localStorage.setItem("proxy-config-seen", String(PROXY_CFG_INTERNAL));
                 localStorage.setItem("transportz", "libcurl");
                 localStorage.setItem("pr0xy", "scram");
-                localStorage.removeItem("location");
+                localStorage.setItem("location", _ULTRAPATCH_WISP);
                 window.notify("v2 Wider Support enabled — reloading…", "success", 6000);
                 setTimeout(function () { location.reload(); }, 900);
                 return;
@@ -1522,11 +1529,10 @@
             onClick: function () {
               if (!window._cstIsLocal) {
                 window._cstOpenLocalServer && window._cstOpenLocalServer();
-                window.notify("opening local server…", "info", 4000);
               } else {
                 localStorage.setItem("transportz", "libcurl");
                 localStorage.setItem("pr0xy", "scram");
-                localStorage.removeItem("location");
+                localStorage.setItem("location", _ULTRAPATCH_WISP);
                 window.notify("Wider Support enabled — reloading…", "success", 6000);
                 setTimeout(function () { location.reload(); }, 900);
               }
@@ -1782,12 +1788,16 @@
       return d;
     };
 
-    // Open local server and pass current settings in URL hash (no interaction needed)
+    // Configure Wisp to bumblcat ultrapatch (cst-celestial.loca.lt) and reload.
+    // The user stays on the current fast site — only proxy WebSocket traffic is
+    // tunnelled through loca.lt; celestial assets continue loading from the CDN.
+    // Multiple users are supported: each gets an independent WSS connection.
     window._cstOpenLocalServer = function () {
-      var data = window._cstCollectSyncData();
-      var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(data))))
-        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-      window.open('https://localhost:58443/#cst-sync=' + b64, '_blank');
+      localStorage.setItem('location', _ULTRAPATCH_WISP);
+      if (!localStorage.getItem('pr0xy'))      localStorage.setItem('pr0xy', 'scram');
+      if (!localStorage.getItem('transportz')) localStorage.setItem('transportz', 'libcurl');
+      window.notify && window.notify('bumblcat ultrapatch configured — reloading…', 'success', 4000);
+      setTimeout(function () { location.reload(); }, 800);
     };
 
     window.exportData = function () {
@@ -1857,12 +1867,10 @@
       );
     };
 
-    // On load: show/hide elements based on instance type
+    // On load: show "use bumblcat ultrapatch" button on non-local sites.
+    // Import button is visible everywhere (data migration between devices).
     document.addEventListener('DOMContentLoaded', function () {
       if (!window._cstIsLocal) {
-        // Regular site: hide import button, show local server button
-        var ib = document.getElementById('cst-import-btn');
-        if (ib) ib.style.display = 'none';
         var lb = document.getElementById('cst-open-local-btn');
         if (lb) lb.style.display = '';
       }

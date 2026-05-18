@@ -441,14 +441,27 @@ function cookieStorage() {
   const wispCustom = document.getElementById('wispCustom');
   if (!tselect || !pr0xySelect || !wispSelect) return;
 
+  const _ULTRAPATCH_WISP = 'wss://cst-celestial.loca.lt/wisp/';
+  const _isLocalHost = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+
   // Restore saved values into selects
   tselect.value = localStorage.getItem('transportz') || 'libcurl';
   pr0xySelect.value = localStorage.getItem('pr0xy') || 'scram';
-  const savedWisp = localStorage.getItem('location');
+
+  // Stale sentinel from old __origin__ bug — clean up silently
+  let savedWisp = localStorage.getItem('location');
+  if (savedWisp === '__origin__') { localStorage.removeItem('location'); savedWisp = null; }
 
   if (!savedWisp) {
-    // No explicit Wisp set — using same-origin default (bumblcat this server)
-    wispSelect.value = '__origin__';
+    // No Wisp saved: default to bumblcat ultrapatch on regular sites;
+    // on localhost show same-origin URL in custom field (direct, no roundtrip).
+    if (_isLocalHost) {
+      const localWisp = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wisp/';
+      wispSelect.value = 'custom';
+      if (wispCustom) { wispCustom.style.display = 'block'; wispCustom.value = localWisp; }
+    } else {
+      wispSelect.value = _ULTRAPATCH_WISP;
+    }
   } else if ([...wispSelect.options].some(o => o.value === savedWisp)) {
     wispSelect.value = savedWisp;
   } else {
@@ -473,11 +486,6 @@ function cookieStorage() {
     if (localStorage.getItem('cfmode') === '1') return;
     if (wispSelect.value === 'custom') {
       if (wispCustom) wispCustom.style.display = 'block';
-    } else if (wispSelect.value === '__origin__') {
-      // Same-origin (bumblcat this server) — clear override so default kicks in
-      if (wispCustom) wispCustom.style.display = 'none';
-      localStorage.removeItem('location');
-      location.reload();
     } else {
       if (wispCustom) wispCustom.style.display = 'none';
       localStorage.setItem('location', wispSelect.value);
