@@ -17,6 +17,10 @@ wispSelect.addEventListener('change', () => {
     if (wispSelect.value === 'custom') {
         wispCustom.style.display = 'block';
         wispCustom.focus();
+    } else if (wispSelect.value === '__origin__') {
+        wispCustom.style.display = 'none';
+        localStorage.removeItem('location');
+        location.reload();
     } else {
         wispCustom.style.display = 'none';
         localStorage.setItem('location', wispSelect.value);
@@ -45,10 +49,12 @@ window.addEventListener('DOMContentLoaded', () => {
     if (savedTransport && [...transportsele.options].some(o => o.value === savedTransport))
         transportsele.value = savedTransport;
 
-    const savedWisp = localStorage.getItem('location') || 'wss://wisp.mercurywork.shop/';
-    if ([...wispSelect.options].some(o => o.value === savedWisp)) {
+    const savedWisp = localStorage.getItem('location');
+    if (!savedWisp) {
+        wispSelect.value = '__origin__';
+    } else if ([...wispSelect.options].some(o => o.value === savedWisp)) {
         wispSelect.value = savedWisp;
-    } else if (savedWisp && savedWisp !== 'wss://wisp.mercurywork.shop/') {
+    } else {
         wispSelect.value = 'custom';
         wispCustom.style.display = 'block';
         wispCustom.value = savedWisp;

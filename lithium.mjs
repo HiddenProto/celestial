@@ -124,8 +124,9 @@ async function _createBRCTransport() {
 	// Wait for the wisp connectivity test — if local wisp is down it will have
 	// already updated wispURL to the remote fallback before we reach here.
 	await _wispCheckPromise;
-	// Read wisp from localStorage — setWisp may not have been called yet
-	const savedWisp = localStorage.getItem("location") || "wss://celestial-wisp.onrender.com/";
+	// Read wisp from localStorage — setWisp may not have been called yet.
+	// Default to same-origin /wisp/ (matches what index.html does with _wispOrigin).
+	const savedWisp = localStorage.getItem("location") || _originWisp;
 	const wisp = wispURL || (
 		(savedWisp.startsWith("wss://") || savedWisp.startsWith("ws://"))
 			? savedWisp
@@ -429,8 +430,11 @@ async function ensureBRC() {
 // always fail for them (error code 7).  We detect this early and switch to the
 // remote wisp BEFORE the transport is created so no request ever sees the error.
 const _REMOTE_WISP = "wss://celestial-wisp.onrender.com/";
+// Default Wisp = same-origin /wisp/ — mirrors what index.html does with _wispOrigin.
+// Only fall back to _REMOTE_WISP if we're somehow not on localhost AND have no saved URL.
+const _originWisp = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/wisp/";
 const _wispCheckPromise = (async function _wispCheck() {
-	const saved = localStorage.getItem("location") || _REMOTE_WISP;
+	const saved = localStorage.getItem("location") || _originWisp;
 	const url = (saved.startsWith("wss://") || saved.startsWith("ws://"))
 		? saved
 		: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + saved;

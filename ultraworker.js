@@ -17,8 +17,9 @@ function _ensureUVSW() {
   if (_uvLoaded) return;
   _uvLoaded = true;
   try {
+    importScripts("/violet/violet.bundle.js"); // sets self.Ultraviolet (required by violet.sw.js)
     importScripts("/violet/violet.config.js"); // sets self.__uv$config
-    importScripts("/violet/violet.sw.js");     // sets self.UVServiceWorker
+    importScripts("/violet/violet.sw.js");     // sets self.UVServiceWorker (needs Ultraviolet)
     if (typeof self.UVServiceWorker === "function" && self.__uv$config) {
       _uvSW = new self.UVServiceWorker(self.__uv$config);
     }
