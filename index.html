@@ -174,35 +174,20 @@
     var _cstIsLocal = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
     window._cstIsLocal = _cstIsLocal;
 
-    // ── Auto-configure Wisp URL from GitHub (bumblcat-ultrapatch-url) ──────────
-    // Only runs on the local instance — the regular site cannot use bumblcat
-    // ultrapatch natively, and running this there would cause reload loops.
-    if (_cstIsLocal) (function() {
-      var _RAW = 'https://raw.githubusercontent.com/HiddenProto/celestial/main/bumblcat-ultrapatch-url';
-      fetch(_RAW, { cache: 'no-store' })
-        .then(function(r) { return r.ok ? r.text() : ''; })
-        .then(function(txt) {
-          var base = (txt || '').trim();
-          if (!base) return;
-          var wispUrl = base.replace('https://', 'wss://').replace('http://', 'ws://').replace(/\/$/, '') + '/wisp/';
-          var lastPatch = localStorage.getItem('cst-brc-patch') || '';
-          if (wispUrl === lastPatch) return;
-          localStorage.setItem('location', wispUrl);
-          localStorage.setItem('cst-brc-patch', wispUrl);
-          location.reload();
-        })
-        .catch(function() {});
-    })();
-
-    // One-time migration: replace old celestial-wisp default with mercury workshop.
-    // Only runs once (flag prevents overwriting a deliberate user choice later).
+    // ── Migrate stale Wisp URLs to same-origin (runs once per browser) ──────────
+    // Clears any old third-party or unrelated Wisp URLs so users automatically
+    // get the correct same-origin /wisp/ on next load.
     (function() {
-      if (localStorage.getItem('cst-wisp-migrated')) return;
-      var _old = localStorage.getItem('location');
-      if (_old === 'wss://celestial-wisp.onrender.com/' || _old === 'ws://celestial-wisp.onrender.com/') {
-        localStorage.setItem('location', 'wss://wisp.mercurywork.shop/');
-      }
-      localStorage.setItem('cst-wisp-migrated', '1');
+      if (localStorage.getItem('cst-wisp-migrated-v2')) return;
+      var _stale = [
+        'wss://celestial-wisp.onrender.com/',
+        'ws://celestial-wisp.onrender.com/',
+        'wss://wisp.mercurywork.shop/',
+        'ws://localhost:3001/',
+      ];
+      var _cur = localStorage.getItem('location');
+      if (_stale.indexOf(_cur) !== -1) localStorage.removeItem('location');
+      localStorage.setItem('cst-wisp-migrated-v2', '1');
     })();
     // Default Wisp = same-origin /wisp/ — serve.js hosts both the site and Wisp
     // on the same port, so wss://[current host]/wisp/ is always correct whether
@@ -452,11 +437,9 @@
               </select>
             </div>
             <div class="box">
-              <h3>Wisp Server <span class="info-icon"><span class="tip">The backend WebSocket server that relays your proxy traffic. Required for the proxy to work.<br><br><b>bumblcat's server</b> — private server hosted by bumblcat. Uses wisp-server-node. Has full cross-origin support, meaning more apps and games load correctly. Type: <b>private server</b>.<br><br><b>mercury workshop</b> — public community server. Uses wisp-js. May trigger Google CAPTCHA due to shared IP. Type: <b>public server</b>.<br><br><b>custom</b> — enter your own wisp server URL. Type: <b>self-hosted server</b>.</span></span></h3>
+              <h3>Wisp Server <span class="info-icon"><span class="tip">The backend WebSocket server that relays your proxy traffic. Required for the proxy to work.<br><br><b>bumblcat (this server)</b> — default. Same server you loaded the site from. Best performance, uses the host's residential IP. Type: <b>private server</b>.<br><br><b>mercury workshop</b> — public community server. May trigger Google CAPTCHA due to shared IP. Type: <b>public server</b>.<br><br><b>custom</b> — enter your own wisp server URL. Type: <b>self-hosted server</b>.</span></span></h3>
               <p class="desc">the server that routes your proxied traffic</p>
               <select class="select" id="wispSelect">
-                <option value="ws://localhost:3001/">bumblcat ultrapatch (local)</option>
-                <option value="wss://celestial-wisp.onrender.com/">bumblcat's server</option>
                 <option value="wss://wisp.mercurywork.shop/">mercury workshop</option>
                 <option value="wss://anura.pro/wisp/">anura (free)</option>
                 <option value="wss://wisp.nodeppt.com/">nodeppt (free)</option>
@@ -1246,7 +1229,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.80";
+      var SITE_VER = "2.2.81";
 
       /**
        * Show a notification toast.
@@ -1425,66 +1408,17 @@
         var buttons_v2 = [
           {
             label: "Wider Support",
-            info: "libcurl + bumblcat rrc + bumblcat ultrapatch (local) — best compatibility, uses your device's IP to bypass Google anomaly checks",
+            info: "libcurl + bumblcat rrc + bumblcat's Wisp server — best compatibility, routes through the host's residential IP",
             rawClick: true,
             onClick: function (btn, dismissFn) {
               if (btn._wsReady) {
                 dismissFn();
                 localStorage.setItem("transportz", "libcurl");
                 localStorage.setItem("pr0xy", "scram");
-                localStorage.setItem("location", "ws://localhost:3001/");
+                localStorage.removeItem("location"); // use same-origin Wisp (our server)
                 localStorage.setItem("proxy-config-seen", String(PROXY_CFG_INTERNAL));
-                // ── "another site required" follow-up notification ────────────
-                var _warnKey = "cst-wider-site-warn";
-                var _alwaysShow = localStorage.getItem(_warnKey) !== "0";
-                if (_alwaysShow) {
-                  var _warnAlways = _alwaysShow; // local copy for closures
-                  window.notifyOption(
-                    "another site is required",
-                    "to use this server, another site is required to have open.",
-                    [
-                      {
-                        label: "Open site",
-                        info: "open the local celestial server in a new tab",
-                        onClick: function () {
-                          window.open("https://localhost:58443", "_blank");
-                          setTimeout(function () { location.reload(); }, 500);
-                        }
-                      },
-                      {
-                        label: "Skip",
-                        info: "continue without opening",
-                        className: "opt-skip",
-                        onClick: function () {
-                          if (!_warnAlways) {
-                            window.notify(
-                              "you can switch this option on or go there instantly via going to proxy.",
-                              "info", 9000
-                            );
-                          }
-                          setTimeout(function () { location.reload(); }, 500);
-                        }
-                      },
-                      {
-                        label: "always show",
-                        info: "toggle whether this reminder appears when selecting v2 Wider Support",
-                        className: _warnAlways ? "" : "opt-skip",
-                        rawClick: true,
-                        onClick: function (b, _df) {
-                          _warnAlways = !_warnAlways;
-                          localStorage.setItem(_warnKey, _warnAlways ? "1" : "0");
-                          var lbl = b.querySelector(".notif-opt-label");
-                          if (lbl) lbl.textContent = _warnAlways ? "always show" : "don't show again";
-                          b.className = b.className.replace(/\bopt-skip\b/, "").trim();
-                          if (!_warnAlways) b.className += " opt-skip";
-                        }
-                      }
-                    ],
-                    { noAutoDismiss: true }
-                  );
-                } else {
-                  setTimeout(function () { location.reload(); }, 900);
-                }
+                window.notify("v2 Wider Support enabled — reloading…", "success", 6000);
+                setTimeout(function () { location.reload(); }, 900);
                 return;
               }
               var labelEl = btn.querySelector(".notif-opt-label");
@@ -1543,11 +1477,11 @@
         var buttons_v1 = [
           {
             label: "Wider Support",
-            info: "libcurl + bumblcat rrc + bumblcat ultrapatch (local) — best compatibility, uses your device's IP",
+            info: "libcurl + bumblcat rrc + bumblcat's Wisp server — best compatibility, routes through the host's residential IP",
             onClick: function () {
               localStorage.setItem("transportz", "libcurl");
               localStorage.setItem("pr0xy", "scram");
-              localStorage.setItem("location", "ws://localhost:3001/");
+              localStorage.removeItem("location"); // use same-origin Wisp
               window.notify("Wider Support enabled — reloading…", "success", 6000);
               setTimeout(function () { location.reload(); }, 900);
             }
@@ -1896,9 +1830,9 @@
 <script>
 // Wisp auto-test
 window.__testWisp = function() {
+  var _wispTestOrigin = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wisp/';
   const servers = [
-    'ws://localhost:3001/',
-    'wss://celestial-wisp.onrender.com/',
+    _wispTestOrigin,
     'wss://wisp.mercurywork.shop/',
     'wss://anura.pro/wisp/',
     'wss://wisp.nodeppt.com/'
