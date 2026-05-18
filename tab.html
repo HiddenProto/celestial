@@ -188,6 +188,14 @@
       <hr>
 
       <details open>
+        <summary>05/18 patch 2 — scramjet restored &amp; app loading</summary>
+        <p>- scramjet proxy engine re-enabled — fully functional again, no longer falls back to UV</p>
+        <p>- quick apps and media now load statically (direct) by default — faster, no Wisp needed</p>
+        <p>- settings: new "Quick Apps &amp; Media" toggle to switch between static and proxied app loading</p>
+        <p>- local games now navigate directly (no /news/frame.html wrapper needed)</p>
+      </details>
+
+      <details open>
         <summary>05/18 — new games &amp; proxy options</summary>
         <p>- added Krunker, Basketball Stars 2026, Moto X3M 4: Winter, Night of the Consumers, YoHoHo.IO, Just Shapes And Beats, s.p.l.i.t, and -b (Minus B) — pulled from celestial.press via cross-origin proxy</p>
         <p>- Wisp: added "local Wisp" option (enter your own device IP + port)</p>
@@ -488,7 +496,9 @@
       acClose();
       if (top) {
         if (top.source === "local") {
-          location.href = "/news/frame.html?mbed=" + encodeURIComponent(top.url);
+          location.href = top.url; // same-origin: navigate directly
+        } else if (top.badge === "app" && localStorage.getItem("proxy-tools") !== "1") {
+          location.href = makeURL(top.url, search); // apps: direct by default
         } else {
           location.href = await getProxied(makeURL(top.url, search));
         }
@@ -559,7 +569,9 @@
           e.preventDefault(); // prevent input blur before click fires
           acClose();
           if (it.source === "local") {
-            location.href = "/news/frame.html?mbed=" + encodeURIComponent(it.url);
+            location.href = it.url; // same-origin: navigate directly
+          } else if (it.badge === "app" && localStorage.getItem("proxy-tools") !== "1") {
+            location.href = makeURL(it.url, search); // apps: direct by default
           } else {
             location.href = await getProxied(makeURL(it.url, search));
           }
@@ -600,10 +612,10 @@
     document.getElementById("close").addEventListener("click", exitUpdLog);
 
     window.addEventListener("load", function () {
-      if (!localStorage.getItem("updlogview16")) {
+      if (!localStorage.getItem("updlogview17")) {
         document.getElementById("update-log").style.display = "block";
         document.querySelector(".upd-bg").style.display = "block";
-        localStorage.setItem("updlogview16", "1");
+        localStorage.setItem("updlogview17", "1");
       }
     });
   </script>

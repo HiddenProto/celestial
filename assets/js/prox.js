@@ -3,6 +3,7 @@ const transportsele = document.getElementById('tselect');
 const wispSelect = document.getElementById('wispSelect');
 const wispCustom = document.getElementById('wispCustom');
 const wispLocalFields = document.getElementById('wispLocalFields');
+const proxyToolsSelect = document.getElementById('proxyToolsSelect');
 
 const _ULTRAPATCH_WISP = 'wss://cst-celestial.loca.lt/wisp/';
 const _isLocalHost = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
@@ -46,10 +47,22 @@ wispCustom.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') wispCustom.dispatchEvent(new Event('change'));
 });
 
+if (proxyToolsSelect) {
+    proxyToolsSelect.addEventListener('change', () => {
+        localStorage.setItem('proxy-tools', proxyToolsSelect.value);
+    });
+}
+
 window.addEventListener('DOMContentLoaded', () => {
     const savedProxy = localStorage.getItem('pr0xy');
     if (savedProxy && [...pr0xySelect.options].some(o => o.value === savedProxy))
         pr0xySelect.value = savedProxy;
+
+    if (proxyToolsSelect) {
+        const savedPT = localStorage.getItem('proxy-tools');
+        if (savedPT === '1') proxyToolsSelect.value = '1';
+        else proxyToolsSelect.value = '0';
+    }
 
     const savedTransport = localStorage.getItem('transportz');
     if (savedTransport && [...transportsele.options].some(o => o.value === savedTransport))

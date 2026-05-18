@@ -464,13 +464,13 @@
               </select>
             </div>
             <div class="box">
-              <h3>Pr<span>o</span>xy <span class="info-icon"><span class="tip">Controls how page content is rewritten for proxying.<br><br><b>scramjet (incompatible)</b> — currently broken, do not use. Falls back to ultraviolet automatically. Type: <b>client-side</b>.<br><br><b>bumblcat rrc (WIP)</b> — private scramjet fork. Best for multiplayer games: spoofs WebSocket Origin and User-Agent headers so game servers see the correct site origin. Requires <b>epoxy</b> transport to take effect. Work in progress — may not render all sites correctly yet. Type: <b>client-side</b>.<br><br><b>ultraviolet</b> — older rewriter, works with some legacy sites. Type: <b>client-side</b>.<br><br>💡 Tip: enable <b>Virtual Entity</b> mode to give the pr<span>o</span>xy a real browser identity — improves access to Google, YouTube, and other sites that detect pr<span>o</span>xies.</span></span></h3>
+              <h3>Pr<span>o</span>xy <span class="info-icon"><span class="tip">Controls how page content is rewritten for proxying.<br><br><b>bumblcat rrc</b> — private BRC fork. Best for multiplayer games: spoofs WebSocket Origin and User-Agent so game servers see the correct origin. Requires <b>epoxy</b> transport. Type: <b>client-side</b>.<br><br><b>scramjet</b> — Mercury Workshop's open-source rewriter. Wider site compatibility. Recommended for general browsing. Type: <b>client-side</b>.<br><br><b>ultraviolet</b> — older rewriter, works with some legacy sites. Type: <b>client-side</b>.<br><br>💡 Tip: enable <b>Virtual Entity</b> mode to give the pr<span>o</span>xy a real browser identity — improves access to Google, YouTube, and other sites that detect pr<span>o</span>xies.</span></span></h3>
               <p class="desc">
                 change which rewriter engine handles pr<span>o</span>xied pages
               </p>
               <select class="select" id="pr0xySelect">
                 <option value="scram" selected>bumblcat rrc</option>
-                <option value="scramjet">sc<span>ram</span>jet (incompatible)</option>
+                <option value="scramjet">sc<span>ram</span>jet</option>
                 <option value="violet">ul<span>tr</span>av<span>io</span>l<span>e</span>t</option>
               </select>
             </div>
@@ -496,6 +496,14 @@
                 <button onclick="__applyLocalWisp()" class="button" style="width:100%;">connect</button>
               </div>
               <input id="wispCustom" class="select" placeholder="wss://your-server/" style="display:none;" />
+            </div>
+            <div class="box">
+              <h3>Quick Apps &amp; Media <span class="info-icon"><span class="tip">Controls how quick apps and media sites are loaded when opened from the new tab page.<br><br><b>static (default)</b> — opens apps directly without the proxy. Works for most accessible sites. Faster.<br><br><b>proxied</b> — routes apps through the selected proxy engine. Use if apps are blocked on your network.</span></span></h3>
+              <p class="desc">how quick apps and media are opened</p>
+              <select class="select" id="proxyToolsSelect">
+                <option value="0" selected>static (direct)</option>
+                <option value="1">proxied</option>
+              </select>
             </div>
           </div>
           <div id="appear">
@@ -1277,7 +1285,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.91";
+      var SITE_VER = "2.2.92";
 
       /**
        * Show a notification toast.
@@ -1431,17 +1439,8 @@
       // ── Proxy config version ─────────────────────────────────────────────────
       var PROXY_CFG_INTERNAL = 3;
 
-      // Warn only for users who explicitly chose scramjet (still useful)
+      // Proxy config prompt disabled — users configure via Settings → Proxy.
       setTimeout(function () {
-        const currentProxy = localStorage.getItem("pr0xy");
-        if (currentProxy === "scramjet") {
-          window.notify(
-            "The current proxy you have on, scramjet, is currently an unreliable configuration.",
-            "warning",
-            12000
-          );
-        }
-        // Proxy config prompt disabled — users configure via Settings → Proxy.
         if (true) return;
 
         // ── v2 buttons (with Wider Support animation) ──────────────────────

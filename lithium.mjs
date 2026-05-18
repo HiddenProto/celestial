@@ -653,10 +653,20 @@ export async function getProxied(input) {
 			}
 			if (frame) return frame.prefix + encodeURIComponent(url);
 		}
-		// BRC not ready — skip scramjet (currently incompatible), fall through to UV.
+		// BRC not ready — fall through to scramjet or UV.
 	} else if (proxyOption === "scramjet") {
-		// Scramjet is currently marked incompatible — fall straight through to UV.
-		console.warn("lethal.js: scramjet selected but incompatible, falling back to UV");
+		// Wait for scramjet init if it's in flight (up to 5 s)
+		if (!_scramjetController && _scramjetInitPromise) {
+			await Promise.race([_scramjetInitPromise, new Promise(r => setTimeout(r, 5000))]);
+		}
+		if (_scramjetController) {
+			try {
+				return _scramjetController.encodeUrl(url);
+			} catch(e) {
+				console.warn("lethal.js: scramjet encodeUrl failed —", e.message);
+			}
+		}
+		// Scramjet not ready — fall through to UV
 	}
 	return window.__uv$config.prefix + window.__uv$config.encodeUrl(url);
 }
