@@ -174,6 +174,29 @@
     var _cstIsLocal = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
     window._cstIsLocal = _cstIsLocal;
 
+    // ── Auto-import sync data from regular site (local instance only) ─────────
+    // Regular site encodes settings into the URL hash when opening local server.
+    // We apply silently here before anything else runs, then reload once.
+    if (_cstIsLocal) (function () {
+      var h = location.hash;
+      if (!h || !h.startsWith('#cst-sync=')) return;
+      history.replaceState(null, '', location.pathname + location.search);
+      try {
+        var enc = h.slice('#cst-sync='.length);
+        var b64 = enc.replace(/-/g, '+').replace(/_/g, '/');
+        while (b64.length % 4) b64 += '=';
+        var data = JSON.parse(decodeURIComponent(escape(atob(b64))));
+        var _x = { 'cst-admin': 1, 'cst-admin-id': 1, 'cst-keys': 1, 'cst-key': 1 };
+        var changed = false;
+        Object.keys(data).forEach(function (k) {
+          if (!_x[k] && localStorage.getItem(k) !== data[k]) {
+            localStorage.setItem(k, data[k]); changed = true;
+          }
+        });
+        if (changed) location.reload();
+      } catch (e) {}
+    })();
+
     // ── Migrate stale Wisp URLs to same-origin (runs once per browser) ──────────
     // Clears any old third-party or unrelated Wisp URLs so users automatically
     // get the correct same-origin /wisp/ on next load.
@@ -445,7 +468,7 @@
               <h3>Wisp Server <span class="info-icon"><span class="tip">The backend WebSocket server that relays your proxy traffic. Required for the proxy to work.<br><br><b>bumblcat (this server)</b> — default. Same server you loaded the site from. Best performance, uses the host's residential IP. Type: <b>private server</b>.<br><br><b>mercury workshop</b> — public community server. May trigger Google CAPTCHA due to shared IP. Type: <b>public server</b>.<br><br><b>custom</b> — enter your own wisp server URL. Type: <b>self-hosted server</b>.</span></span></h3>
               <p class="desc">the server that routes your proxied traffic</p>
               <select class="select" id="wispSelect">
-                <option value="__origin__">bumblcat (this server) ✦</option>
+                <option value="__origin__">bumblcat ultrapatch ✦</option>
                 <option value="wss://celestial-wisp.onrender.com/">bumblcat's server</option>
                 <option value="wss://wisp.mercurywork.shop/">mercury workshop</option>
                 <option value="wss://anura.pro/wisp/">anura (free)</option>
@@ -453,8 +476,7 @@
                 <option value="custom">custom server...</option>
               </select>
               <button onclick="__testWisp()" style="margin-top:6px;" class="button">test &amp; auto-pick fastest</button>
-              <button onclick="__reconfigProxy()" style="margin-top:6px;" class="button">reconfigure proxy…</button>
-              <button id="cst-open-local-btn" onclick="window.open('https://localhost:58443','_blank')" style="margin-top:6px;display:none;" class="button">open local server version</button>
+              <button id="cst-open-local-btn" onclick="window._cstOpenLocalServer&&window._cstOpenLocalServer()" style="margin-top:6px;display:none;" class="button">open local server version</button>
               <p id="wisp-test-out" style="font-size:.75rem;color:#666;margin:6px 0 0;min-height:14px;"></p>
               <input id="wispCustom" class="select" placeholder="wss://your-server/" style="display:none;" />
             </div>
@@ -1238,7 +1260,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.86";
+      var SITE_VER = "2.2.87";
 
       /**
        * Show a notification toast.
@@ -1422,12 +1444,18 @@
             onClick: function (btn, dismissFn) {
               if (btn._wsReady) {
                 dismissFn();
-                localStorage.setItem("transportz", "libcurl");
-                localStorage.setItem("pr0xy", "scram");
-                localStorage.removeItem("location"); // use same-origin Wisp (our server)
                 localStorage.setItem("proxy-config-seen", String(PROXY_CFG_INTERNAL));
-                window.notify("v2 Wider Support enabled — reloading…", "success", 6000);
-                setTimeout(function () { location.reload(); }, 900);
+                if (!window._cstIsLocal) {
+                  // Regular site: open local server with synced data, don't touch proxy here
+                  window._cstOpenLocalServer && window._cstOpenLocalServer();
+                  window.notify("opening local server…", "info", 4000);
+                } else {
+                  localStorage.setItem("transportz", "libcurl");
+                  localStorage.setItem("pr0xy", "scram");
+                  localStorage.removeItem("location");
+                  window.notify("v2 Wider Support enabled — reloading…", "success", 6000);
+                  setTimeout(function () { location.reload(); }, 900);
+                }
                 return;
               }
               var labelEl = btn.querySelector(".notif-opt-label");
@@ -1486,13 +1514,18 @@
         var buttons_v1 = [
           {
             label: "Wider Support",
-            info: "libcurl + bumblcat rrc + bumblcat's Wisp server — best compatibility, routes through the host's residential IP",
+            info: "libcurl + bumblcat rrc + bumblcat ultrapatch — best compatibility, routes through the host's residential IP",
             onClick: function () {
-              localStorage.setItem("transportz", "libcurl");
-              localStorage.setItem("pr0xy", "scram");
-              localStorage.removeItem("location"); // use same-origin Wisp
-              window.notify("Wider Support enabled — reloading…", "success", 6000);
-              setTimeout(function () { location.reload(); }, 900);
+              if (!window._cstIsLocal) {
+                window._cstOpenLocalServer && window._cstOpenLocalServer();
+                window.notify("opening local server…", "info", 4000);
+              } else {
+                localStorage.setItem("transportz", "libcurl");
+                localStorage.setItem("pr0xy", "scram");
+                localStorage.removeItem("location");
+                window.notify("Wider Support enabled — reloading…", "success", 6000);
+                setTimeout(function () { location.reload(); }, 900);
+              }
             }
           },
           {
@@ -1695,11 +1728,6 @@
 
   document.getElementById("close").addEventListener("click", exitSetting);
 
-  window.__reconfigProxy = function () {
-    localStorage.removeItem('proxy-config-seen');
-    exitSetting();
-    location.reload();
-  };
 
   // ── Export / Import data system ──────────────────────────────────────────────
   (function () {
@@ -1739,6 +1767,24 @@
         return { data: data };
       } catch (e) { return { error: 'unknown' }; }
     }
+
+    // Collect non-sensitive localStorage data for export/sync
+    window._cstCollectSyncData = function () {
+      var d = {};
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!_EXCL[k]) d[k] = localStorage.getItem(k);
+      }
+      return d;
+    };
+
+    // Open local server and pass current settings in URL hash (no interaction needed)
+    window._cstOpenLocalServer = function () {
+      var data = window._cstCollectSyncData();
+      var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(data))))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      window.open('https://localhost:58443/#cst-sync=' + b64, '_blank');
+    };
 
     window.exportData = function () {
       var d = {};
