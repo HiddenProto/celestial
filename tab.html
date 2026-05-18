@@ -188,6 +188,14 @@
       <hr>
 
       <details open>
+        <summary>05/18 patch 3 — offline admin tokens</summary>
+        <p>- admin system: new signed token types (proxy / notify / theme) — work entirely offline, no hub connection required</p>
+        <p>- access keys now fall back to local validation when admin is unreachable — no more "admin is offline" dead-end</p>
+        <p>- admin panel: Token Creator for generating proxy config, notification, and theme tokens to share with users</p>
+        <p>- admin Global Actions: push proxy config, push theme, and reload all connected clients at once</p>
+      </details>
+
+      <details open>
         <summary>05/18 patch 2 — scramjet restored &amp; app loading</summary>
         <p>- scramjet proxy engine re-enabled — fully functional again, no longer falls back to UV</p>
         <p>- quick apps and media now load statically (direct) by default — faster, no Wisp needed</p>
@@ -612,10 +620,10 @@
     document.getElementById("close").addEventListener("click", exitUpdLog);
 
     window.addEventListener("load", function () {
-      if (!localStorage.getItem("updlogview17")) {
+      if (!localStorage.getItem("updlogview18")) {
         document.getElementById("update-log").style.display = "block";
         document.querySelector(".upd-bg").style.display = "block";
-        localStorage.setItem("updlogview17", "1");
+        localStorage.setItem("updlogview18", "1");
       }
     });
   </script>

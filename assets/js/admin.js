@@ -82,6 +82,33 @@
       return Date.now() > e ? null : { name: n, expires: e };
     } catch { return null; }
   }
+
+  // ─── generalized token system (offline-capable) ──────────────
+  // Tokens share the same HMAC structure as keys but carry a type + arbitrary
+  // payload.  Types: 'access' (identical to old key), 'proxy', 'notify', 'theme'.
+  // Old-format keys ({n,e}) are recognized as type 'access' for full compat.
+  function makeToken(type, payload, days) {
+    const e = Date.now() + days * 86400000;
+    const p = btoa(JSON.stringify({ t: type, p: payload, e }));
+    return p + '.' + H(p + SEC);
+  }
+  function checkToken(raw) {
+    if (!raw) return null;
+    try {
+      const dot = raw.lastIndexOf('.');
+      const base = raw.slice(0, dot);
+      if (H(base + SEC) !== raw.slice(dot + 1)) return null;
+      const decoded = JSON.parse(atob(base));
+      if (Date.now() > decoded.e) return null;
+      // Old key format: {n, e}
+      if (typeof decoded.n !== 'undefined') {
+        return { type: 'access', name: decoded.n, expires: decoded.e };
+      }
+      // New token format: {t, p, e}
+      if (!decoded.t) return null;
+      return { type: decoded.t, payload: decoded.p || {}, expires: decoded.e };
+    } catch { return null; }
+  }
   function makeUID() {
     const an  = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     const sym = '!@#$%^&*-_+=';
@@ -263,13 +290,49 @@
 
     const go = () => {
       const k  = inp.value.trim();
-      const kv = checkKey(k);
-      if (!kv) {
+      const tv = checkToken(k);
+      if (!tv) {
         inp.style.borderColor = '#ff3333';
         setTimeout(() => inp.style.borderColor = '', 2500);
         setError(k ? 'invalid or expired key.' : 'enter a key first.');
         return;
       }
+
+      // ── Non-access tokens are handled entirely offline ──────────
+      if (tv.type === 'proxy') {
+        const cfg = tv.payload || {};
+        if (cfg.pr0xy)      localStorage.setItem('pr0xy',      cfg.pr0xy);
+        if (cfg.transportz) localStorage.setItem('transportz', cfg.transportz);
+        if (cfg.location)   localStorage.setItem('location',   cfg.location);
+        d.remove();
+        window.notify?.('Proxy config applied — reloading…', 'success', 4000);
+        setTimeout(() => location.reload(), 800);
+        return;
+      }
+      if (tv.type === 'notify') {
+        const cfg = tv.payload || {};
+        const level = ['info','success','warning','error'].includes(cfg.level) ? cfg.level : 'info';
+        const dur   = Math.min(Math.max(parseInt(cfg.dur) || 8, 1), 60) * 1000;
+        window.notify?.(cfg.msg || 'notification', level, dur);
+        d.remove();
+        return;
+      }
+      if (tv.type === 'theme') {
+        const cfg = tv.payload || {};
+        if (cfg.theme) {
+          localStorage.setItem('theme', cfg.theme);
+          document.body.setAttribute('theme', cfg.theme);
+          if (cfg.theme === 'apex' && !document.querySelector('script[src="/assets/js/apex.js"]')) {
+            const s = document.createElement('script'); s.src = '/assets/js/apex.js';
+            document.body.appendChild(s);
+          }
+        }
+        d.remove();
+        window.notify?.('Theme applied: ' + (cfg.theme || ''), 'success', 3000);
+        return;
+      }
+
+      // ── Access token — hub validates single-use, offline fallback ─
       lock();
       err.textContent = '';
       setInfo('contacting admin…');
@@ -305,10 +368,27 @@
       setTimeout(() => inp.style.borderColor = '', 3000);
     };
     window.__cstGateOffline = () => {
+      // If the key is locally valid, approve offline (sacrifices single-use
+      // enforcement when hub is unreachable — acceptable as a fallback).
+      const rawKey = window.__cstPendingKey || '';
+      const tv = checkToken(rawKey);
+      if (tv && tv.type === 'access') {
+        const uid = makeUID();
+        setApproved(tv.name, tv.expires, { uid });
+        renderBadgeButton();
+        d.remove();
+        delete window.__cstGateApproved;
+        delete window.__cstGateRejected;
+        delete window.__cstGateOffline;
+        delete window.__cstPendingKey;
+        localStorage.removeItem('cst-key');
+        window.notify?.('Access approved (admin offline — local validation)', 'info', 6000);
+        return;
+      }
       unlock();
       localStorage.removeItem('cst-key');
       delete window.__cstPendingKey;
-      setInfo('admin is offline — keys require admin to be connected. try again later.');
+      setInfo('admin is offline — try again later.');
       setTimeout(() => setInfo(''), 5000);
     };
   }
@@ -450,6 +530,65 @@
         </div>
       </div>
       <div class="cb">
+        <h3>Create Token <span style="font-size:.7rem;color:#444;font-weight:normal;">offline-capable</span></h3>
+        <p style="font-size:.73rem;color:#444;margin:0 0 10px;">tokens are executed client-side — no hub needed. share like a key.</p>
+        <div class="crow" style="margin-bottom:8px;">
+          <select class="ci" id="ct-type" style="width:130px;">
+            <option value="proxy">proxy config</option>
+            <option value="notify">notification</option>
+            <option value="theme">theme</option>
+          </select>
+          <input class="ci" id="ct-days" type="number" value="1" min="1" style="width:58px;" title="valid for N days"/>
+          <button class="cbtn g" id="ct-make">create</button>
+        </div>
+        <div id="ct-fields-proxy">
+          <div class="crow">
+            <select class="ci" id="ct-pr0xy" style="width:115px;" title="proxy engine">
+              <option value="">— engine —</option>
+              <option value="brc">brc</option>
+              <option value="scramjet">scramjet</option>
+              <option value="uv">uv</option>
+              <option value="epoxy">epoxy</option>
+            </select>
+            <select class="ci" id="ct-transport" style="width:115px;" title="transport">
+              <option value="">— transport —</option>
+              <option value="libcurl">libcurl</option>
+              <option value="epoxy">epoxy</option>
+            </select>
+          </div>
+          <div class="crow">
+            <input class="ci" id="ct-location" placeholder="wisp URL or 'static'" style="flex:1;min-width:0;"/>
+          </div>
+        </div>
+        <div id="ct-fields-notify" style="display:none;">
+          <div class="crow">
+            <input class="ci" id="ct-notify-msg" placeholder="message text" style="flex:1;min-width:0;"/>
+            <select class="ci" id="ct-notify-level" style="width:90px;">
+              <option value="info">info</option>
+              <option value="success">success</option>
+              <option value="warning">warning</option>
+              <option value="error">error</option>
+            </select>
+            <input class="ci" id="ct-notify-dur" type="number" value="8" min="1" max="60" style="width:50px;" title="seconds"/>
+          </div>
+        </div>
+        <div id="ct-fields-theme" style="display:none;">
+          <div class="crow">
+            <select class="ci" id="ct-theme" style="width:130px;">
+              <option value="dark">dark</option>
+              <option value="light">light</option>
+              <option value="apex">apex</option>
+            </select>
+          </div>
+        </div>
+        <div id="ct-out" style="display:none;margin-top:10px;">
+          <p style="font-size:.75rem;color:#555;margin:0 0 6px;">share token:</p>
+          <div id="ct-val" style="background:#080808;border:1px solid #1e2a1e;border-radius:5px;
+            padding:10px;font-family:monospace;font-size:.7rem;word-break:break-all;color:#77ccff;"></div>
+          <button class="cbtn" id="ct-copy" style="margin-top:8px;">copy</button>
+        </div>
+      </div>
+      <div class="cb">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
           <h3 style="margin:0;">Keys <span id="ck-cnt" style="color:#444;font-size:.75rem;font-weight:normal;"></span></h3>
           <div style="margin-left:auto;display:flex;gap:6px;">
@@ -486,6 +625,32 @@
           <input class="ci" id="cp-nuke-url" placeholder="embed URL…" style="display:none;flex:1;min-width:0;"/>
           <button class="cbtn r" id="cp-nuke-all">💥 nuke all</button>
           <button class="cbtn" id="cp-unnuke-all" style="font-size:.72rem;">✕ un-nuke all</button>
+        </div>
+        <div style="border-top:1px solid #161616;margin:10px 0 8px;"></div>
+        <div class="crow" style="align-items:center;flex-wrap:wrap;gap:6px;">
+          <select class="ci" id="cp-proxy-eng" style="width:100px;" title="proxy engine">
+            <option value="">— engine —</option>
+            <option value="brc">brc</option>
+            <option value="scramjet">scramjet</option>
+            <option value="uv">uv</option>
+            <option value="epoxy">epoxy</option>
+          </select>
+          <select class="ci" id="cp-proxy-tr" style="width:95px;" title="transport">
+            <option value="">— transport —</option>
+            <option value="libcurl">libcurl</option>
+            <option value="epoxy">epoxy</option>
+          </select>
+          <input class="ci" id="cp-proxy-loc" placeholder="wisp / static" style="width:120px;" title="wisp URL or 'static'"/>
+          <button class="cbtn" id="cp-proxy-push" style="font-size:.72rem;">⚙ push proxy</button>
+        </div>
+        <div class="crow" style="flex-wrap:wrap;gap:6px;margin-top:4px;">
+          <select class="ci" id="cp-theme-sel" style="width:100px;">
+            <option value="dark">dark</option>
+            <option value="light">light</option>
+            <option value="apex">apex</option>
+          </select>
+          <button class="cbtn" id="cp-theme-push" style="font-size:.72rem;">🎨 push theme</button>
+          <button class="cbtn r" id="cp-reload-all" style="font-size:.72rem;">↺ reload all</button>
         </div>
         <div id="cp-ping-stat" style="font-size:.7rem;color:#444;margin-top:6px;display:none;"></div>
       </div>
@@ -535,9 +700,10 @@
         <p style="font-size:.82rem;">instance: <code id="cp-inst-info" style="color:#777;"></code></p>
       </div>
       <div class="cb">
-        <h3>Keys</h3>
-        <p style="font-size:.78rem;color:#555;margin:0 0 6px;">keys are single-use. admin must be online to activate. users reconnect automatically via device ID after first use.</p>
-        <p style="font-size:.78rem;color:#555;margin:0;">key expiry is set at creation and counts from creation date, not first use.</p>
+        <h3>Keys &amp; Tokens</h3>
+        <p style="font-size:.78rem;color:#555;margin:0 0 6px;">access keys are single-use and require admin online on first activation. after first use, device reconnects automatically. if admin is offline, the key is validated locally (sacrifices single-use enforcement).</p>
+        <p style="font-size:.78rem;color:#555;margin:0 0 6px;">tokens (proxy / notify / theme) require no admin connection — they execute immediately on the client side using the same HMAC signature.</p>
+        <p style="font-size:.78rem;color:#555;margin:0;">key/token expiry counts from creation date, not first use.</p>
       </div>
       <div class="cb">
         <h3>Screen Viewer</h3>
@@ -589,6 +755,50 @@
     panelEl.querySelector('#ck-make').onclick   = doMakeKey;
     panelEl.querySelector('#ck-copy').onclick   = () =>
       navigator.clipboard?.writeText(document.getElementById('ck-val').textContent).catch(() => {});
+
+    // ── Token Creator ──
+    const ctType = panelEl.querySelector('#ct-type');
+    const ctFieldsProxy  = panelEl.querySelector('#ct-fields-proxy');
+    const ctFieldsNotify = panelEl.querySelector('#ct-fields-notify');
+    const ctFieldsTheme  = panelEl.querySelector('#ct-fields-theme');
+    function _ctShowFields(t) {
+      ctFieldsProxy.style.display  = t === 'proxy'  ? '' : 'none';
+      ctFieldsNotify.style.display = t === 'notify' ? '' : 'none';
+      ctFieldsTheme.style.display  = t === 'theme'  ? '' : 'none';
+    }
+    if (ctType) {
+      ctType.addEventListener('change', () => _ctShowFields(ctType.value));
+      _ctShowFields(ctType.value);
+    }
+    panelEl.querySelector('#ct-make').onclick = () => {
+      const type = ctType?.value || 'proxy';
+      const days = Math.max(1, parseInt(panelEl.querySelector('#ct-days')?.value) || 1);
+      let payload = {};
+      if (type === 'proxy') {
+        const eng = panelEl.querySelector('#ct-pr0xy')?.value;
+        const tr  = panelEl.querySelector('#ct-transport')?.value;
+        const loc = (panelEl.querySelector('#ct-location')?.value || '').trim();
+        if (eng) payload.pr0xy      = eng;
+        if (tr)  payload.transportz = tr;
+        if (loc) payload.location   = loc;
+        if (!eng && !tr && !loc) { showToast('Set at least one proxy field'); return; }
+      } else if (type === 'notify') {
+        const msg = (panelEl.querySelector('#ct-notify-msg')?.value || '').trim();
+        if (!msg) { showToast('Enter notification text'); return; }
+        payload.msg   = msg;
+        payload.level = panelEl.querySelector('#ct-notify-level')?.value || 'info';
+        payload.dur   = parseInt(panelEl.querySelector('#ct-notify-dur')?.value) || 8;
+      } else if (type === 'theme') {
+        payload.theme = panelEl.querySelector('#ct-theme')?.value || 'dark';
+      }
+      const token = makeToken(type, payload, days);
+      const ctOut = panelEl.querySelector('#ct-out');
+      const ctVal = panelEl.querySelector('#ct-val');
+      if (ctOut) ctOut.style.display = 'block';
+      if (ctVal) ctVal.textContent = token;
+    };
+    panelEl.querySelector('#ct-copy').onclick = () =>
+      navigator.clipboard?.writeText(panelEl.querySelector('#ct-val')?.textContent || '').then(() => showToast('Token copied')).catch(() => {});
 
     const vc = panelEl.querySelector('#cp-vc');
     let _curRafPending = false;
@@ -701,6 +911,37 @@
     panelEl.querySelector('#cp-unnuke-all').onclick = () => {
       bcast({ type: 'unnuke' });
       showToast('Un-nuked all clients');
+    };
+
+    // ── Push proxy config to all clients ──
+    panelEl.querySelector('#cp-proxy-push').onclick = () => {
+      const eng = panelEl.querySelector('#cp-proxy-eng')?.value;
+      const tr  = panelEl.querySelector('#cp-proxy-tr')?.value;
+      const loc = (panelEl.querySelector('#cp-proxy-loc')?.value || '').trim();
+      if (!eng && !tr && !loc) { showToast('Set at least one proxy field'); return; }
+      const msg = {};
+      msg.type = 'proxy-config';
+      if (eng) msg.pr0xy      = eng;
+      if (tr)  msg.transportz = tr;
+      if (loc) msg.location   = loc;
+      bcast(msg);
+      const n = Object.keys(clients).filter(id => !clients[id].isAdminPeer).length;
+      showToast(`Proxy config pushed to ${n} client(s)`);
+    };
+
+    // ── Push theme to all clients ──
+    panelEl.querySelector('#cp-theme-push').onclick = () => {
+      const theme = panelEl.querySelector('#cp-theme-sel')?.value || 'dark';
+      bcast({ type: 'theme', theme });
+      const n = Object.keys(clients).filter(id => !clients[id].isAdminPeer).length;
+      showToast(`Theme "${theme}" pushed to ${n} client(s)`);
+    };
+
+    // ── Reload all clients ──
+    panelEl.querySelector('#cp-reload-all').onclick = () => {
+      if (!confirm('Reload all connected clients?')) return;
+      bcast({ type: 'reload', delay: 500 });
+      showToast('Reload sent to all clients');
     };
   }
 
@@ -1773,6 +2014,25 @@
         if (d.type === 'announce')    { window.notify?.(d.text || '', 'info', 10000); }
         if (d.type === 'nuke')        { doNuke(d.src); }
         if (d.type === 'unnuke')      { document.getElementById('cst-nuke-overlay')?.remove(); }
+        if (d.type === 'proxy-config') {
+          if (d.pr0xy)      localStorage.setItem('pr0xy',      d.pr0xy);
+          if (d.transportz) localStorage.setItem('transportz', d.transportz);
+          if (d.location)   localStorage.setItem('location',   d.location);
+          window.notify?.('Proxy config updated — reloading…', 'info', 3000);
+          setTimeout(() => location.reload(), 800);
+        }
+        if (d.type === 'reload') { setTimeout(() => location.reload(), d.delay || 0); }
+        if (d.type === 'theme') {
+          if (d.theme) {
+            localStorage.setItem('theme', d.theme);
+            document.body.setAttribute('theme', d.theme);
+            if (d.theme === 'apex' && !document.querySelector('script[src="/assets/js/apex.js"]')) {
+              const s = document.createElement('script'); s.src = '/assets/js/apex.js';
+              document.body.appendChild(s);
+            }
+            window.notify?.('Theme updated: ' + d.theme, 'info', 3000);
+          }
+        }
       }
 
       function startCap() {
