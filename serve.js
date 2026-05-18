@@ -10,6 +10,7 @@
 'use strict';
 
 const https  = require('https');
+const http   = require('http');
 const fs     = require('fs');
 const path   = require('path');
 const net    = require('net');
@@ -21,6 +22,7 @@ const CERTS = path.join(ROOT, 'certs');
 const CERT  = path.join(CERTS, 'cert.pem');
 const KEY   = path.join(CERTS, 'key.pem');
 const PORT      = Number(process.env.PORT)      || 443;
+const HTTP_PORT = Number(process.env.HTTP_PORT) || 8080;   // plain-HTTP for CF tunnel
 const PEER_PORT = Number(process.env.PEER_PORT) || 9001;
 const BUF   = 1 << 24; // 16 MB flow-control window
 
@@ -129,6 +131,14 @@ const server = https.createServer(
   staticHandler
 );
 
+// ── Plain-HTTP server (Cloudflare Tunnel origin — no cert needed) ────────────
+// cloudflared proxies this to a public wss:// URL with a real CF cert.
+const httpServer = http.createServer(staticHandler);
+httpServer.on('error', err => {
+  if (err.code === 'EADDRINUSE')
+    console.warn(`[warn] HTTP tunnel port ${HTTP_PORT} in use — cloudflared won't start.`);
+});
+
 // ── Wisp WebSocket server ─────────────────────────────────────────────────────
 // Implements the Wisp protocol directly — same logic as celestial-wisp/index.js.
 // No extra npm package needed beyond ws.
@@ -138,14 +148,16 @@ const wispWss = new WebSocketServer({
   verifyClient:    (_, cb) => cb(true),
 });
 
-// Route WebSocket upgrades: /wisp/* → wisp handler
-server.on('upgrade', (req, socket, head) => {
+// Route WebSocket upgrades: /wisp/* → wisp handler  (HTTPS + HTTP share wispWss)
+function routeUpgrade(req, socket, head) {
   if ((req.url || '').startsWith('/wisp')) {
     wispWss.handleUpgrade(req, socket, head, ws => wispWss.emit('connection', ws, req));
   } else {
     socket.destroy();
   }
-});
+}
+server.on('upgrade', routeUpgrade);
+httpServer.on('upgrade', routeUpgrade);
 
 // Wisp protocol handler
 wispWss.on('connection', ws => {
@@ -257,15 +269,20 @@ server.on('error', err => {
 
 server.listen(PORT, () => {
   const peerOk = startPeerServer();
+  httpServer.listen(HTTP_PORT);   // plain-HTTP for Cloudflare Tunnel
+
+  const localUrl = PORT === 443 ? 'https://localhost' : `https://localhost:${PORT}`;
+  const wispUrl  = PORT === 443 ? 'wss://localhost/wisp/' : `wss://localhost:${PORT}/wisp/`;
 
   console.log('\n✦  Celestial local dev server');
-  console.log(`   HTTPS  →  https://localhost:${PORT}`);
-  console.log(`   Wisp   →  wss://localhost:${PORT}/wisp/`);
+  console.log(`   HTTPS  →  ${localUrl}`);
+  console.log(`   Wisp   →  ${wispUrl}`);
   if (peerOk) {
     console.log(`   PeerJS →  ws://localhost:${PEER_PORT}/peerjs  (local signaling — always-on)`);
   } else {
     console.log('   PeerJS →  0.peerjs.com (local server unavailable)');
   }
+  console.log(`   CF     →  http://localhost:${HTTP_PORT}  (Cloudflare Tunnel origin)`);
   console.log();
   console.log('   ✔  Server active — ready for connections');
   console.log();

@@ -43,8 +43,23 @@ echo  Checking ports...
 for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :443 "') do (
   taskkill /PID %%P /F >nul 2>&1
 )
+for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :8080 "') do (
+  taskkill /PID %%P /F >nul 2>&1
+)
 for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :9001 "') do (
   taskkill /PID %%P /F >nul 2>&1
+)
+
+:: --- Cloudflare Tunnel -------------------------------------------------------
+where cloudflared >nul 2>&1
+if %errorlevel% equ 0 (
+  echo  Starting Cloudflare Tunnel ^(separate window^)...
+  start "Cloudflare Tunnel" cmd /k "cloudflared tunnel --url http://localhost:8080"
+  echo.
+) else (
+  echo  [info] cloudflared not found -- no public tunnel started.
+  echo  [info] Install: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
+  echo.
 )
 
 :: --- Launch ------------------------------------------------------------------
@@ -56,6 +71,7 @@ echo.
 echo  HTTPS   -^>  https://localhost
 echo  Wisp    -^>  wss://localhost/wisp/
 echo  PeerJS  -^>  ws://localhost:9001/peerjs
+echo  CF      -^>  http://localhost:8080  ^(tunnel origin^)
 echo.
 echo  Tip: if Chrome shows a cert warning, click anywhere on the
 echo  page and type:  thisisunsafe
@@ -76,6 +92,9 @@ echo  [!] Server exited ^(code %EXIT_CODE%^). Freeing ports and restarting in 3 
 echo      Press Ctrl+C to cancel.
 echo.
 for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :443 "') do (
+  taskkill /PID %%P /F >nul 2>&1
+)
+for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :8080 "') do (
   taskkill /PID %%P /F >nul 2>&1
 )
 for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :9001 "') do (
