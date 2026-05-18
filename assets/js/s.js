@@ -439,6 +439,7 @@ function cookieStorage() {
   const pr0xySelect = document.getElementById('pr0xySelect');
   const wispSelect = document.getElementById('wispSelect');
   const wispCustom = document.getElementById('wispCustom');
+  const wispLocalFields = document.getElementById('wispLocalFields');
   if (!tselect || !pr0xySelect || !wispSelect) return;
 
   const _ULTRAPATCH_WISP = 'wss://cst-celestial.loca.lt/wisp/';
@@ -484,11 +485,16 @@ function cookieStorage() {
 
   wispSelect.addEventListener('change', () => {
     if (localStorage.getItem('cfmode') === '1') return;
-    if (wispSelect.value === 'custom') {
+    const val = wispSelect.value;
+    if (wispCustom) wispCustom.style.display = 'none';
+    if (wispLocalFields) wispLocalFields.style.display = 'none';
+
+    if (val === 'custom') {
       if (wispCustom) wispCustom.style.display = 'block';
+    } else if (val === '__local__') {
+      if (wispLocalFields) wispLocalFields.style.display = 'block';
     } else {
-      if (wispCustom) wispCustom.style.display = 'none';
-      localStorage.setItem('location', wispSelect.value);
+      localStorage.setItem('location', val);
       location.reload();
     }
   });

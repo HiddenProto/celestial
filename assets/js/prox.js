@@ -2,6 +2,7 @@ const pr0xySelect = document.getElementById('pr0xySelect');
 const transportsele = document.getElementById('tselect');
 const wispSelect = document.getElementById('wispSelect');
 const wispCustom = document.getElementById('wispCustom');
+const wispLocalFields = document.getElementById('wispLocalFields');
 
 const _ULTRAPATCH_WISP = 'wss://cst-celestial.loca.lt/wisp/';
 const _isLocalHost = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
@@ -17,12 +18,18 @@ transportsele.addEventListener('change', () => {
 });
 
 wispSelect.addEventListener('change', () => {
-    if (wispSelect.value === 'custom') {
+    const val = wispSelect.value;
+    wispCustom.style.display = 'none';
+    if (wispLocalFields) wispLocalFields.style.display = 'none';
+
+    if (val === 'custom') {
         wispCustom.style.display = 'block';
         wispCustom.focus();
+    } else if (val === '__local__') {
+        if (wispLocalFields) wispLocalFields.style.display = 'block';
     } else {
-        wispCustom.style.display = 'none';
-        localStorage.setItem('location', wispSelect.value);
+        // static, or any real WSS URL — save and reload
+        localStorage.setItem('location', val);
         location.reload();
     }
 });

@@ -437,6 +437,8 @@ const _isLocalHostLjs = (location.hostname === "localhost" || location.hostname 
 const _wispDefaultLjs = _isLocalHostLjs ? _originWisp : _ULTRAPATCH_WISP;
 const _wispCheckPromise = (async function _wispCheck() {
 	const saved = localStorage.getItem("location") || _wispDefaultLjs;
+	// Static mode: no Wisp server needed — skip the check entirely.
+	if (saved === "static") return;
 	const url = (saved.startsWith("wss://") || saved.startsWith("ws://"))
 		? saved
 		: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + saved;
@@ -586,6 +588,9 @@ export function getProxy() {
  */
 export async function getProxied(input) {
 	const url = makeURL(input);
+
+	// Static mode: no proxy — return URL directly.
+	if (localStorage.getItem("location") === "static") return url;
 
 	// ── Internal / same-origin URLs — never proxy these ──────────────────────
 	// celestial:// is the internal protocol for built-in pages

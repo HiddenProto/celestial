@@ -3298,5 +3298,69 @@
             "other"
         ],
         "source": "proxied"
+    },
+    {
+        "name": "Krunker",
+        "img": "https://celestial.press/assets/img/gms/krunker.jpg",
+        "type": "exclusive",
+        "url": "https://io.krunker.zip",
+        "categories": ["shooter", "2player", "indie"],
+        "source": "proxied"
+    },
+    {
+        "name": "Basketball Stars 2026",
+        "img": "https://celestial.press/assets/img/gms/bs2026.png",
+        "type": "exclusive",
+        "url": "https://html5.gamedistribution.com/516d6908fbc848bdb89e65a58a43a7dc/?gd_sdk_referrer_url=https://basketballstars2026.io/basketball-stars-2026",
+        "categories": ["sports", "2player"],
+        "source": "proxied"
+    },
+    {
+        "name": "Moto X3M 4; Winter",
+        "img": "https://celestial.press/assets/img/gms/motox3m-winter.png",
+        "type": "regular",
+        "url": "https://celestial.press/assets/src/moto-x3m/winter/index.html",
+        "categories": ["adventure", "indie"],
+        "source": "proxied"
+    },
+    {
+        "name": "Night of the Consumers",
+        "img": "https://celestial.press/assets/img/gms/notc.png",
+        "type": "exclusive",
+        "url": "https://celestial.press/assets/src/notc/index.html",
+        "categories": ["horror", "port", "indie"],
+        "source": "proxied"
+    },
+    {
+        "name": "YoHoHo.IO",
+        "img": "https://celestial.press/assets/img/gms/yohoho.png",
+        "type": "exclusive",
+        "url": "https://celestial.press/assets/src/yohoho/index.html",
+        "categories": ["shooter", "port", "indie"],
+        "source": "proxied"
+    },
+    {
+        "name": "Just Shapes And Beats",
+        "img": "https://celestial.press/assets/img/gms/jsab.png",
+        "type": "exclusive",
+        "url": "https://celestial.press/assets/src/jsab/index.html",
+        "categories": ["rhythm", "port", "indie"],
+        "source": "proxied"
+    },
+    {
+        "name": "s.p.l.i.t (SPLIT)",
+        "img": "https://celestial.press/assets/img/gms/split.png",
+        "type": "exclusive",
+        "url": "https://celestial.press/assets/src/split/index.html",
+        "categories": ["horror", "port", "indie"],
+        "source": "proxied"
+    },
+    {
+        "name": "-b (Minus B)",
+        "img": "https://celestial.press/assets/img/gms/-b.png",
+        "type": "exclusive",
+        "url": "https://tutoring-services.org/games/minusbbog/index.html",
+        "categories": ["adventure", "port", "indie"],
+        "source": "proxied"
     }
 ]

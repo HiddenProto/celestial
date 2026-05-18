@@ -230,11 +230,13 @@
     var _wispOrigin  = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wisp/';
     var _wispDefault = _cstIsLocal ? _wispOrigin : _ULTRAPATCH_WISP;
     const _wispLoc = localStorage.getItem('location') || _wispDefault;
-    setWisp(
-      (_wispLoc.startsWith('wss://') || _wispLoc.startsWith('ws://'))
-        ? _wispLoc
-        : _wispDefault
-    );
+    if (_wispLoc !== 'static') {
+      setWisp(
+        (_wispLoc.startsWith('wss://') || _wispLoc.startsWith('ws://'))
+          ? _wispLoc
+          : _wispDefault
+      );
+    }
 
     setTransport(localStorage.getItem("transportz") || "libcurl");
     async function autofill(url) {
@@ -473,19 +475,26 @@
               </select>
             </div>
             <div class="box">
-              <h3>Wisp Server <span class="info-icon"><span class="tip">The backend WebSocket server that relays your proxy traffic. Required for the proxy to work.<br><br><b>bumblcat ultrapatch</b> — default. Tunnels Wisp through cst-celestial.loca.lt (bumblcat's local server). Only proxy traffic uses the tunnel; page assets still load from wherever you opened the site. Uses a residential IP. Type: <b>private server</b>.<br><br><b>mercury workshop</b> — public community server. May trigger Google CAPTCHA due to shared IP. Type: <b>public server</b>.<br><br><b>custom</b> — enter your own wisp server URL. Type: <b>self-hosted server</b>.</span></span></h3>
+              <h3>Wisp Server <span class="info-icon"><span class="tip">The WebSocket relay server that routes proxy traffic.<br><br><b>bumblcat's server</b> — always-on Render server. Easy, no setup. Type: <b>private server</b>.<br><br><b>mercury / anura / nodeppt</b> — free public servers. May show Google CAPTCHA. Type: <b>public server</b>.<br><br><b>local Wisp</b> — your own device. Enter IP and port (e.g. 192.168.1.5 : 58443). Only works on your network. Type: <b>self-hosted</b>.<br><br><b>no Wisp (static)</b> — disables the Wisp relay. Only static content works; most sites will fail. Use if you have a custom transport. Type: <b>none</b>.<br><br><b>custom</b> — any Wisp URL you supply. Type: <b>user-defined</b>.</span></span></h3>
               <p class="desc">the server that routes your proxied traffic</p>
               <select class="select" id="wispSelect">
-                <option value="wss://cst-celestial.loca.lt/wisp/">bumblcat ultrapatch</option>
+                <option value="wss://cst-celestial.loca.lt/wisp/" disabled style="color:#555;font-style:italic;">bumblcat ultrapatch (unavailable)</option>
                 <option value="wss://celestial-wisp.onrender.com/">bumblcat's server</option>
                 <option value="wss://wisp.mercurywork.shop/">mercury workshop</option>
                 <option value="wss://anura.pro/wisp/">anura (free)</option>
                 <option value="wss://wisp.nodeppt.com/">nodeppt (free)</option>
+                <option value="__local__">local Wisp</option>
+                <option value="static">no Wisp (static)</option>
                 <option value="custom">custom server...</option>
               </select>
               <button onclick="__testWisp()" style="margin-top:6px;" class="button">test &amp; auto-pick fastest</button>
-              <button id="cst-open-local-btn" onclick="window._cstOpenLocalServer&&window._cstOpenLocalServer()" style="margin-top:6px;display:none;" class="button">use bumblcat ultrapatch</button>
               <p id="wisp-test-out" style="font-size:.75rem;color:#666;margin:6px 0 0;min-height:14px;"></p>
+              <!-- Local Wisp IP/port fields -->
+              <div id="wispLocalFields" style="display:none;margin-top:6px;gap:4px;display:none;">
+                <input id="wispLocalIp"   class="select" placeholder="IP address (e.g. 192.168.1.5)" style="width:100%;box-sizing:border-box;margin-bottom:4px;" />
+                <input id="wispLocalPort" class="select" placeholder="Port (e.g. 58443)" style="width:100%;box-sizing:border-box;margin-bottom:4px;" type="number" min="1" max="65535" />
+                <button onclick="__applyLocalWisp()" class="button" style="width:100%;">connect</button>
+              </div>
               <input id="wispCustom" class="select" placeholder="wss://your-server/" style="display:none;" />
             </div>
           </div>
@@ -1268,7 +1277,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.90";
+      var SITE_VER = "2.2.91";
 
       /**
        * Show a notification toast.
@@ -1420,17 +1429,11 @@
       };
 
       // ── Proxy config version ─────────────────────────────────────────────────
-      // Proxy config gate:
-      // Shows to new users (no proxy set) OR users who haven't seen it yet.
-      // Once seen it won't show again — UNLESS a future special update bumps
-      // PROXY_CFG_INTERNAL above the stored value (to be implemented later).
-      var PROXY_CFG_INTERNAL = 3; // bump this when a major proxy update needs re-showing
+      var PROXY_CFG_INTERNAL = 3;
 
-      // Auto-show proxy config prompt
+      // Warn only for users who explicitly chose scramjet (still useful)
       setTimeout(function () {
         const currentProxy = localStorage.getItem("pr0xy");
-
-        // Warn only for users who explicitly chose scramjet
         if (currentProxy === "scramjet") {
           window.notify(
             "The current proxy you have on, scramjet, is currently an unreliable configuration.",
@@ -1438,10 +1441,8 @@
             12000
           );
         }
-
-        // Gate: show if never seen, or if stored version is below current internal version
-        var seenVal = parseInt(localStorage.getItem("proxy-config-seen") || "0", 10);
-        if (currentProxy !== null && seenVal >= PROXY_CFG_INTERNAL) return;
+        // Proxy config prompt disabled — users configure via Settings → Proxy.
+        if (true) return;
 
         // ── v2 buttons (with Wider Support animation) ──────────────────────
         var buttons_v2 = [
@@ -1603,51 +1604,6 @@
         }, 2000);
       })();
 
-      // ── Ultrapatch server availability notice ────────────────────────────
-      (function () {
-        var key = "ultrapatch-server-ack";
-        if (localStorage.getItem(key)) return;
-        setTimeout(function () {
-          window.notifyOption(
-            "notice",
-            "the bumblcat ultrapatch wisp server is now available.",
-            [
-              {
-                label: "acknowledge",
-                info: "dismiss this notice permanently",
-                onClick: function () {
-                  localStorage.setItem(key, "1");
-                }
-              }
-            ],
-            { noAutoDismiss: true }
-          );
-        }, 3500);
-      })();
-
-      // ── Ultrapatch how-to notice ─────────────────────────────────────────
-      (function () {
-        var key = "ultrapatch-howto-ack";
-        if (localStorage.getItem(key)) return;
-        setTimeout(function () {
-          window.notifyOption(
-            "how to use bumblcat ultrapatch",
-            "1. open youtube.com and search a video — click it and let it play briefly. " +
-            "2. close that tab, then open google.com and type your query. " +
-            "note: some searches may still get flagged depending on what you search and how often.",
-            [
-              {
-                label: "got it",
-                info: "dismiss this guide permanently",
-                onClick: function () {
-                  localStorage.setItem(key, "1");
-                }
-              }
-            ],
-            { noAutoDismiss: true }
-          );
-        }, 5500);
-      })();
 
       // ── Server uptime notice (regular/server site only) ─────────────────
       (function () {
@@ -1800,6 +1756,20 @@
       setTimeout(function () { location.reload(); }, 800);
     };
 
+    // Build a wss://ip:port/wisp/ URL from the local Wisp IP/port fields and reload.
+    window.__applyLocalWisp = function () {
+      var ip   = ((document.getElementById('wispLocalIp')   || {}).value || '').trim();
+      var port = ((document.getElementById('wispLocalPort') || {}).value || '').trim();
+      if (!ip || !port) { window.notify && window.notify('enter an IP address and port', 'warning', 3000); return; }
+      var scheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
+      var url = scheme + ip + ':' + port + '/wisp/';
+      localStorage.setItem('location', url);
+      if (!localStorage.getItem('pr0xy'))      localStorage.setItem('pr0xy', 'scram');
+      if (!localStorage.getItem('transportz')) localStorage.setItem('transportz', 'libcurl');
+      window.notify && window.notify('local Wisp configured — reloading…', 'success', 4000);
+      setTimeout(function () { location.reload(); }, 800);
+    };
+
     window.exportData = function () {
       var d = {};
       for (var i = 0; i < localStorage.length; i++) {
@@ -1867,14 +1837,6 @@
       );
     };
 
-    // On load: show "use bumblcat ultrapatch" button on non-local sites.
-    // Import button is visible everywhere (data migration between devices).
-    document.addEventListener('DOMContentLoaded', function () {
-      if (!window._cstIsLocal) {
-        var lb = document.getElementById('cst-open-local-btn');
-        if (lb) lb.style.display = '';
-      }
-    });
   })();
 </script>
 <script>

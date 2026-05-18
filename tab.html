@@ -188,6 +188,14 @@
       <hr>
 
       <details open>
+        <summary>05/18 — new games &amp; proxy options</summary>
+        <p>- added Krunker, Basketball Stars 2026, Moto X3M 4: Winter, Night of the Consumers, YoHoHo.IO, Just Shapes And Beats, s.p.l.i.t, and -b (Minus B) — pulled from celestial.press via cross-origin proxy</p>
+        <p>- Wisp: added "local Wisp" option (enter your own device IP + port)</p>
+        <p>- Wisp: added "no Wisp (static)" option — disables proxy, loads direct content only</p>
+        <p>- bumblcat ultrapatch is currently unavailable (grayed out in selector)</p>
+      </details>
+
+      <details open>
         <summary>05/16 — photon transport</summary>
         <p>- photon: new custom proxy transport backed by a Cloudflare Worker — server-side TLS, no WASM SSL, no error 35 fingerprinting issues</p>
         <p>- SSL error 35 auto-recovery: libcurl transport now silently retries through epoxy when it hits a TLS fingerprint rejection (Cloudflare-protected sites)</p>
@@ -223,7 +231,7 @@
 
       <details open>
         <summary>revival changes</summary>
-        <p>- revived and redeployed to callanambulance.vercel.app</p>
+
         <p>- fixed proxy backend (wisp server)</p>
         <p>- fixed service worker (removed broken UV references)</p>
         <p>- all sites now stay within celestial instead of opening new tabs</p>
@@ -440,11 +448,13 @@
     } from "/lithium.mjs";
 
     const _wispLoc = localStorage.getItem('location') || 'wss://celestial-wisp.onrender.com/';
-    setWisp(
-      (_wispLoc.startsWith('wss://') || _wispLoc.startsWith('ws://'))
-        ? _wispLoc
-        : (location.protocol === "https:" ? "wss://" : "ws://") + location.host + _wispLoc
-    );
+    if (_wispLoc !== 'static') {
+      setWisp(
+        (_wispLoc.startsWith('wss://') || _wispLoc.startsWith('ws://'))
+          ? _wispLoc
+          : (location.protocol === "https:" ? "wss://" : "ws://") + location.host + _wispLoc
+      );
+    }
     setProxy(localStorage.getItem("pr0xy") || "scram");
     setTransport(localStorage.getItem("transportz") || "libcurl");
 
@@ -590,10 +600,10 @@
     document.getElementById("close").addEventListener("click", exitUpdLog);
 
     window.addEventListener("load", function () {
-      if (!localStorage.getItem("updlogview15")) {
+      if (!localStorage.getItem("updlogview16")) {
         document.getElementById("update-log").style.display = "block";
         document.querySelector(".upd-bg").style.display = "block";
-        localStorage.setItem("updlogview15", "1");
+        localStorage.setItem("updlogview16", "1");
       }
     });
   </script>
