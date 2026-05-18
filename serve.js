@@ -87,6 +87,7 @@ function staticHandler(req, res) {
   // Security: prevent directory traversal
   const abs = path.resolve(path.join(ROOT, decodeURIComponent(urlPath)));
   if (!abs.startsWith(ROOT + path.sep) && abs !== ROOT) {
+    console.log(`[http] 403 ${urlPath}`);
     res.writeHead(403); return res.end('Forbidden');
   }
 
@@ -103,10 +104,16 @@ function staticHandler(req, res) {
         'Cross-Origin-Embedder-Policy':  'require-corp',
         'Access-Control-Allow-Origin':   '*',
       });
+      // Log page loads (HTML) but skip noisy asset requests
+      if (['.html', '.htm', ''].includes(ext)) {
+        const ip = req.socket.remoteAddress || '?';
+        console.log(`[http] ${ip} → GET ${urlPath}`);
+      }
       fs.createReadStream(p).pipe(res);
       return;
     } catch { /* try next */ }
   }
+  console.log(`[http] 404 ${urlPath}`);
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('404: ' + urlPath);
 }
@@ -137,6 +144,8 @@ server.on('upgrade', (req, socket, head) => {
 
 // Wisp protocol handler
 wispWss.on('connection', ws => {
+  const ip = (ws._socket && ws._socket.remoteAddress) || '?';
+  console.log(`[wisp] + client connected  ${ip}`);
   const streams = new Map(); // streamId → net.Socket
 
   // Send initial CONTINUE for stream 0 (required by Wisp spec)
@@ -158,6 +167,7 @@ wispWss.on('connection', ws => {
       const port     = body.readUInt16LE(1);
       const hostname = body.subarray(3).toString('utf8');
 
+      console.log(`[wisp] → ${hostname}:${port}`);
       const sock = net.createConnection({ host: hostname, port }, () => {
         const pkt = Buffer.alloc(9);
         pkt[0] = 0x03; pkt.writeUInt32LE(sid, 1); pkt.writeUInt32LE(BUF, 5);
@@ -192,7 +202,11 @@ wispWss.on('connection', ws => {
     }
   });
 
-  const cleanup = () => { streams.forEach(s => s.destroy()); streams.clear(); };
+  const cleanup = () => {
+    console.log(`[wisp] - client disconnected  ${ip}`);
+    streams.forEach(s => s.destroy());
+    streams.clear();
+  };
   ws.on('close', cleanup);
   ws.on('error', cleanup);
 });
@@ -248,6 +262,8 @@ server.listen(PORT, () => {
     console.log('   PeerJS →  0.peerjs.com (local server unavailable)');
   }
   console.log();
-  console.log('   Cert warning? Click anywhere on the Chrome page and type: thisisunsafe');
-  console.log('   Or permanently trust: certs/cert.pem in your OS certificate store.\n');
+  console.log('   ✔  Server active — ready for connections');
+  console.log();
+  console.log('   Cert warning? type: thisisunsafe  |  Trust: certs/cert.pem');
+  console.log('─'.repeat(55) + '\n');
 });

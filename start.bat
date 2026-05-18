@@ -45,9 +45,9 @@ echo  ==========================================
 echo     Celestial  --  local dev server
 echo  ==========================================
 echo.
-echo  HTTPS   ->  https://localhost:58443
-echo  Wisp    ->  wss://localhost:58443/wisp/
-echo  PeerJS  ->  ws://localhost:9001/peerjs
+echo  HTTPS   -^>  https://localhost:58443
+echo  Wisp    -^>  wss://localhost:58443/wisp/
+echo  PeerJS  -^>  ws://localhost:9001/peerjs
 echo.
 echo  Tip: if Chrome shows a cert warning, click anywhere on the
 echo  page and type:  thisisunsafe
