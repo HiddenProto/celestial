@@ -444,11 +444,14 @@ function cookieStorage() {
   // Restore saved values into selects
   tselect.value = localStorage.getItem('transportz') || 'libcurl';
   pr0xySelect.value = localStorage.getItem('pr0xy') || 'scram';
-  const savedWisp = localStorage.getItem('location') || 'wss://celestial-wisp.onrender.com/';
+  const savedWisp = localStorage.getItem('location');
 
-  if ([...wispSelect.options].some(o => o.value === savedWisp)) {
+  if (!savedWisp) {
+    // No explicit Wisp set — using same-origin default (bumblcat this server)
+    wispSelect.value = '__origin__';
+  } else if ([...wispSelect.options].some(o => o.value === savedWisp)) {
     wispSelect.value = savedWisp;
-  } else if (savedWisp) {
+  } else {
     wispSelect.value = 'custom';
     if (wispCustom) { wispCustom.style.display = 'block'; wispCustom.value = savedWisp; }
   }
@@ -470,6 +473,11 @@ function cookieStorage() {
     if (localStorage.getItem('cfmode') === '1') return;
     if (wispSelect.value === 'custom') {
       if (wispCustom) wispCustom.style.display = 'block';
+    } else if (wispSelect.value === '__origin__') {
+      // Same-origin (bumblcat this server) — clear override so default kicks in
+      if (wispCustom) wispCustom.style.display = 'none';
+      localStorage.removeItem('location');
+      location.reload();
     } else {
       if (wispCustom) wispCustom.style.display = 'none';
       localStorage.setItem('location', wispSelect.value);
