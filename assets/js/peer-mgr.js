@@ -78,7 +78,10 @@
       const custom = { host: _locHost, port: _locPort || 443, path: '/peerjs', secure: true, debug: 0 };
       return [custom, _prod, _cloud, _render].filter(Boolean);
     }
-    if (_isLocal) return [_local, _prod, _cloud, _render].filter(Boolean);
+    // IMPORTANT: cloud server MUST come first for ALL instances (local and remote alike)
+    // so peers can find each other regardless of which hostname they loaded from.
+    // Local PeerJS server (localhost:9001) is appended as a fallback ONLY.
+    if (_isLocal) return [_prod, _cloud, _render, _local].filter(Boolean);
     return          [_prod, _cloud, _render].filter(Boolean);
   }
 

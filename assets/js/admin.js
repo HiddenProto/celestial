@@ -12,11 +12,10 @@
   // public PeerJS cloud.  Override via localStorage('cst-hub-id') without
   // needing a code push (useful if the ID ever gets stale-locked again).
   // Hub uses a RANDOM PeerJS ID — no stale-locks ever.
-  // Clients discover the hub's current ID through the chat registry
-  // (same discovery path as the P2P mesh, which already works reliably).
-  // The registry ID formula is identical to chat.js so they share the same node.
-  const REGISTRY_ID = localStorage.getItem('cst-registry-id') ||
-    ('cst-registry-' + location.hostname.replace(/[^a-z0-9]/gi, '').slice(0, 12));
+  // Fixed deployment-wide registry ID — must match chat.js exactly.
+  // NEVER derive from hostname: local (localhost) and remote (tunnel URL) would
+  // produce different IDs and end up on completely separate, invisible meshes.
+  const REGISTRY_ID = localStorage.getItem('cst-registry-id') || 'cst-reg-bumblcat-v1';
   const SEC  = 'Hr332941369';
 
   let isAdmin    = localStorage.getItem('cst-admin') === '1';

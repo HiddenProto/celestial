@@ -8,11 +8,11 @@
 (function () {
   'use strict';
 
-  // Site-specific registry ID so different deployments don't collide on
-  // the public PeerJS cloud, and stale locks from other sites don't block us.
+  // Fixed deployment-wide registry ID so local and remote instances share the
+  // same mesh.  Must NOT be hostname-derived — that was the root cause of local
+  // and remote clients being on completely separate, invisible networks.
   // Override via localStorage('cst-registry-id') without a code push.
-  const REGISTRY_ID = localStorage.getItem('cst-registry-id') ||
-    ('cst-registry-' + location.hostname.replace(/[^a-z0-9]/gi, '').slice(0, 12));
+  const REGISTRY_ID = localStorage.getItem('cst-registry-id') || 'cst-reg-bumblcat-v1';
   const APPEAR_KEY  = 'cst-appearance';
   const MAX_CHARS   = 400;
   const COOLDOWN    = 1000;
