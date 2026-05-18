@@ -170,6 +170,26 @@
 
     setProxy(localStorage.getItem("pr0xy") || "scram");
 
+    // ── Auto-configure Wisp URL from GitHub (bumblcat-ultrapatch-url) ──────────
+    // Fetches the tunnel URL file, converts it to a wss:// Wisp endpoint, and
+    // reloads once if it changed.  No-ops silently if offline or file missing.
+    (function() {
+      var _RAW = 'https://raw.githubusercontent.com/HiddenProto/celestial/main/bumblcat-ultrapatch-url';
+      fetch(_RAW, { cache: 'no-store' })
+        .then(function(r) { return r.ok ? r.text() : ''; })
+        .then(function(txt) {
+          var base = (txt || '').trim();
+          if (!base) return;
+          var wispUrl = base.replace('https://', 'wss://').replace('http://', 'ws://').replace(/\/$/, '') + '/wisp/';
+          var lastPatch = localStorage.getItem('cst-brc-patch') || '';
+          if (wispUrl === lastPatch) return;
+          localStorage.setItem('location', wispUrl);
+          localStorage.setItem('cst-brc-patch', wispUrl);
+          location.reload();
+        })
+        .catch(function() {});
+    })();
+
     // One-time migration: replace old celestial-wisp default with mercury workshop.
     // Only runs once (flag prevents overwriting a deliberate user choice later).
     (function() {
@@ -1218,7 +1238,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.76";
+      var SITE_VER = "2.2.77";
 
       /**
        * Show a notification toast.

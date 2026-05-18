@@ -735,10 +735,14 @@
       notifTog.addEventListener('change', () => setNotifsOn(notifTog.checked));
     }
     maybeShowNotif();
-    if (isChatOn() && canChat()) {
+    // Admin always joins the chat mesh so the hub peer ID is discoverable by
+    // clients via _discoverHub(), even when the chat UI toggle is off.
+    if (amAdmin() || (isChatOn() && canChat())) {
       initChat();
-      if (document.readyState !== 'loading') renderWidget();
-      else document.addEventListener('DOMContentLoaded', renderWidget);
+      if (isChatOn() && canChat()) {
+        if (document.readyState !== 'loading') renderWidget();
+        else document.addEventListener('DOMContentLoaded', renderWidget);
+      }
     }
   }
 
