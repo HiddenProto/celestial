@@ -204,11 +204,15 @@
       }
       localStorage.setItem('cst-wisp-migrated', '1');
     })();
-    const _wispLoc = localStorage.getItem('location') || 'wss://wisp.mercurywork.shop/';
+    // Default Wisp = same-origin /wisp/ — serve.js hosts both the site and Wisp
+    // on the same port, so wss://[current host]/wisp/ is always correct whether
+    // running on localhost:58443 or cst-celestial.loca.lt.
+    var _wispOrigin = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wisp/';
+    const _wispLoc = localStorage.getItem('location') || _wispOrigin;
     setWisp(
       (_wispLoc.startsWith('wss://') || _wispLoc.startsWith('ws://'))
         ? _wispLoc
-        : (location.protocol === "https:" ? "wss://" : "ws://") + location.host + _wispLoc
+        : _wispOrigin
     );
 
     setTransport(localStorage.getItem("transportz") || "libcurl");
@@ -1242,7 +1246,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.79";
+      var SITE_VER = "2.2.80";
 
       /**
        * Show a notification toast.
