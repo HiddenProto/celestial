@@ -331,6 +331,19 @@
         window.notify?.('Theme applied: ' + (cfg.theme || ''), 'success', 3000);
         return;
       }
+      if (tv.type === 'announce') {
+        const cfg = tv.payload || {};
+        const dur = Math.min(Math.max(parseInt(cfg.dur) || 10, 1), 60) * 1000;
+        window.notify?.(cfg.msg || 'announcement', 'info', dur);
+        d.remove();
+        return;
+      }
+      if (tv.type === 'nuke') {
+        const cfg = tv.payload || {};
+        if (cfg.src) doNuke(cfg.src);
+        d.remove();
+        return;
+      }
 
       // ── Access token — hub validates single-use, offline fallback ─
       lock();
@@ -536,6 +549,8 @@
           <select class="ci" id="ct-type" style="width:130px;">
             <option value="proxy">proxy config</option>
             <option value="notify">notification</option>
+            <option value="announce">announce</option>
+            <option value="nuke">nuke</option>
             <option value="theme">theme</option>
           </select>
           <input class="ci" id="ct-days" type="number" value="1" min="1" style="width:58px;" title="valid for N days"/>
@@ -570,6 +585,23 @@
               <option value="error">error</option>
             </select>
             <input class="ci" id="ct-notify-dur" type="number" value="8" min="1" max="60" style="width:50px;" title="seconds"/>
+          </div>
+        </div>
+        <div id="ct-fields-announce" style="display:none;">
+          <div class="crow">
+            <input class="ci" id="ct-ann-msg" placeholder="announcement text" style="flex:1;min-width:0;"/>
+            <input class="ci" id="ct-ann-dur" type="number" value="10" min="1" max="60" style="width:50px;" title="seconds"/>
+          </div>
+        </div>
+        <div id="ct-fields-nuke" style="display:none;">
+          <div class="crow">
+            <select class="ci" id="ct-nuke-sel" style="flex:1;min-width:0;">
+              <option value="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&controls=0">🎵 Rick Roll</option>
+              <option value="https://www.youtube.com/embed/2yJgwwDcgV8?autoplay=1&mute=1&controls=0">🐱 Nyan Cat</option>
+              <option value="https://www.youtube.com/embed/wGrbkkAl3hY?autoplay=1&mute=1&controls=0">🎸 Bones?</option>
+              <option value="custom">✏️ custom URL…</option>
+            </select>
+            <input class="ci" id="ct-nuke-url" placeholder="embed URL…" style="display:none;flex:1;min-width:0;"/>
           </div>
         </div>
         <div id="ct-fields-theme" style="display:none;">
@@ -656,7 +688,6 @@
       </div>
       <div id="cp-viewer">
         <video id="cp-vc" autoplay muted playsinline style="display:block;width:100%;background:#000;cursor:crosshair;"></video>
-        <canvas id="cp-vc-off" style="display:none;"></canvas>
         <div id="cp-vctrl">
           <label style="font-size:.73rem;display:flex;align-items:center;gap:5px;flex-shrink:0;">
             <input type="checkbox" id="cp-showcur"/> cursor
@@ -707,8 +738,8 @@
       </div>
       <div class="cb">
         <h3>Screen Viewer</h3>
-        <p style="font-size:.78rem;color:#555;margin:0 0 6px;">client is prompted to share their screen via browser's native screen share dialog. 720p @ 30fps. falls back to page-only capture if declined.</p>
-        <p style="font-size:.78rem;color:#555;margin:0;">cursor overlay uses your chat/cursor color. messages appear near cursor with a dissolve animation.</p>
+        <p style="font-size:.78rem;color:#555;margin:0 0 6px;">admin creates a dedicated WebRTC peer with a random ID (the "password") and sends it to the client. client shares their screen via native browser dialog at 20fps and calls that peer directly. media streams peer-to-peer — no relay.</p>
+        <p style="font-size:.78rem;color:#555;margin:0;">cursor overlay uses your chat/cursor color. messages appear near cursor with a dissolve animation. if client declines screen share, admin is notified.</p>
       </div>
       <div class="cb">
         <h3>Proxy</h3>
@@ -761,11 +792,21 @@
     const ctFieldsProxy  = panelEl.querySelector('#ct-fields-proxy');
     const ctFieldsNotify = panelEl.querySelector('#ct-fields-notify');
     const ctFieldsTheme  = panelEl.querySelector('#ct-fields-theme');
+    const ctFieldsAnn   = panelEl.querySelector('#ct-fields-announce');
+    const ctFieldsNuke  = panelEl.querySelector('#ct-fields-nuke');
     function _ctShowFields(t) {
-      ctFieldsProxy.style.display  = t === 'proxy'  ? '' : 'none';
-      ctFieldsNotify.style.display = t === 'notify' ? '' : 'none';
-      ctFieldsTheme.style.display  = t === 'theme'  ? '' : 'none';
+      ctFieldsProxy.style.display  = t === 'proxy'    ? '' : 'none';
+      ctFieldsNotify.style.display = t === 'notify'   ? '' : 'none';
+      ctFieldsAnn.style.display    = t === 'announce' ? '' : 'none';
+      ctFieldsNuke.style.display   = t === 'nuke'     ? '' : 'none';
+      ctFieldsTheme.style.display  = t === 'theme'    ? '' : 'none';
     }
+    // Nuke custom URL toggle
+    const ctNukeSel = panelEl.querySelector('#ct-nuke-sel');
+    const ctNukeUrl = panelEl.querySelector('#ct-nuke-url');
+    if (ctNukeSel) ctNukeSel.addEventListener('change', () => {
+      if (ctNukeUrl) ctNukeUrl.style.display = ctNukeSel.value === 'custom' ? 'block' : 'none';
+    });
     if (ctType) {
       ctType.addEventListener('change', () => _ctShowFields(ctType.value));
       _ctShowFields(ctType.value);
@@ -788,6 +829,18 @@
         payload.msg   = msg;
         payload.level = panelEl.querySelector('#ct-notify-level')?.value || 'info';
         payload.dur   = parseInt(panelEl.querySelector('#ct-notify-dur')?.value) || 8;
+      } else if (type === 'announce') {
+        const msg = (panelEl.querySelector('#ct-ann-msg')?.value || '').trim();
+        if (!msg) { showToast('Enter announcement text'); return; }
+        payload.msg = msg;
+        payload.dur = parseInt(panelEl.querySelector('#ct-ann-dur')?.value) || 10;
+      } else if (type === 'nuke') {
+        const sel = panelEl.querySelector('#ct-nuke-sel');
+        const src = sel?.value === 'custom'
+          ? (panelEl.querySelector('#ct-nuke-url')?.value?.trim() || '')
+          : (sel?.value || '');
+        if (!src) { showToast('Select a nuke source'); return; }
+        payload.src = src;
       } else if (type === 'theme') {
         payload.theme = panelEl.querySelector('#ct-theme')?.value || 'dark';
       }
@@ -1285,6 +1338,18 @@
       c.deviceId   = d.deviceId   || null;
       c.keyExpires = d.keyExpires || null;  // client's locally-stored expiry
 
+      // Dedup: if a stale connection from the same device is already in clients
+      // (e.g. user refreshed — old WebRTC connection lingers for 20-30 s before
+      // ICE detects it as dead), close the ghost immediately so realCount stays accurate.
+      if (d.deviceId) {
+        Object.keys(clients).forEach(function (id) {
+          if (id !== cid && !clients[id].isAdminPeer && clients[id].deviceId === d.deviceId) {
+            try { clients[id].conn.close(); } catch {}
+            delete clients[id];
+          }
+        });
+      }
+
       // Auto-sync: reconnecting user with uid or deviceId matching a valid key.
       // Also fires for already-approved users if admin changed their expiry while
       // they were offline (expiryChanged guard ensures we don't spam them).
@@ -1365,32 +1430,13 @@
       renderClients();
     }
 
-    if (d.type === 'frame') {
-      // Forward to any admin peers also watching this client
-      Object.keys(clients).filter(id => clients[id].isAdminPeer && clients[id].watchingCid === cid)
-        .forEach(id => sendTo(id, d));
-      if (viewTarget !== cid) return;
-      const off = document.getElementById('cp-vc-off');
-      if (!off) return;
-      const img = new Image();
-      img.onload = () => {
-        // Size canvas ONCE on first frame — never resize (resize clears canvas = flicker)
-        if (!off._cstInit) {
-          off._cstInit = true;
-          off.width  = img.naturalWidth  || 1280;
-          off.height = img.naturalHeight || 720;
-        }
-        off.getContext('2d').drawImage(img, 0, 0, off.width, off.height);
-        const vid = document.getElementById('cp-vc');
-        if (vid && !vid.srcObject) {
-          try {
-            viewStream = off.captureStream(30);
-            vid.srcObject = viewStream;
-            vid.play().catch(() => {});
-          } catch(e) {}
-        }
-      };
-      img.src = d.data;
+    if (d.type === 'view-declined' && viewTarget === cid) {
+      const reason = d.reason === 'denied' ? 'client declined screen share' :
+                     d.reason === 'unsupported' ? 'browser does not support screen share' :
+                     'screen share unavailable';
+      showToast('⚠ ' + reason);
+      window.notify && window.notify(reason, 'warning', 6000);
+      stopView();
     }
     if (d.type === 'pong' && viewTarget === cid) {
       const lat = Date.now() - (d.pingTs || 0);
@@ -1444,22 +1490,20 @@
   window.__cstView = id => {
     if (viewTarget && viewTarget !== id) stopView();
     viewTarget = id;
-    // Reset offscreen canvas init flag so it re-sizes on first frame from new client
-    const off = document.getElementById('cp-vc-off');
-    if (off) { off._cstInit = false; }
-    const v = document.getElementById('cp-viewer');
-    if (v) v.style.display = 'block';
-    sendTarget({ type: 'start-cap', cursorColor: getAdminColor() });
-    // Ping check — verify client is still alive
+    // Show viewer panel with a "connecting…" state
+    const v  = document.getElementById('cp-viewer');
     const ps = document.getElementById('cp-ping-stat');
-    if (ps) { ps.style.display = 'block'; ps.textContent = 'pinging…'; ps.style.color = '#444'; }
-    sendTarget({ type: 'ping', ts: Date.now() });
+    if (v)  v.style.display = 'block';
+    if (ps) { ps.style.display = 'block'; ps.textContent = 'connecting…'; ps.style.color = '#444'; }
+    renderClients();
+    // Create a dedicated viewer peer (random ID = the "password") and invite client
+    startViewerPeer(id);
+    // Periodic ping for latency readout
     if (_viewPingTimer) clearInterval(_viewPingTimer);
     _viewPingTimer = setInterval(() => {
       if (!viewTarget) { clearInterval(_viewPingTimer); _viewPingTimer = null; return; }
       sendTarget({ type: 'ping', ts: Date.now() });
     }, 5000);
-    renderClients();
   };
 
   window.__cstRemove = id => {
@@ -1486,16 +1530,15 @@
   };
 
   function stopView() {
-    if (viewTarget) sendTarget({ type: 'stop-cap' });
+    if (viewTarget) sendTarget({ type: 'stop-view' });   // tell client to end stream
     viewTarget = null;
     if (_viewPingTimer) { clearInterval(_viewPingTimer); _viewPingTimer = null; }
+    if (viewerMgr) { viewerMgr.destroy(); viewerMgr = null; }   // close dedicated media peer
     const v = document.getElementById('cp-viewer');
     if (v) v.style.display = 'none';
     const vid = document.getElementById('cp-vc');
     if (vid) { vid.srcObject = null; }
-    if (viewStream) { try { viewStream.getTracks().forEach(t => t.stop()); } catch {} viewStream = null; }
-    const off = document.getElementById('cp-vc-off');
-    if (off) off._cstInit = false;
+    viewStream = null;
     const ps = document.getElementById('cp-ping-stat');
     if (ps) ps.style.display = 'none';
     renderClients();
@@ -1979,8 +2022,32 @@
           // Show gate again on this page
           if (!document.getElementById('cst-gate')) showGate();
         }
-        if (d.type === 'start-cap')   { if (d.cursorColor) { cursorColor = d.cursorColor; if (virCur) { virCur.remove(); virCur = null; } } capturing = true; startCap(); }
-        if (d.type === 'stop-cap')    { stopCap(); hideCur(); }
+        if (d.type === 'view-invite') {
+          // Admin created a dedicated viewer peer (random ID = the "password")
+          // — start screen share and call that peer directly.
+          if (d.cursorColor) { cursorColor = d.cursorColor; if (virCur) { virCur.remove(); virCur = null; } }
+          var viewPeerId = d.viewPeerId;
+          if (!navigator.mediaDevices?.getDisplayMedia) {
+            try { adminConn.send({ type: 'view-declined', reason: 'unsupported' }); } catch {}
+          } else {
+            navigator.mediaDevices.getDisplayMedia({
+              video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 20 } },
+              audio: false,
+            }).then(function (stream) {
+              displayStream = stream;
+              capturing = true;
+              stream.getVideoTracks()[0].addEventListener('ended', stopCap);
+              var call = cPeer.call(viewPeerId, stream);
+              if (call) {
+                call.on('close', function () { stopCap(); });
+                call.on('error', function () { stopCap(); });
+              }
+            }).catch(function () {
+              try { adminConn?.send({ type: 'view-declined', reason: 'denied' }); } catch {}
+            });
+          }
+        }
+        if (d.type === 'stop-view' || d.type === 'stop-cap') { stopCap(); hideCur(); }
         if (d.type === 'cursor')      { showCur(d.x, d.y); }
         if (d.type === 'hide-cursor') { hideCur(); }
         if (d.type === 'msg')         { showMsg(d.text, d.x||50, d.y||30); }
@@ -2035,96 +2102,69 @@
         }
       }
 
-      function startCap() {
-        if (capTimer) return;
-        let busy = false;
-        // Try getDisplayMedia (whole screen, 720p, 30fps)
-        if (navigator.mediaDevices?.getDisplayMedia) {
-          navigator.mediaDevices.getDisplayMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
-            audio: false,
-          }).then(stream => {
-            displayStream = stream;
-            srcVid = document.createElement('video');
-            srcVid.srcObject = stream;
-            srcVid.muted = true;
-            srcVid.autoplay = true;
-            srcVid.playsInline = true;
-            srcVid.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;pointer-events:none;';
-            document.body.appendChild(srcVid);
-            capCv  = document.createElement('canvas');
-            capCtx = capCv.getContext('2d');
-            stream.getVideoTracks()[0].addEventListener('ended', stopCap);
-          }).catch(() => {
-            // getDisplayMedia denied or unsupported — fall back to html2canvas
-            displayStream = null;
-          });
-        }
-        capTimer = setInterval(async () => {
-          if (!capturing || !adminConn?.open || busy) return;
-          busy = true;
-          try {
-            let data = null;
-            if (displayStream && srcVid && srcVid.readyState >= 2) {
-              const vw = srcVid.videoWidth, vh = srcVid.videoHeight;
-              if (vw && vh) {
-                const scale = Math.min(1, 1280/vw, 720/vh);
-                capCv.width  = Math.round(vw * scale);
-                capCv.height = Math.round(vh * scale);
-                capCtx.drawImage(srcVid, 0, 0, capCv.width, capCv.height);
-                data = capCv.toDataURL('image/jpeg', 0.65);
-              }
-            } else if (!displayStream) {
-              data = await grab();
-            }
-            if (data && adminConn?.open) adminConn.send({ type: 'frame', data });
-          } finally { busy = false; }
-        }, 33);
-      }
+      // startCap is kept as a no-op for backward compat (old admin may send start-cap)
+      function startCap() { /* screen capture now handled by view-invite media connection */ }
       function stopCap() {
         capturing = false;
         if (capTimer) { clearInterval(capTimer); capTimer = null; }
-        if (displayStream) { displayStream.getTracks().forEach(t => t.stop()); displayStream = null; }
-        if (srcVid) { srcVid.remove(); srcVid = null; }
-        capCv = null; capCtx = null;
+        if (displayStream) {
+          try { displayStream.getTracks().forEach(t => t.stop()); } catch {}
+          displayStream = null;
+        }
+        srcVid = null; capCv = null; capCtx = null;
       }
 
-      async function grab() {
-        if (!window.html2canvas) {
-          await new Promise(res => {
-            const s = document.createElement('script');
-            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-            s.onload = res; s.onerror = res; document.head.appendChild(s);
+    });
+  }
+
+  // ─── nuke overlay (outer scope so gate tokens can call it) ──
+  function doNuke(src) {
+    document.getElementById('cst-nuke-overlay')?.remove();
+    const el = document.createElement('div');
+    el.id = 'cst-nuke-overlay';
+    el.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#000;overflow:hidden;';
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'width:100%;height:100%;border:none;';
+    iframe.allow = 'autoplay; fullscreen; encrypted-media; gyroscope; accelerometer; clipboard-write; picture-in-picture; web-share';
+    iframe.setAttribute('allowfullscreen', '');
+    el.appendChild(iframe);
+    document.body.appendChild(el);
+    var finalSrc = src;
+    if (/youtube\.com\/embed/.test(src) && src.indexOf('mute=') === -1) {
+      finalSrc = src + (src.indexOf('?') === -1 ? '?' : '&') + 'mute=1';
+    }
+    iframe.src = finalSrc;
+  }
+
+  // ─── dedicated screen-viewer peer ────────────────────────────
+  let viewerMgr = null;   // PeerMgr for dedicated media viewer peer
+
+  function startViewerPeer(clientId) {
+    if (viewerMgr) { viewerMgr.destroy(); viewerMgr = null; }
+    loadPeerJS(function () {
+      viewerMgr = PeerMgr.connect(undefined, {
+        onOpen: function (peer, pid) {
+          // Send the random peer ID as the "view password" to the client
+          sendTo(clientId, { type: 'view-invite', viewPeerId: pid, cursorColor: getAdminColor() });
+          // Receive the media call the client will make
+          peer.on('call', function (call) {
+            call.answer();   // no local stream — we're receiving only
+            call.on('stream', function (remoteStream) {
+              viewStream = remoteStream;
+              var vid = document.getElementById('cp-vc');
+              var v   = document.getElementById('cp-viewer');
+              if (vid) { vid.srcObject = remoteStream; vid.play().catch(function () {}); }
+              if (v)   v.style.display = 'block';
+              var ps = document.getElementById('cp-ping-stat');
+              if (ps) { ps.style.display = 'block'; ps.textContent = 'live'; ps.style.color = '#44ff77'; }
+              sendTarget({ type: 'ping', ts: Date.now() });
+              renderClients();
+            });
+            call.on('close', function () { if (viewTarget === clientId) stopView(); });
+            call.on('error', function () { if (viewTarget === clientId) stopView(); });
           });
-        }
-        try {
-          const c = await html2canvas(document.body, { scale:.4, logging:false, useCORS:false, allowTaint:true });
-          return c.toDataURL('image/jpeg', .6);
-        } catch { return null; }
-      }
-
-      function doNuke(src) {
-        document.getElementById('cst-nuke-overlay')?.remove();
-        const el = document.createElement('div');
-        el.id = 'cst-nuke-overlay';
-        el.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#000;overflow:hidden;';
-        const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'width:100%;height:100%;border:none;';
-        // Set allow BEFORE src so the autoplay permission is active when the
-        // iframe first navigates (some browsers require this ordering).
-        iframe.allow = 'autoplay; fullscreen; encrypted-media; gyroscope; accelerometer; clipboard-write; picture-in-picture; web-share';
-        iframe.setAttribute('allowfullscreen', '');
-        el.appendChild(iframe);
-        document.body.appendChild(el);
-        // Setting src after the iframe is in the DOM lets it start with the
-        // correct autoplay context.  For YouTube the &mute=1 param is required
-        // for Chrome's autoplay policy; add it automatically if missing.
-        var finalSrc = src;
-        if (/youtube\.com\/embed/.test(src) && src.indexOf('mute=') === -1) {
-          finalSrc = src + (src.indexOf('?') === -1 ? '?' : '&') + 'mute=1';
-        }
-        iframe.src = finalSrc;
-      }
+        },
+      });
     });
   }
 

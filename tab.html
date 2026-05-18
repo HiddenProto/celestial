@@ -188,6 +188,15 @@
       <hr>
 
       <details open>
+        <summary>05/18 patch 4 — screen viewer, ghost user, token types</summary>
+        <p>- screen viewer: now uses a dedicated WebRTC media connection per session — admin creates a peer with a random ID and sends it to the client, client calls it directly with a 20fps screen share stream</p>
+        <p>- ghost user fix: stale beacon connections from the same device are now closed immediately when the device reconnects, fixing the "+1" phantom user count</p>
+        <p>- chat: online users tooltip no longer constrained (removed white-space:nowrap)</p>
+        <p>- token creator: added announce and nuke token types</p>
+        <p>- gate: announce, nuke, proxy, notify, theme tokens all execute offline without hub</p>
+      </details>
+
+      <details open>
         <summary>05/18 patch 3 — offline admin tokens</summary>
         <p>- admin system: new signed token types (proxy / notify / theme) — work entirely offline, no hub connection required</p>
         <p>- access keys now fall back to local validation when admin is unreachable — no more "admin is offline" dead-end</p>
@@ -620,10 +629,10 @@
     document.getElementById("close").addEventListener("click", exitUpdLog);
 
     window.addEventListener("load", function () {
-      if (!localStorage.getItem("updlogview18")) {
+      if (!localStorage.getItem("updlogview19")) {
         document.getElementById("update-log").style.display = "block";
         document.querySelector(".upd-bg").style.display = "block";
-        localStorage.setItem("updlogview18", "1");
+        localStorage.setItem("updlogview19", "1");
       }
     });
   </script>

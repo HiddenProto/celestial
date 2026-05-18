@@ -498,7 +498,7 @@
   font-size:.72rem;color:#444;cursor:default;}
 #cst-chat-online-tip{position:absolute;bottom:calc(100%+6px);right:0;
   background:#111;border:1px solid #1e1e1e;border-radius:7px;padding:8px 12px;
-  min-width:120px;z-index:2;opacity:0;pointer-events:none;transition:opacity .15s;white-space:nowrap;}
+  min-width:140px;z-index:2;opacity:0;pointer-events:none;transition:opacity .15s;}
 #cst-online-wrap:hover #cst-chat-online-tip{opacity:1;}
 #cst-chat-msgs{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;
   scrollbar-width:thin;scrollbar-color:#222 transparent;}
