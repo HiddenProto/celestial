@@ -416,6 +416,8 @@
 <div id="cp-bar">
   <h2>celestial. admin</h2>
   <span class="cp-badge">ADMIN</span>
+  <span id="cp-instance" style="font-size:.63rem;padding:2px 7px;border-radius:3px;
+    border:1px solid #222;background:#0a0a0a;color:#555;margin-left:2px;"></span>
   <span id="cp-hub">hub offline</span>
   <span id="cp-online-cnt" style="font-size:.7rem;padding:2px 8px;border-radius:3px;
     border:1px solid #1a2a1a;background:#020f02;color:#44aa66;display:none;"></span>
@@ -531,6 +533,7 @@
         </p>
         <p style="font-size:.82rem;">registry: <code id="cp-reg-id" style="color:#555;font-size:.72rem;word-break:break-all;"></code></p>
         <p style="font-size:.82rem;color:#444;">admin code: ← → ← → ↑ ↓ A B, then passcode</p>
+        <p style="font-size:.82rem;">instance: <code id="cp-inst-info" style="color:#777;"></code></p>
       </div>
       <div class="cb">
         <h3>Keys</h3>
@@ -566,6 +569,24 @@
     // Registry ID is static — show it immediately
     var elRegId = panelEl.querySelector('#cp-reg-id');
     if (elRegId) elRegId.textContent = REGISTRY_ID;
+    // Instance type badge + info tab
+    var _instEl   = panelEl.querySelector('#cp-instance');
+    var _instInfo = panelEl.querySelector('#cp-inst-info');
+    var _isLocalInst = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+    var _instLabel   = _isLocalInst ? 'local' : 'remote';
+    if (_instEl) {
+      _instEl.textContent = _instLabel;
+      if (_isLocalInst) {
+        _instEl.style.borderColor = '#1a3a1a';
+        _instEl.style.background  = '#020f02';
+        _instEl.style.color       = '#44cc66';
+      } else {
+        _instEl.style.borderColor = '#1a2a3a';
+        _instEl.style.background  = '#020a12';
+        _instEl.style.color       = '#4499cc';
+      }
+    }
+    if (_instInfo) _instInfo.textContent = _instLabel + ' — ' + location.hostname;
     panelEl.querySelector('#ck-make').onclick   = doMakeKey;
     panelEl.querySelector('#ck-copy').onclick   = () =>
       navigator.clipboard?.writeText(document.getElementById('ck-val').textContent).catch(() => {});

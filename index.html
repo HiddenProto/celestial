@@ -170,10 +170,14 @@
 
     setProxy(localStorage.getItem("pr0xy") || "scram");
 
+    // ── Instance type detection (used throughout) ────────────────────────────
+    var _cstIsLocal = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+    window._cstIsLocal = _cstIsLocal;
+
     // ── Auto-configure Wisp URL from GitHub (bumblcat-ultrapatch-url) ──────────
-    // Fetches the tunnel URL file, converts it to a wss:// Wisp endpoint, and
-    // reloads once if it changed.  No-ops silently if offline or file missing.
-    (function() {
+    // Only runs on the local instance — the regular site cannot use bumblcat
+    // ultrapatch natively, and running this there would cause reload loops.
+    if (_cstIsLocal) (function() {
       var _RAW = 'https://raw.githubusercontent.com/HiddenProto/celestial/main/bumblcat-ultrapatch-url';
       fetch(_RAW, { cache: 'no-store' })
         .then(function(r) { return r.ok ? r.text() : ''; })
@@ -562,7 +566,7 @@
               </p>
               <div class="wrap">
                 <button onclick="exportData()">export</button>
-                <button onclick="importData()">import</button>
+                <button id="cst-import-btn" onclick="importData()">import</button>
               </div>
             </div>
             <div class="fakebox oops">
@@ -1238,7 +1242,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.77";
+      var SITE_VER = "2.2.78";
 
       /**
        * Show a notification toast.
@@ -1426,8 +1430,57 @@
                 localStorage.setItem("pr0xy", "scram");
                 localStorage.setItem("location", "ws://localhost:3001/");
                 localStorage.setItem("proxy-config-seen", String(PROXY_CFG_INTERNAL));
-                window.notify("v2 Wider Support enabled — reloading…", "success", 6000);
-                setTimeout(function () { location.reload(); }, 900);
+                // ── "another site required" follow-up notification ────────────
+                var _warnKey = "cst-wider-site-warn";
+                var _alwaysShow = localStorage.getItem(_warnKey) !== "0";
+                if (_alwaysShow) {
+                  var _warnAlways = _alwaysShow; // local copy for closures
+                  window.notifyOption(
+                    "another site is required",
+                    "to use this server, another site is required to have open.",
+                    [
+                      {
+                        label: "Open site",
+                        info: "open the local celestial server in a new tab",
+                        onClick: function () {
+                          window.open("https://localhost:58443", "_blank");
+                          setTimeout(function () { location.reload(); }, 500);
+                        }
+                      },
+                      {
+                        label: "Skip",
+                        info: "continue without opening",
+                        className: "opt-skip",
+                        onClick: function () {
+                          if (!_warnAlways) {
+                            window.notify(
+                              "you can switch this option on or go there instantly via going to proxy.",
+                              "info", 9000
+                            );
+                          }
+                          setTimeout(function () { location.reload(); }, 500);
+                        }
+                      },
+                      {
+                        label: "always show",
+                        info: "toggle whether this reminder appears when selecting v2 Wider Support",
+                        className: _warnAlways ? "" : "opt-skip",
+                        rawClick: true,
+                        onClick: function (b, _df) {
+                          _warnAlways = !_warnAlways;
+                          localStorage.setItem(_warnKey, _warnAlways ? "1" : "0");
+                          var lbl = b.querySelector(".notif-opt-label");
+                          if (lbl) lbl.textContent = _warnAlways ? "always show" : "don't show again";
+                          b.className = b.className.replace(/\bopt-skip\b/, "").trim();
+                          if (!_warnAlways) b.className += " opt-skip";
+                        }
+                      }
+                    ],
+                    { noAutoDismiss: true }
+                  );
+                } else {
+                  setTimeout(function () { location.reload(); }, 900);
+                }
                 return;
               }
               var labelEl = btn.querySelector(".notif-opt-label");
@@ -1694,6 +1747,123 @@
   }
 
   document.getElementById("close").addEventListener("click", exitSetting);
+
+  // ── Export / Import data system ──────────────────────────────────────────────
+  (function () {
+    var _EXCL = { 'cst-admin': 1, 'cst-admin-id': 1, 'cst-keys': 1, 'cst-key': 1 };
+
+    function _hash(s) {
+      var h = 5381 >>> 0;
+      for (var i = 0; i < s.length; i++) h = (Math.imul(h, 33) ^ s.charCodeAt(i)) >>> 0;
+      return h.toString(16);
+    }
+    // Encode: base64 → shift each char into CJK range → looks like Chinese text
+    function _enc(s) {
+      var b64 = btoa(unescape(encodeURIComponent(s)));
+      return b64.split('').map(function (c) {
+        return String.fromCharCode(c.charCodeAt(0) + 0x4E00);
+      }).join('');
+    }
+    function _dec(s) {
+      var b64 = s.split('').map(function (c) {
+        var n = c.charCodeAt(0) - 0x4E00;
+        if (n < 0 || n > 127) throw new Error('bad');
+        return String.fromCharCode(n);
+      }).join('');
+      return decodeURIComponent(escape(atob(b64)));
+    }
+    function _parse(encoded) {
+      try {
+        var raw = _dec(encoded.trim());
+        if (!raw.startsWith('CST1:')) return { error: 'unknown' };
+        var c1 = raw.indexOf(':');
+        var c2 = raw.indexOf(':', c1 + 1);
+        var sig  = raw.slice(c1 + 1, c2);
+        var json = raw.slice(c2 + 1);
+        var data = JSON.parse(json);
+        if (_hash(json) !== sig) return { error: 'tampered' };
+        if (!data || typeof data !== 'object' || !Object.keys(data).length) return { error: 'corrupted' };
+        return { data: data };
+      } catch (e) { return { error: 'unknown' }; }
+    }
+
+    window.exportData = function () {
+      var d = {};
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!_EXCL[k]) d[k] = localStorage.getItem(k);
+      }
+      var json = JSON.stringify(d);
+      var payload = 'CST1:' + _hash(json) + ':' + json;
+      var blob = new Blob([_enc(payload)], { type: 'text/plain' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'celestial-data.cst';
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      window.notify('data exported — save the .cst file.', 'success', 4000);
+    };
+
+    window.importData = function () {
+      if (!window._cstIsLocal) {
+        window.notify('import is only available on the local instance.', 'warning', 5000);
+        return;
+      }
+      window.notifyOption(
+        '↓ import celestial data',
+        '① on the regular site  →  ⋮ → Misc → Export Data → export\n' +
+        '② save the .cst file to your device\n' +
+        '③ click Choose File below and select it\n\n' +
+        'your settings, themes, and history will be restored.',
+        [
+          {
+            label: 'Choose File',
+            rawClick: true,
+            onClick: function (btn, dismissFn) {
+              var inp = document.createElement('input');
+              inp.type = 'file'; inp.accept = '.cst,text/plain';
+              inp.onchange = function () {
+                var file = inp.files[0];
+                if (!file) return;
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                  var result = _parse((e.target.result || '').trim());
+                  if (result.error === 'unknown') {
+                    window.notify('unknown format — this may not be a celestial export file.', 'warning', 8000);
+                  } else if (result.error === 'tampered') {
+                    window.notify('tampered — file values were modified after export.', 'warning', 8000);
+                  } else if (result.error === 'corrupted') {
+                    window.notify('corrupted — file parsed but data is empty or unreadable.', 'warning', 8000);
+                  } else {
+                    Object.keys(result.data).forEach(function (k) {
+                      if (!_EXCL[k]) localStorage.setItem(k, result.data[k]);
+                    });
+                    dismissFn();
+                    window.notify('data imported — reloading…', 'success', 3000);
+                    setTimeout(function () { location.reload(); }, 1200);
+                  }
+                };
+                reader.readAsText(file);
+              };
+              inp.click();
+            }
+          },
+          { label: 'Cancel', className: 'opt-skip', onClick: function () {} }
+        ],
+        { noAutoDismiss: true }
+      );
+    };
+
+    // On load: hide import button + local wisp option on regular site
+    document.addEventListener('DOMContentLoaded', function () {
+      if (!window._cstIsLocal) {
+        var ib = document.getElementById('cst-import-btn');
+        if (ib) ib.style.display = 'none';
+        var lo = document.querySelector('#wispSelect option[value="ws://localhost:3001/"]');
+        if (lo) lo.style.display = 'none';
+      }
+    });
+  })();
 </script>
 <script>
   addEventListener("keydown", (e) => {
