@@ -1229,7 +1229,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.82";
+      var SITE_VER = "2.2.83";
 
       /**
        * Show a notification toast.
@@ -1512,7 +1512,7 @@
           "Choose how the proxy handles connections.",
           buttons_v2
         );
-      }, 0);
+      }, 800);
 
       // ── Version update check ─────────────────────────────────────────────
       (function () {
@@ -1597,18 +1597,17 @@
         }, 5500);
       })();
 
-      // ── Ultrapatch (local) notice — shows when local server is selected ──
+      // ── Server uptime notice ─────────────────────────────────────────────
       (function () {
-        var key = "ultrapatch-local-notice-ack";
+        var key = "cst-server-uptime-ack";
         if (localStorage.getItem(key)) return;
-        if (localStorage.getItem("location") !== "ws://localhost:3001/") return;
         setTimeout(function () {
           window.notifyOption(
-            "notice",
-            "this proxy is ran through Chris's laptop. Expect downtime on the weekends.",
+            "heads up",
+            "remember, this is the server version — it will not always be up.",
             [
               {
-                label: "acknowledge",
+                label: "got it",
                 info: "dismiss this notice permanently",
                 onClick: function () {
                   localStorage.setItem(key, "1");
@@ -1617,7 +1616,7 @@
             ],
             { noAutoDismiss: true }
           );
-        }, 4500);
+        }, 5000);
       })();
 
       // BRC lifecycle — silent, no toasts for fallback
