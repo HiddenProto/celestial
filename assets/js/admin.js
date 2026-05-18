@@ -931,9 +931,15 @@
   function startHub() {
     if (_hubMgr) return;
     loadPeerJS(function () {
-      _hubMgr = PeerMgr.connect(undefined, {  // random ID — no stale-lock possible
+      // Reuse persisted hub ID so the peer ID is stable across refreshes.
+      // On unavailable-id (stale-lock after crash), we clear it and get a fresh one.
+      var _persistedHubId = localStorage.getItem('cst-hub-pid') || undefined;
+
+      _hubMgr = PeerMgr.connect(_persistedHubId, {
 
         onOpen: function (peer, pid) {
+          // Persist so the next refresh reuses the same ID.
+          localStorage.setItem('cst-hub-pid', pid);
           hub = peer;
 
           // ── UI ───────────────────────────────────────────────
@@ -1000,7 +1006,9 @@
         },
 
         onUnavailable: function () {
-          // Random IDs should never produce unavailable-id, but handle defensively.
+          // Stored ID is stale-locked (peer didn't close cleanly) — clear it so
+          // PeerMgr gets a fresh random ID on the next attempt.
+          localStorage.removeItem('cst-hub-pid');
           _hubMgr = null; hub = null;
           setTimeout(function () { if (!_hubMgr) startHub(); }, 1000);
         },
