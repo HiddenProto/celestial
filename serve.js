@@ -20,7 +20,7 @@ const ROOT  = __dirname;
 const CERTS = path.join(ROOT, 'certs');
 const CERT  = path.join(CERTS, 'cert.pem');
 const KEY   = path.join(CERTS, 'key.pem');
-const PORT      = Number(process.env.PORT)      || 8443;
+const PORT      = Number(process.env.PORT)      || 58443;
 const PEER_PORT = Number(process.env.PEER_PORT) || 9001;
 const BUF   = 1 << 24; // 16 MB flow-control window
 
