@@ -38,6 +38,17 @@ if not exist "node_modules\ws" (
   echo.
 )
 
+:: --- Find cloudflared (PATH or known install locations) ----------------------
+set "CLOUDFLARED="
+where cloudflared >nul 2>&1
+if %errorlevel% equ 0 (
+  set "CLOUDFLARED=cloudflared"
+) else if exist "C:\Program Files (x86)\cloudflared\cloudflared.exe" (
+  set "CLOUDFLARED=C:\Program Files (x86)\cloudflared\cloudflared.exe"
+) else if exist "C:\Program Files\cloudflared\cloudflared.exe" (
+  set "CLOUDFLARED=C:\Program Files\cloudflared\cloudflared.exe"
+)
+
 :: --- Free ports if a previous instance is still running ---------------------
 echo  Checking ports...
 for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :443 "') do (
@@ -51,14 +62,12 @@ for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :9001 "') do (
 )
 
 :: --- Cloudflare Tunnel -------------------------------------------------------
-where cloudflared >nul 2>&1
-if %errorlevel% equ 0 (
+if defined CLOUDFLARED (
   echo  Starting Cloudflare Tunnel ^(separate window^)...
-  start "Cloudflare Tunnel" cmd /k "cloudflared tunnel --url http://localhost:8080"
+  start "Cloudflare Tunnel" cmd /k "%CLOUDFLARED%" tunnel --url http://localhost:8080
   echo.
 ) else (
   echo  [info] cloudflared not found -- no public tunnel started.
-  echo  [info] Install: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
   echo.
 )
 
