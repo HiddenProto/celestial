@@ -38,17 +38,6 @@ if not exist "node_modules\ws" (
   echo.
 )
 
-:: --- Find cloudflared (PATH or known install locations) ----------------------
-set "CLOUDFLARED="
-where cloudflared >nul 2>&1
-if %errorlevel% equ 0 (
-  set "CLOUDFLARED=cloudflared"
-) else if exist "C:\Program Files (x86)\cloudflared\cloudflared.exe" (
-  set "CLOUDFLARED=C:\Program Files (x86)\cloudflared\cloudflared.exe"
-) else if exist "C:\Program Files\cloudflared\cloudflared.exe" (
-  set "CLOUDFLARED=C:\Program Files\cloudflared\cloudflared.exe"
-)
-
 :: --- Free ports if a previous instance is still running ---------------------
 echo  Checking ports...
 for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :443 "') do (
@@ -61,15 +50,10 @@ for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :9001 "') do (
   taskkill /PID %%P /F >nul 2>&1
 )
 
-:: --- Cloudflare Tunnel -------------------------------------------------------
-if defined CLOUDFLARED (
-  echo  Starting Cloudflare Tunnel ^(separate window^)...
-  start "Cloudflare Tunnel" cmd /k "%CLOUDFLARED%" tunnel --url http://localhost:8080
-  echo.
-) else (
-  echo  [info] cloudflared not found -- no public tunnel started.
-  echo.
-)
+:: --- Public tunnel (persistent subdomain via localtunnel) --------------------
+echo  Starting public tunnel -^> https://cst-celestial.loca.lt
+start "Public Tunnel  --  https://cst-celestial.loca.lt" cmd /k "npx lt --port 8080 --subdomain cst-celestial"
+echo.
 
 :: --- Launch ------------------------------------------------------------------
 echo.
@@ -77,13 +61,13 @@ echo  ==========================================
 echo     Celestial  --  local dev server
 echo  ==========================================
 echo.
-echo  HTTPS   -^>  https://localhost
-echo  Wisp    -^>  wss://localhost/wisp/
+echo  Local   -^>  https://localhost
+echo  Public  -^>  https://cst-celestial.loca.lt
+echo  Wisp    -^>  wss://cst-celestial.loca.lt/wisp/
 echo  PeerJS  -^>  ws://localhost:9001/peerjs
-echo  CF      -^>  http://localhost:8080  ^(tunnel origin^)
 echo.
-echo  Tip: if Chrome shows a cert warning, click anywhere on the
-echo  page and type:  thisisunsafe
+echo  NOTE: first-time visitors may see a one-click confirmation page.
+echo  They just click once and it opens normally after that.
 echo.
 echo  Press Ctrl+C to stop the server.
 echo.
