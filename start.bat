@@ -3,7 +3,7 @@ title Celestial Dev Server
 cd /d "%~dp0"
 color 0A
 
-:: ─── Node.js check ───────────────────────────────────────────────────────────
+:: --- Node.js check -----------------------------------------------------------
 where node >nul 2>&1
 if %errorlevel% neq 0 (
   echo.
@@ -14,7 +14,7 @@ if %errorlevel% neq 0 (
   exit /b 1
 )
 
-:: ─── Dependency check ────────────────────────────────────────────────────────
+:: --- Dependency check --------------------------------------------------------
 if not exist "node_modules\ws" (
   echo.
   echo  [setup] ws not found -- running npm install...
@@ -30,18 +30,18 @@ if not exist "node_modules\ws" (
   echo.
 )
 
-:: ─── Launch ──────────────────────────────────────────────────────────────────
+:: --- Launch ------------------------------------------------------------------
 echo.
-echo  ╔══════════════════════════════════════════╗
-echo  ║     Celestial  --  local dev server      ║
-echo  ╚══════════════════════════════════════════╝
+echo  ==========================================
+echo     Celestial  --  local dev server
+echo  ==========================================
 echo.
-echo  HTTPS   →  https://localhost:8443
-echo  Wisp    →  wss://localhost:8443/wisp/
-echo  PeerJS  →  ws://localhost:9001/peerjs
+echo  HTTPS   -^>  https://localhost:8443
+echo  Wisp    -^>  wss://localhost:8443/wisp/
+echo  PeerJS  -^>  ws://localhost:9001/peerjs
 echo.
-echo  Tip: if Chrome shows a cert warning, click anywhere on the page
-echo  and type:  thisisunsafe
+echo  Tip: if Chrome shows a cert warning, click anywhere on the
+echo  page and type:  thisisunsafe
 echo.
 echo  Press Ctrl+C to stop the server.
 echo.
@@ -49,7 +49,7 @@ echo.
 :restart
 node serve.js
 echo.
-echo  [!] Server exited (code %errorlevel%). Restarting in 3 seconds...
+echo  [!] Server exited ^(code %errorlevel%^). Restarting in 3 s...
 echo      Press Ctrl+C to cancel.
 echo.
 timeout /t 3 /nobreak >nul
