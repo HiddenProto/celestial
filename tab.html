@@ -188,36 +188,23 @@
       <hr>
 
       <details open>
-        <summary>05/18 patch 4 — screen viewer, ghost user, token types</summary>
-        <p>- screen viewer: now uses a dedicated WebRTC media connection per session — admin creates a peer with a random ID and sends it to the client, client calls it directly with a 20fps screen share stream</p>
-        <p>- ghost user fix: stale beacon connections from the same device are now closed immediately when the device reconnects, fixing the "+1" phantom user count</p>
-        <p>- chat: online users tooltip no longer constrained (removed white-space:nowrap)</p>
-        <p>- token creator: added announce and nuke token types</p>
-        <p>- gate: announce, nuke, proxy, notify, theme tokens all execute offline without hub</p>
+        <summary>05/18 — v2.2.95 fixes</summary>
+        <p>- screen viewer reworked: static viewer peer is always-on, clients connect to it every second — no more race condition on first view attempt</p>
+        <p>- site-down notice added: shows once on page load letting users know the original site is down but celestial is still fully working</p>
+        <p>- fixed a console error that sometimes prevented startup notifications from showing</p>
       </details>
 
       <details open>
-        <summary>05/18 patch 3 — offline admin tokens</summary>
-        <p>- admin system: new signed token types (proxy / notify / theme) — work entirely offline, no hub connection required</p>
-        <p>- access keys now fall back to local validation when admin is unreachable — no more "admin is offline" dead-end</p>
-        <p>- admin panel: Token Creator for generating proxy config, notification, and theme tokens to share with users</p>
-        <p>- admin Global Actions: push proxy config, push theme, and reload all connected clients at once</p>
-      </details>
-
-      <details open>
-        <summary>05/18 patch 2 — scramjet restored &amp; app loading</summary>
-        <p>- scramjet proxy engine re-enabled — fully functional again, no longer falls back to UV</p>
-        <p>- quick apps and media now load statically (direct) by default — faster, no Wisp needed</p>
-        <p>- settings: new "Quick Apps &amp; Media" toggle to switch between static and proxied app loading</p>
-        <p>- local games now navigate directly (no /news/frame.html wrapper needed)</p>
-      </details>
-
-      <details open>
-        <summary>05/18 — new games &amp; proxy options</summary>
-        <p>- added Krunker, Basketball Stars 2026, Moto X3M 4: Winter, Night of the Consumers, YoHoHo.IO, Just Shapes And Beats, s.p.l.i.t, and -b (Minus B) — pulled from celestial.press via cross-origin proxy</p>
+        <summary>05/18 — updates</summary>
+        <p>- added Krunker, Basketball Stars 2026, Moto X3M 4: Winter, Night of the Consumers, YoHoHo.IO, Just Shapes And Beats, s.p.l.i.t, and -b (Minus B)</p>
         <p>- Wisp: added "local Wisp" option (enter your own device IP + port)</p>
         <p>- Wisp: added "no Wisp (static)" option — disables proxy, loads direct content only</p>
-        <p>- bumblcat ultrapatch is currently unavailable (grayed out in selector)</p>
+        <p>- scramjet proxy engine re-enabled — fully functional again</p>
+        <p>- quick apps and media now load statically (direct) by default — faster, no Wisp needed</p>
+        <p>- settings: new "Quick Apps &amp; Media" toggle to switch between static and proxied loading</p>
+        <p>- chat: online users list no longer truncated</p>
+        <p>- screen viewer: now uses a native WebRTC stream — 20fps, no encoding lag</p>
+        <p>- access keys now work even when the server is offline — local validation fallback</p>
       </details>
 
       <details open>
@@ -629,10 +616,10 @@
     document.getElementById("close").addEventListener("click", exitUpdLog);
 
     window.addEventListener("load", function () {
-      if (!localStorage.getItem("updlogview19")) {
+      if (!localStorage.getItem("updlogview20")) {
         document.getElementById("update-log").style.display = "block";
         document.querySelector(".upd-bg").style.display = "block";
-        localStorage.setItem("updlogview19", "1");
+        localStorage.setItem("updlogview20", "1");
       }
     });
   </script>

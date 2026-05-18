@@ -1285,7 +1285,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.94";
+      var SITE_VER = "2.2.95";
 
       /**
        * Show a notification toast.
@@ -1604,19 +1604,19 @@
       })();
 
 
-      // ── Server uptime notice (regular/server site only) ─────────────────
+      // ── Site-down notice ────────────────────────────────────────────────
       (function () {
-        if (_cstIsLocal) return; // admin's own machine — no need to warn
-        var key = "cst-server-uptime-ack";
+        if (window._cstIsLocal) return;
+        var key = "cst-site-down-ack-v2";
         if (localStorage.getItem(key)) return;
         setTimeout(function () {
           window.notifyOption(
-            "heads up",
-            "remember, this is the server version — it will not always be up.",
+            "notice",
+            "site is currently down but still operational.",
             [
               {
                 label: "got it",
-                info: "dismiss this notice permanently",
+                info: "dismiss permanently",
                 onClick: function () {
                   localStorage.setItem(key, "1");
                 }
@@ -1624,7 +1624,7 @@
             ],
             { noAutoDismiss: true }
           );
-        }, 5000);
+        }, 3000);
       })();
 
       // BRC lifecycle — silent, no toasts for fallback

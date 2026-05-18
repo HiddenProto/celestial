@@ -17,6 +17,9 @@
   // produce different IDs and end up on completely separate, invisible meshes.
   const REGISTRY_ID = localStorage.getItem('cst-registry-id') || 'cst-reg-bumblcat-v1';
   const SEC  = 'Hr332941369';
+  // Static viewer peer ID — same on all instances (admin + clients share this file).
+  // Pre-registered when admin opens the panel; clients connect to it every 1 s.
+  const CST_VIEWER_PID = 'cst-vwr-bumblcat-v1';
 
   let isAdmin    = localStorage.getItem('cst-admin') === '1';
   let buf        = [];
@@ -944,6 +947,9 @@
       if (_lp0 && _hubOnlinePid) _lp0.textContent = _hubOnlinePid;
     }
 
+    // Pre-create static viewer peer so it's ready before admin ever clicks "view"
+    startViewerMain();
+
     // ── global actions ──
     const annSel = panelEl.querySelector('#cp-nuke-sel');
     const annUrl = panelEl.querySelector('#cp-nuke-url');
@@ -1500,15 +1506,29 @@
     if (v)  v.style.display = 'block';
     if (ps) { ps.style.display = 'block'; ps.textContent = 'connecting…'; ps.style.color = '#444'; }
     renderClients();
-    // Create a dedicated viewer peer (random ID = the "password") and invite client
-    startViewerPeer(id);
+    // Deliver view request — prefer the direct viewer data channel (client
+    // maintains it via 1-second polling), fall back to hub channel.
+    _doViewInvite(id);
     // Periodic ping for latency readout
     if (_viewPingTimer) clearInterval(_viewPingTimer);
     _viewPingTimer = setInterval(() => {
       if (!viewTarget) { clearInterval(_viewPingTimer); _viewPingTimer = null; return; }
-      sendTarget({ type: 'ping', ts: Date.now() });
+      var _vc = viewerConns[viewTarget];
+      if (_vc && _vc.open) { try { _vc.send({ type: 'ping', ts: Date.now() }); } catch {} }
+      else sendTarget({ type: 'ping', ts: Date.now() });
     }, 5000);
   };
+
+  function _doViewInvite(id) {
+    var _vc = viewerConns[id];
+    if (_vc && _vc.open) {
+      // Client is already connected to the static viewer peer — just tell it to start
+      try { _vc.send({ type: 'view-start', cursorColor: getAdminColor() }); } catch {}
+    } else {
+      // No direct viewer connection yet — fall back to hub data channel
+      sendTo(id, { type: 'view-invite', viewPeerId: CST_VIEWER_PID, cursorColor: getAdminColor() });
+    }
+  }
 
   window.__cstRemove = id => {
     sendTo(id, { type: 'revoke' });
@@ -1534,10 +1554,14 @@
   };
 
   function stopView() {
-    if (viewTarget) sendTarget({ type: 'stop-view' });   // tell client to end stream
-    viewTarget = null;
     if (_viewPingTimer) { clearInterval(_viewPingTimer); _viewPingTimer = null; }
-    if (viewerMgr) { viewerMgr.destroy(); viewerMgr = null; }   // close dedicated media peer
+    // Tell client to stop sharing (try viewer channel first, then hub)
+    if (viewTarget) {
+      var _vc = viewerConns[viewTarget];
+      if (_vc && _vc.open) { try { _vc.send({ type: 'stop-view' }); } catch {} }
+      else sendTarget({ type: 'stop-view' });
+    }
+    viewTarget = null;
     const v = document.getElementById('cp-viewer');
     if (v) v.style.display = 'none';
     const vid = document.getElementById('cp-vc');
@@ -1545,6 +1569,7 @@
     viewStream = null;
     const ps = document.getElementById('cp-ping-stat');
     if (ps) ps.style.display = 'none';
+    // viewerMgr stays alive — it's a persistent static peer, don't destroy it
     renderClients();
   }
 
@@ -1631,8 +1656,10 @@
       let _hoverThrottle = 0;     // last hover-check timestamp (throttle to ~15fps)
 
       // Intervals are created once; cPeer is updated if the peer is recreated.
-      let _tryConnTimer = null;
-      let _capWatchdog  = null;
+      let _tryConnTimer     = null;
+      let _capWatchdog      = null;
+      let viewerConn        = null;   // data connection to admin's static viewer peer
+      let _viewerConnTimer  = null;
 
       // Hub discovery via the chat registry.
       // Admin hub uses a RANDOM peer ID each session (no stale-locks).
@@ -1674,6 +1701,57 @@
         regConn.on('close',  function () { clearTimeout(t); _discovering = false; });
       }
 
+      // ── Viewer peer polling ─────────────────────────────────────
+      // Every 1 s, ensure we have a data connection to admin's static
+      // viewer peer (CST_VIEWER_PID).  When admin clicks "view" on this
+      // client, they push view-start over this channel instead of
+      // relying on the hub — faster, no extra round-trip.
+      function _tryViewerConn() {
+        if (viewerConn && viewerConn.open) return;
+        if (!cPeer || !cPeer.open) return;
+        viewerConn = null;
+        try {
+          var conn = cPeer.connect(CST_VIEWER_PID, { reliable: true });
+          conn.on('open', function () {
+            // Tell admin which hub peer we are so they can match us to a client
+            var apprV = getApproval();
+            conn.send({ type: 'vwr-hello', peerId: cPeer.id, name: apprV?.name || null });
+            viewerConn = conn;
+            conn.on('data', function (d) {
+              if (!d) return;
+              if (d.type === 'view-start') {
+                // Admin wants our screen — same flow as view-invite
+                if (d.cursorColor) { cursorColor = d.cursorColor; if (virCur) { virCur.remove(); virCur = null; } }
+                if (!navigator.mediaDevices?.getDisplayMedia) {
+                  try { viewerConn?.send({ type: 'view-declined', reason: 'unsupported' }); } catch {}
+                  return;
+                }
+                navigator.mediaDevices.getDisplayMedia({
+                  video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 20 } },
+                  audio: false,
+                }).then(function (stream) {
+                  displayStream = stream;
+                  capturing = true;
+                  stream.getVideoTracks()[0].addEventListener('ended', stopCap);
+                  var call = cPeer.call(CST_VIEWER_PID, stream);
+                  if (call) {
+                    call.on('close', function () { stopCap(); });
+                    call.on('error', function () { stopCap(); });
+                  }
+                }).catch(function () {
+                  try { viewerConn?.send({ type: 'view-declined', reason: 'denied' }); } catch {}
+                });
+              }
+              if (d.type === 'stop-view' || d.type === 'stop-cap') { stopCap(); hideCur(); }
+              if (d.type === 'ping')  { try { viewerConn?.send({ type: 'pong', pingTs: d.ts }); } catch {} }
+            });
+            conn.on('close', function () { if (viewerConn === conn) viewerConn = null; });
+            conn.on('error', function () { if (viewerConn === conn) viewerConn = null; });
+          });
+          conn.on('error', function () { /* peer-unavailable = admin viewer offline, retry next tick */ });
+        } catch {}
+      }
+
       PeerMgr.connect(undefined, {
         onOpen: function (peer) {
           cPeer = peer;
@@ -1688,8 +1766,9 @@
             adminConn    = null;
           });
           // Start intervals only once (survives peer recreation).
-          if (!_tryConnTimer) _tryConnTimer = setInterval(tryConnect, 1000);
-          if (!_capWatchdog)  _capWatchdog  = setInterval(function () {
+          if (!_tryConnTimer)    _tryConnTimer    = setInterval(tryConnect, 1000);
+          if (!_viewerConnTimer) _viewerConnTimer = setInterval(_tryViewerConn, 1000);
+          if (!_capWatchdog)     _capWatchdog     = setInterval(function () {
             var now = Date.now();
             // Stop capture if admin stops pulsing (existing behaviour)
             if (capturing && lastPulse && now - lastPulse > 3000) { stopCap(); hideCur(); }
@@ -2027,10 +2106,10 @@
           if (!document.getElementById('cst-gate')) showGate();
         }
         if (d.type === 'view-invite') {
-          // Admin created a dedicated viewer peer (random ID = the "password")
-          // — start screen share and call that peer directly.
+          // Hub-channel fallback: admin couldn't reach viewer data channel yet.
+          // Use CST_VIEWER_PID (static) regardless of d.viewPeerId for consistency.
           if (d.cursorColor) { cursorColor = d.cursorColor; if (virCur) { virCur.remove(); virCur = null; } }
-          var viewPeerId = d.viewPeerId;
+          var viewPeerId = CST_VIEWER_PID;
           if (!navigator.mediaDevices?.getDisplayMedia) {
             try { adminConn.send({ type: 'view-declined', reason: 'unsupported' }); } catch {}
           } else {
@@ -2140,33 +2219,74 @@
     iframe.src = finalSrc;
   }
 
-  // ─── dedicated screen-viewer peer ────────────────────────────
-  let viewerMgr = null;   // PeerMgr for dedicated media viewer peer
+  // ─── static screen-viewer peer ───────────────────────────────
+  // One persistent peer (CST_VIEWER_PID) is created when the panel opens.
+  // Clients poll it every 1 s via a data channel; admin can push view-start
+  // directly over that channel instead of relying on the hub.  Media calls
+  // still travel via the same peer.
+  let viewerMgr   = null;
+  let viewerConns = {};   // clientHubPeerId → PeerJS data connection
 
-  function startViewerPeer(clientId) {
-    if (viewerMgr) { viewerMgr.destroy(); viewerMgr = null; }
+  function startViewerMain() {
+    if (viewerMgr) return;
     loadPeerJS(function () {
-      viewerMgr = PeerMgr.connect(undefined, {
-        onOpen: function (peer, pid) {
-          // Send the random peer ID as the "view password" to the client
-          sendTo(clientId, { type: 'view-invite', viewPeerId: pid, cursorColor: getAdminColor() });
-          // Receive the media call the client will make
+      viewerMgr = PeerMgr.connect(CST_VIEWER_PID, {
+        onOpen: function (peer) {
+          // ── Incoming data connections from clients (1-s polling) ──
+          peer.on('connection', function (conn) {
+            conn.on('open', function () {
+              conn.on('data', function (d) {
+                if (d && d.type === 'vwr-hello' && d.peerId) {
+                  viewerConns[d.peerId] = conn;
+                  // If admin already wants this client, send start immediately
+                  if (viewTarget === d.peerId) {
+                    try { conn.send({ type: 'view-start', cursorColor: getAdminColor() }); } catch {}
+                  }
+                }
+                if (d && d.type === 'pong' && d.pingTs) {
+                  var lat = Date.now() - d.pingTs;
+                  var ps2 = document.getElementById('cp-ping-stat');
+                  if (ps2 && viewTarget) ps2.textContent = lat + ' ms';
+                }
+                if (d && d.type === 'view-declined') {
+                  var ps3 = document.getElementById('cp-ping-stat');
+                  if (ps3) { ps3.textContent = 'declined'; ps3.style.color = '#ff8844'; }
+                }
+              });
+              conn.on('close', function () {
+                Object.keys(viewerConns).forEach(function (k) {
+                  if (viewerConns[k] === conn) delete viewerConns[k];
+                });
+              });
+              conn.on('error', function () {
+                Object.keys(viewerConns).forEach(function (k) {
+                  if (viewerConns[k] === conn) delete viewerConns[k];
+                });
+              });
+            });
+          });
+          // ── Incoming media calls from clients ──
           peer.on('call', function (call) {
-            call.answer();   // no local stream — we're receiving only
+            if (!viewTarget) { call.close(); return; }
+            call.answer();
             call.on('stream', function (remoteStream) {
               viewStream = remoteStream;
               var vid = document.getElementById('cp-vc');
               var v   = document.getElementById('cp-viewer');
               if (vid) { vid.srcObject = remoteStream; vid.play().catch(function () {}); }
               if (v)   v.style.display = 'block';
-              var ps = document.getElementById('cp-ping-stat');
-              if (ps) { ps.style.display = 'block'; ps.textContent = 'live'; ps.style.color = '#44ff77'; }
-              sendTarget({ type: 'ping', ts: Date.now() });
+              var ps4 = document.getElementById('cp-ping-stat');
+              if (ps4) { ps4.style.display = 'block'; ps4.textContent = 'live'; ps4.style.color = '#44ff77'; }
               renderClients();
             });
-            call.on('close', function () { if (viewTarget === clientId) stopView(); });
-            call.on('error', function () { if (viewTarget === clientId) stopView(); });
+            call.on('close', function () { if (viewTarget) stopView(); });
+            call.on('error', function () { if (viewTarget) stopView(); });
           });
+        },
+        onUnavailable: function () {
+          // Static ID still taken by a previous session — retry after 20 s
+          viewerMgr = null;
+          setTimeout(startViewerMain, 20000);
         },
       });
     });
