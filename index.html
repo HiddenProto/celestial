@@ -186,7 +186,12 @@
         'ws://localhost:3001/',
       ];
       var _cur = localStorage.getItem('location');
-      if (_stale.indexOf(_cur) !== -1) localStorage.removeItem('location');
+      if (_stale.indexOf(_cur) !== -1) {
+        localStorage.removeItem('location');
+        // Flag so the proxy config prompt re-shows once for this user only —
+        // their Wisp was silently changed, they should know.
+        localStorage.removeItem('proxy-config-seen');
+      }
       localStorage.setItem('cst-wisp-migrated-v2', '1');
     })();
     // Default Wisp = same-origin /wisp/ — serve.js hosts both the site and Wisp
@@ -1229,7 +1234,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.83";
+      var SITE_VER = "2.2.84";
 
       /**
        * Show a notification toast.
@@ -1385,7 +1390,7 @@
       // Shows to new users (no proxy set) OR users who haven't seen it yet.
       // Once seen it won't show again — UNLESS a future special update bumps
       // PROXY_CFG_INTERNAL above the stored value (to be implemented later).
-      var PROXY_CFG_INTERNAL = 2; // bump this when a major proxy update needs re-showing
+      var PROXY_CFG_INTERNAL = 1; // bump this when a major proxy update needs re-showing
 
       // Auto-show proxy config prompt
       setTimeout(function () {
