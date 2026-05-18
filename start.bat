@@ -30,6 +30,15 @@ if not exist "node_modules\ws" (
   echo.
 )
 
+:: --- Free ports if a previous instance is still running ---------------------
+echo  Checking ports...
+for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :8443 "') do (
+  taskkill /PID %%P /F >nul 2>&1
+)
+for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :9001 "') do (
+  taskkill /PID %%P /F >nul 2>&1
+)
+
 :: --- Launch ------------------------------------------------------------------
 echo.
 echo  ==========================================
@@ -48,9 +57,21 @@ echo.
 
 :restart
 node serve.js
+set EXIT_CODE=%errorlevel%
 echo.
-echo  [!] Server exited ^(code %errorlevel%^). Restarting in 3 s...
+if %EXIT_CODE%==0 (
+  echo  Server stopped cleanly.
+  pause
+  exit /b 0
+)
+echo  [!] Server exited ^(code %EXIT_CODE%^). Freeing ports and restarting in 3 s...
 echo      Press Ctrl+C to cancel.
 echo.
+for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :8443 "') do (
+  taskkill /PID %%P /F >nul 2>&1
+)
+for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :9001 "') do (
+  taskkill /PID %%P /F >nul 2>&1
+)
 timeout /t 3 /nobreak >nul
 goto restart

@@ -226,6 +226,16 @@ function startPeerServer() {
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────
+server.on('error', err => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n[error] Port ${PORT} is already in use.`);
+    console.error('[error] Another instance of serve.js may still be running.');
+    console.error('[error] start.bat will kill the old process and retry.\n');
+    process.exit(1);
+  }
+  throw err;
+});
+
 server.listen(PORT, () => {
   const peerOk = startPeerServer();
 
