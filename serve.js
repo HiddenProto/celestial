@@ -20,7 +20,7 @@ const ROOT  = __dirname;
 const CERTS = path.join(ROOT, 'certs');
 const CERT  = path.join(CERTS, 'cert.pem');
 const KEY   = path.join(CERTS, 'key.pem');
-const PORT      = Number(process.env.PORT)      || 58443;
+const PORT      = Number(process.env.PORT)      || 443;
 const PEER_PORT = Number(process.env.PEER_PORT) || 9001;
 const BUF   = 1 << 24; // 16 MB flow-control window
 
@@ -83,6 +83,11 @@ const MIME = {
 function staticHandler(req, res) {
   let urlPath = (req.url || '/').split('?')[0];
   if (urlPath === '/') urlPath = '/index.html';
+
+  // Silently absorb Cloudflare CDN/RUM paths — always 404 on non-CF hosts
+  if (urlPath.startsWith('/cdn-cgi/')) {
+    res.writeHead(204); return res.end();
+  }
 
   // Security: prevent directory traversal
   const abs = path.resolve(path.join(ROOT, decodeURIComponent(urlPath)));

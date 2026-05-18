@@ -3,6 +3,14 @@ title Celestial Dev Server
 cd /d "%~dp0"
 color 0A
 
+:: Self-elevate to administrator (port 443 requires elevated rights on Windows)
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+  echo  Requesting administrator privileges ^(required for port 443^)...
+  powershell -Command "Start-Process -FilePath '%~f0' -Verb RunAs -WorkingDirectory '%~dp0'"
+  exit /b
+)
+
 :: --- Node.js check -----------------------------------------------------------
 where node >nul 2>&1
 if %errorlevel% neq 0 (
@@ -32,7 +40,7 @@ if not exist "node_modules\ws" (
 
 :: --- Free ports if a previous instance is still running ---------------------
 echo  Checking ports...
-for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :58443 "') do (
+for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :443 "') do (
   taskkill /PID %%P /F >nul 2>&1
 )
 for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :9001 "') do (
@@ -45,8 +53,8 @@ echo  ==========================================
 echo     Celestial  --  local dev server
 echo  ==========================================
 echo.
-echo  HTTPS   -^>  https://localhost:58443
-echo  Wisp    -^>  wss://localhost:58443/wisp/
+echo  HTTPS   -^>  https://localhost
+echo  Wisp    -^>  wss://localhost/wisp/
 echo  PeerJS  -^>  ws://localhost:9001/peerjs
 echo.
 echo  Tip: if Chrome shows a cert warning, click anywhere on the
@@ -67,7 +75,7 @@ if %EXIT_CODE%==0 (
 echo  [!] Server exited ^(code %EXIT_CODE%^). Freeing ports and restarting in 3 s...
 echo      Press Ctrl+C to cancel.
 echo.
-for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :58443 "') do (
+for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :443 "') do (
   taskkill /PID %%P /F >nul 2>&1
 )
 for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr " :9001 "') do (
