@@ -1005,6 +1005,10 @@
       bcast({ type: 'reload', delay: 500 });
       showToast('Reload sent to all clients');
     };
+
+    // Populate lists immediately with any clients already connected before the panel opened
+    renderClients();
+    renderKeys();
   }
 
   function reconnectHub() {
@@ -1290,7 +1294,7 @@
             });
             Object.keys(adminChatConns).forEach(function (id) {
               if (clients[id]) return; // already sent via control channel above
-              try { adminChatConns[id].send(Object.assign({}, _pulse, { _adm: 1 })); } catch {}
+              try { adminChatConns[id].conn.send(Object.assign({}, _pulse, { _adm: 1 })); } catch {}
             });
             window.__cstHubOnline   = realCount;
             window.__cstHubOnlineTs = Date.now();
@@ -1309,9 +1313,9 @@
               conn.once('data', function (d) {
                 if (d && d.type === 'mesh-hello') {
                   var cid = conn.peer;
-                  adminChatConns[cid] = conn;
-                  conn.on('close', function () { delete adminChatConns[cid]; });
-                  conn.on('error', function () { delete adminChatConns[cid]; });
+                  adminChatConns[cid] = { conn: conn, name: d.name || null };
+                  conn.on('close', function () { delete adminChatConns[cid]; renderClients(); });
+                  conn.on('error', function () { delete adminChatConns[cid]; renderClients(); });
                   window.__cstChatIncoming && window.__cstChatIncoming(conn, d);
                 } else {
                   var cid = conn.peer;
@@ -1488,29 +1492,37 @@
   function renderClients() {
     const list = document.getElementById('cp-clist');
     if (!list) return;
-    const ids = Object.keys(clients).filter(id => !clients[id].isAdminPeer);
+
+    // Full control-channel clients
+    const ctrlIds = Object.keys(clients).filter(id => !clients[id].isAdminPeer);
+    // Chat-only clients (connected via chat mesh but no control channel yet)
+    const chatOnlyIds = Object.keys(adminChatConns).filter(id => !clients[id] || clients[id].isAdminPeer);
+
+    const total = ctrlIds.length + chatOnlyIds.length;
     var cntEl = document.getElementById('cp-online-cnt');
-    if (!ids.length) {
+    if (!total) {
       list.innerHTML = '<p style="color:#333;font-size:.82rem;">no clients connected.</p>';
       if (cntEl) cntEl.style.display = 'none';
       return;
     }
     if (cntEl) {
-      cntEl.textContent = ids.length + ' client' + (ids.length === 1 ? '' : 's') + ' online';
+      cntEl.textContent = total + ' client' + (total === 1 ? '' : 's') + ' online';
       cntEl.style.display = '';
     }
-    list.innerHTML = ids.map(id => {
+
+    const _dot = online =>
+      `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;` +
+      `background:${online ? '#44ff77' : '#ff5555'};margin-right:5px;flex-shrink:0;` +
+      `box-shadow:0 0 4px ${online ? 'rgba(68,255,119,.6)' : 'rgba(255,85,85,.4)'};"></span>`;
+
+    const ctrlHtml = ctrlIds.map(id => {
       const c      = clients[id];
       const online = c.conn && c.conn.open;
-      const dot    = `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;` +
-                     `background:${online ? '#44ff77' : '#ff5555'};margin-right:5px;flex-shrink:0;` +
-                     `box-shadow:0 0 4px ${online ? 'rgba(68,255,119,.6)' : 'rgba(255,85,85,.4)'};"></span>`;
       const vp     = c.vp ? `${c.vp.w}×${c.vp.h}` : '?×?';
-      const status = online ? 'online' : 'offline';
       return `<div class="ccl${viewTarget === id ? ' sel' : ''}">
         <div class="ccl-info" onclick="__cstView('${id}')">
-          <div class="cn2" style="display:flex;align-items:center;">${dot}${c.name}${c.approved ? '' : ' <span style="color:#ffaa44;font-size:.7rem;margin-left:4px;">(pending)</span>'}</div>
-          <div class="cm" style="margin-left:12px;">${status} · ${vp} · ${c.url}</div>
+          <div class="cn2" style="display:flex;align-items:center;">${_dot(online)}${c.name}${c.approved ? '' : ' <span style="color:#ffaa44;font-size:.7rem;margin-left:4px;">(pending)</span>'}</div>
+          <div class="cm" style="margin-left:12px;">${online ? 'online' : 'offline'} · ${vp} · ${c.url}</div>
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0;align-items:center;">
           ${!c.approved ? `<button class="cbtn" onclick="__cstAuthorize('${id}')" title="authorize this client" style="padding:5px 8px;font-size:.72rem;color:#44ff77;border-color:#1e4a1e;">authorize</button>` : ''}
@@ -1520,6 +1532,25 @@
         </div>
       </div>`;
     }).join('');
+
+    const chatOnlyHtml = chatOnlyIds.map(id => {
+      const ac     = adminChatConns[id];
+      const online = ac?.conn?.open;
+      const name   = ac?.name || id.slice(-6);
+      return `<div class="ccl">
+        <div class="ccl-info">
+          <div class="cn2" style="display:flex;align-items:center;">${_dot(online)}${name} <span style="color:#4477aa;font-size:.7rem;margin-left:4px;">(chat)</span></div>
+          <div class="cm" style="margin-left:12px;">${online ? 'online' : 'offline'} · chat only</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0;align-items:center;">
+          <button class="cbtn" onclick="__cstAnn1('${id}')" title="announce to this user" style="padding:5px 8px;font-size:.72rem;">📢</button>
+          <button class="cbtn r" onclick="__cstNuke1('${id}')" title="nuke this client" style="padding:5px 8px;font-size:.72rem;">💥</button>
+          <button class="cbtn r" onclick="__cstRemove('${id}')" style="flex-shrink:0;">remove</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    list.innerHTML = ctrlHtml + chatOnlyHtml;
   }
 
   let _viewPingTimer = null;
@@ -1559,7 +1590,7 @@
   window.__cstRemove = id => {
     sendTo(id, { type: 'revoke' });
     if (clients[id]?.conn) try { clients[id].conn.close(); } catch {}
-    if (adminChatConns[id]) try { adminChatConns[id].close(); } catch {}
+    if (adminChatConns[id]) try { adminChatConns[id].conn.close(); } catch {}
     delete clients[id];
     delete adminChatConns[id];
     renderClients();
@@ -1567,18 +1598,19 @@
   };
 
   window.__cstAnn1 = id => {
+    const name = clients[id]?.name || adminChatConns[id]?.name || id;
     const txt = document.getElementById('cp-ann-txt')?.value?.trim()
-      || prompt('Announcement text for ' + (clients[id]?.name || id) + ':');
+      || prompt('Announcement text for ' + name + ':');
     if (!txt) return;
     sendTo(id, { type: 'announce', text: txt });
-    showToast(`Announced to ${clients[id]?.name || id}`);
+    showToast(`Announced to ${name}`);
   };
   window.__cstNuke1 = id => {
     const sel = document.getElementById('cp-nuke-sel');
     const urlEl = document.getElementById('cp-nuke-url');
     const src = sel?.value === 'custom' ? (urlEl?.value?.trim() || '') : (sel?.value || 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&controls=0');
     sendTo(id, { type: 'nuke', src });
-    showToast(`Nuked ${clients[id]?.name || id} 💥`);
+    showToast(`Nuked ${clients[id]?.name || adminChatConns[id]?.name || id} 💥`);
   };
 
   function stopView() {
@@ -1612,7 +1644,7 @@
       return;
     }
     // Prefer chat mesh channel; fall back to direct control channel
-    if (adminChatConns[id]?.open) { try { adminChatConns[id].send(payload); return; } catch {} }
+    if (adminChatConns[id]?.conn?.open) { try { adminChatConns[id].conn.send(payload); return; } catch {} }
     if (clients[id]?.conn) { try { clients[id].conn.send(payload); } catch {} }
   }
   function sendTarget(msg) { if (viewTarget) sendTo(viewTarget, msg); }
@@ -2282,7 +2314,7 @@
   // No getDisplayMedia / media calls involved.
   let viewerMgr   = null;
   let viewerConns     = {};   // clientHubPeerId → PeerJS data connection (screen viewer)
-  let adminChatConns  = {};   // clientHubPeerId → PeerJS data connection (chat mesh channel)
+  let adminChatConns  = {};   // clientHubPeerId → { conn, name } (chat mesh channel)
 
   function startViewerMain() {
     if (viewerMgr) return;
