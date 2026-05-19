@@ -27,6 +27,20 @@ const transportOptions = {
 	photon:  "/photon/index.mjs",
 };
 
+// Chrome 105+ requires { duplex: 'half' } for fetch() calls with a ReadableStream body.
+// BRC's controller code (controller.api.js / controller.sw.js) calls fetch() without it,
+// causing "The `duplex` member must be specified" errors when proxying streaming POST bodies.
+// Patch fetch() early so any call with a streaming body gets duplex added automatically.
+(function _patchFetchDuplex() {
+	const _orig = window.fetch;
+	window.fetch = function (resource, options) {
+		if (options?.body instanceof ReadableStream && !options.duplex) {
+			options = Object.assign({}, options, { duplex: 'half' });
+		}
+		return _orig.call(this, resource, options);
+	};
+}());
+
 //////////////////////////////
 ///           SW           ///
 //////////////////////////////
@@ -498,6 +512,14 @@ const _wispCheckPromise = (async function _wispCheck() {
 			message: `wisp server unreachable — switched to ${name} at ${new Date().toLocaleTimeString()}.`,
 			duration: 8000,
 		}});
+		// Deduplicate across frames: both index.html and tab.html run _wispCheckPromise
+		// independently and would both fire a notification.  Use a top-frame timestamp flag
+		// so only the first fallback notification within a 30-second window is shown.
+		try {
+			const _now = Date.now();
+			if (_now - (window.top._cstWispNotifyTs || 0) < 30000) return;
+			window.top._cstWispNotifyTs = _now;
+		} catch {}
 		document.dispatchEvent(_notifyEvt);
 		// Also notify the top frame when running inside the tab iframe
 		try { if (window !== window.top) window.top.document.dispatchEvent(_notifyEvt); } catch {}

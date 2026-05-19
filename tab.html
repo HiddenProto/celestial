@@ -188,6 +188,13 @@
       <hr>
 
       <details open>
+        <summary>05/19 — v2.2.101</summary>
+        <p>- Fixed Chrome "duplex member must be specified" errors: added a fetch() patch that automatically injects duplex:'half' for streaming request bodies, which BRC's controller code was missing</p>
+        <p>- tab.html now uses the same origin-based default wisp as the main frame (localhost → same-origin /wisp/, deployed → Mercury Workshop) instead of always defaulting to celestial-wisp</p>
+        <p>- wisp fallback notification now deduplicates across frames — both index.html and tab.html were each firing a notification, causing double toasts; now only the first one within 30 s is shown</p>
+      </details>
+
+      <details open>
         <summary>05/19 — v2.2.100</summary>
         <p>- Screen viewer no longer stops when the viewer WebRTC channel drops — capture now falls back to the control channel automatically and resumes via viewer channel once it reconnects</p>
         <p>- admin-pulse now goes directly over the control channel instead of the chat mesh channel, preventing the capture watchdog from firing due to a zombie chat connection</p>
@@ -493,7 +500,14 @@
       setTransport,
     } from "/lithium.mjs";
 
-    const _wispLoc = localStorage.getItem('location') || 'wss://celestial-wisp.onrender.com/';
+    // Use the same origin-based default as index.html: same-origin /wisp/ on localhost,
+    // Mercury Workshop on deployed — avoids the tab iframe starting with a different wisp
+    // than the main frame when 'location' hasn't been saved to localStorage yet.
+    const _tabIsLocal = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+    const _tabWispDefault = _tabIsLocal
+      ? (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wisp/'
+      : 'wss://wisp.mercurywork.shop/';
+    const _wispLoc = localStorage.getItem('location') || _tabWispDefault;
     setProxy(localStorage.getItem("pr0xy") || "scram");
     if (_wispLoc !== 'static') {
       setWisp(
