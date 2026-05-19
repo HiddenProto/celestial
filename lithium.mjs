@@ -450,7 +450,8 @@ const _isLocalHostLjs = (location.hostname === "localhost" || location.hostname 
 const _wispDefaultLjs = _isLocalHostLjs ? _originWisp : _ULTRAPATCH_WISP;
 
 // Supported fallback servers, tried in order when the primary is unreachable.
-const _WISP_FALLBACKS = [_REMOTE_WISP, _MERCURY_WISP];
+// Mercury Workshop first — lowest latency; bumblcat's server as secondary.
+const _WISP_FALLBACKS = [_MERCURY_WISP, _REMOTE_WISP];
 
 /** Quick WebSocket reachability check — resolves true if the server accepts. */
 function _checkWispUrl(url, timeoutMs) {
@@ -494,7 +495,7 @@ const _wispCheckPromise = (async function _wispCheck() {
 		console.warn(`lethal.js: wisp unreachable — fell back to ${name}`);
 		const _notifyEvt = new CustomEvent("notify", { detail: {
 			type: "warning",
-			message: `wisp server unreachable — switched to ${name} automatically.`,
+			message: `wisp server unreachable — switched to ${name} at ${new Date().toLocaleTimeString()}.`,
 			duration: 8000,
 		}});
 		document.dispatchEvent(_notifyEvt);

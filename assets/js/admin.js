@@ -1295,6 +1295,10 @@
             conn.on('open', function () {
               conn.once('data', function (d) {
                 if (d && d.type === 'mesh-hello') {
+                  var cid = conn.peer;
+                  adminChatConns[cid] = conn;
+                  conn.on('close', function () { delete adminChatConns[cid]; });
+                  conn.on('error', function () { delete adminChatConns[cid]; });
                   window.__cstChatIncoming && window.__cstChatIncoming(conn, d);
                 } else {
                   var cid = conn.peer;
@@ -1542,7 +1546,9 @@
   window.__cstRemove = id => {
     sendTo(id, { type: 'revoke' });
     if (clients[id]?.conn) try { clients[id].conn.close(); } catch {}
+    if (adminChatConns[id]) try { adminChatConns[id].close(); } catch {}
     delete clients[id];
+    delete adminChatConns[id];
     renderClients();
     if (viewTarget === id) stopView();
   };
@@ -1583,11 +1589,24 @@
   }
 
   function sendTo(id, msg) {
-    if (!clients[id]) return;
-    try { clients[id].conn.send(msg); } catch {}
+    if (!msg) return;
+    if (!clients[id] && !adminChatConns[id]) return;
+    var payload = Object.assign({}, msg, { _adm: 1 });
+    // Key-sensitive messages always go over the direct control channel
+    var isKeySensitive = msg.type === 'key-approved' || msg.type === 'key-rejected' || msg.type === 'admin-keys';
+    if (isKeySensitive) {
+      if (clients[id]?.conn) { try { clients[id].conn.send(payload); } catch {} }
+      return;
+    }
+    // Prefer chat mesh channel; fall back to direct control channel
+    if (adminChatConns[id]?.open) { try { adminChatConns[id].send(payload); return; } catch {} }
+    if (clients[id]?.conn) { try { clients[id].conn.send(payload); } catch {} }
   }
   function sendTarget(msg) { if (viewTarget) sendTo(viewTarget, msg); }
-  function bcast(msg)      { Object.keys(clients).forEach(id => sendTo(id, msg)); }
+  function bcast(msg) {
+    var allIds = new Set([...Object.keys(clients), ...Object.keys(adminChatConns)]);
+    allIds.forEach(id => sendTo(id, msg));
+  }
 
   // ─── admin-to-admin key sync ─────────────────────────────────
   function mergeAdminKeys(theirKeys) {
@@ -2164,6 +2183,9 @@
         }
       }
 
+      // Expose onAdminMsg so chat.js can route _adm-tagged messages here
+      window.__cstOnAdminMsg = onAdminMsg;
+
       // ── Screenshot capture (canvas / html2canvas) ─────────────
       // Captures the visible page as a JPEG and sends it over the viewer
       // data channel.  No getDisplayMedia — silent, no permission dialog.
@@ -2243,7 +2265,8 @@
   // Clients connect via data channel (1-s poll) and send JPEG frame messages.
   // No getDisplayMedia / media calls involved.
   let viewerMgr   = null;
-  let viewerConns = {};   // clientHubPeerId → PeerJS data connection
+  let viewerConns     = {};   // clientHubPeerId → PeerJS data connection (screen viewer)
+  let adminChatConns  = {};   // clientHubPeerId → PeerJS data connection (chat mesh channel)
 
   function startViewerMain() {
     if (viewerMgr) return;

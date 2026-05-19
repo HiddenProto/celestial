@@ -347,6 +347,12 @@
   function handlePeerMsg(peerId, d) {
     if (!d || typeof d !== 'object') return;
 
+    // Route admin commands (tagged by admin.js's sendTo) to the beacon handler
+    if (d._adm && typeof window.__cstOnAdminMsg === 'function') {
+      window.__cstOnAdminMsg(d);
+      return;
+    }
+
     // Dedup by msgId (prevents double-display if somehow seen twice)
     if (d.msgId) {
       if (seenMsgs.has(d.msgId)) return;

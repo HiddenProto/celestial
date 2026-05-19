@@ -188,6 +188,14 @@
       <hr>
 
       <details open>
+        <summary>05/19 — v2.2.98</summary>
+        <p>- Wisp swap notification now includes a timestamp so you know exactly when the switch happened</p>
+        <p>- Wisp fallback order updated: Mercury Workshop is tried first, then bumblcat's server</p>
+        <p>- Admin commands now route through the chat WebRTC channel when available — separate data channel from control so admin messages reach users already connected via mesh</p>
+        <p>- Admin message routing: key approval/rejection still goes over the direct control channel; everything else prefers the chat mesh channel</p>
+      </details>
+
+      <details open>
         <summary>05/18 — v2.2.97</summary>
         <p>- Wisp auto-fallback now works for all users, not just localhost — if your configured Wisp is down, it automatically tries bumblcat's server then Mercury Workshop</p>
         <p>- fallback notification shows in the browser tab so you know when a switch happened</p>
