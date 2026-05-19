@@ -1278,7 +1278,19 @@
             var realCount = 1 + Object.keys(clients).filter(function (id) {
               return !clients[id].isAdminPeer;
             }).length;
-            bcast({ type: 'admin-pulse', viewing: viewTarget !== null, onlineCount: realCount });
+            // admin-pulse is time-critical (watchdog stops capture after 3s gap).
+            // Send directly via the control channel to every control client — bypasses
+            // the chat-channel preference in sendTo() which could use a zombie channel.
+            // Also cover chat-only clients via adminChatConns.
+            var _pulse = { type: 'admin-pulse', viewing: viewTarget !== null, onlineCount: realCount };
+            Object.keys(clients).forEach(function (id) {
+              if (clients[id].isAdminPeer) return;
+              try { clients[id].conn.send(_pulse); } catch {}
+            });
+            Object.keys(adminChatConns).forEach(function (id) {
+              if (clients[id]) return; // already sent via control channel above
+              try { adminChatConns[id].send(Object.assign({}, _pulse, { _adm: 1 })); } catch {}
+            });
             window.__cstHubOnline   = realCount;
             window.__cstHubOnlineTs = Date.now();
             window.dispatchEvent(new CustomEvent('cst-hub-online'));
@@ -1753,8 +1765,10 @@
               if (d.type === 'stop-view' || d.type === 'stop-cap') { stopCap(); hideCur(); }
               if (d.type === 'ping') { try { conn.send({ type: 'pong', pingTs: d.ts }); } catch {} }
             });
-            conn.on('close', function () { if (viewerConn === conn) { viewerConn = null; stopCap(); } });
-            conn.on('error', function () { if (viewerConn === conn) { viewerConn = null; stopCap(); } });
+            // Just null out the viewer channel — _sendFrame falls back to adminConn
+            // automatically, so we keep capturing rather than interrupting the view.
+            conn.on('close', function () { if (viewerConn === conn) { viewerConn = null; } });
+            conn.on('error', function () { if (viewerConn === conn) { viewerConn = null; } });
           });
           conn.on('error', function () { /* admin viewer peer offline — retry next tick */ });
         } catch {}
