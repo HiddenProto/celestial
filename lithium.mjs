@@ -438,16 +438,32 @@ async function ensureBRC() {
 	return _brcInitPromise;
 }
 
-// Pre-warm the wisp server and auto-fallback if local server is unreachable.
-// Other devices don't run the local ultrapatch server, so ws://localhost:3001/ will
-// always fail for them (error code 7).  We detect this early and switch to the
-// remote wisp BEFORE the transport is created so no request ever sees the error.
-const _REMOTE_WISP = "wss://celestial-wisp.onrender.com/";
+// Pre-warm the wisp server and auto-fallback if the configured server is unreachable.
+// Tries supported public fallbacks (bumblcat → Mercury Workshop) so the proxy keeps
+// working even when the primary Wisp is down.
+const _REMOTE_WISP  = "wss://celestial-wisp.onrender.com/";
+const _MERCURY_WISP = "wss://wisp.mercurywork.shop/";
 const _ULTRAPATCH_WISP = "wss://cst-celestial.loca.lt/wisp/";
 const _originWisp = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/wisp/";
 // Default mirrors index.html: same-origin on localhost (direct), ultrapatch everywhere else.
 const _isLocalHostLjs = (location.hostname === "localhost" || location.hostname === "127.0.0.1");
 const _wispDefaultLjs = _isLocalHostLjs ? _originWisp : _ULTRAPATCH_WISP;
+
+// Supported fallback servers, tried in order when the primary is unreachable.
+const _WISP_FALLBACKS = [_REMOTE_WISP, _MERCURY_WISP];
+
+/** Quick WebSocket reachability check — resolves true if the server accepts. */
+function _checkWispUrl(url, timeoutMs) {
+	return new Promise(resolve => {
+		try {
+			const ws = new WebSocket(url);
+			const t = setTimeout(() => { try { ws.close(); } catch {} resolve(false); }, timeoutMs);
+			ws.onopen  = () => { clearTimeout(t); ws.close(); resolve(true); };
+			ws.onerror = () => { clearTimeout(t); resolve(false); };
+		} catch { resolve(false); }
+	});
+}
+
 const _wispCheckPromise = (async function _wispCheck() {
 	const saved = localStorage.getItem("location") || _wispDefaultLjs;
 	// Static mode: no Wisp server needed — skip the check entirely.
@@ -456,29 +472,38 @@ const _wispCheckPromise = (async function _wispCheck() {
 		? saved
 		: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + saved;
 	const isLocal = url.startsWith("ws://localhost") || url.startsWith("ws://127.");
-	const ok = await new Promise(resolve => {
-		try {
-			const ws = new WebSocket(url);
-			// Local connections refuse near-instantly; give remote servers more time.
-			const t = setTimeout(() => { try { ws.close(); } catch {} resolve(false); }, isLocal ? 1500 : 5000);
-			ws.onopen  = () => { clearTimeout(t); ws.close(); resolve(true); };
-			ws.onerror = () => { clearTimeout(t); resolve(false); };
-		} catch { resolve(false); }
-	});
+
+	const ok = await _checkWispUrl(url, isLocal ? 1500 : 5000);
 	if (ok) {
 		console.log("lethal.js: wisp pre-warm ok");
-	} else if (isLocal) {
-		// Local ultrapatch not running — transparently fall back to remote wisp
-		wispURL = _REMOTE_WISP;
-		localStorage.setItem("location", _REMOTE_WISP);
-		await updateBareMux();
-		console.warn("lethal.js: local wisp unreachable — fell back to remote server");
-		document.dispatchEvent(new CustomEvent("notify", { detail: {
-			type: "warning",
-			message: "local wisp server not found — switched to remote server automatically.",
-			duration: 8000
-		}}));
+		return;
 	}
+
+	// Primary unreachable — try supported public fallbacks in order.
+	const fallbacks = _WISP_FALLBACKS.filter(f => f !== url);
+	for (const fallback of fallbacks) {
+		const fallbackOk = await _checkWispUrl(fallback, 6000);
+		if (!fallbackOk) continue;
+
+		wispURL = fallback;
+		await updateBareMux();
+		// For local instances save permanently (avoids re-checking a dead local server).
+		// For remote, keep in-memory only so the user's stored preference isn't overwritten.
+		if (isLocal) localStorage.setItem("location", fallback);
+		const name = fallback.includes("mercurywork") ? "Mercury Workshop" : "bumblcat's server";
+		console.warn(`lethal.js: wisp unreachable — fell back to ${name}`);
+		const _notifyEvt = new CustomEvent("notify", { detail: {
+			type: "warning",
+			message: `wisp server unreachable — switched to ${name} automatically.`,
+			duration: 8000,
+		}});
+		document.dispatchEvent(_notifyEvt);
+		// Also notify the top frame when running inside the tab iframe
+		try { if (window !== window.top) window.top.document.dispatchEvent(_notifyEvt); } catch {}
+		return;
+	}
+
+	console.warn("lethal.js: all wisp servers unreachable — proxy may not work");
 })();
 
 registerSW()

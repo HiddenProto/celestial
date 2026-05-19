@@ -188,6 +188,12 @@
       <hr>
 
       <details open>
+        <summary>05/18 — v2.2.97</summary>
+        <p>- Wisp auto-fallback now works for all users, not just localhost — if your configured Wisp is down, it automatically tries bumblcat's server then Mercury Workshop</p>
+        <p>- fallback notification shows in the browser tab so you know when a switch happened</p>
+      </details>
+
+      <details open>
         <summary>05/18 — v2.2.96</summary>
         <p>- proxy setup notification is back — shows once to help new users pick a connection mode</p>
         <p>- "Wider Support" renamed to "Mercury" in the proxy prompt</p>
@@ -624,10 +630,10 @@
     document.getElementById("close").addEventListener("click", exitUpdLog);
 
     window.addEventListener("load", function () {
-      if (!localStorage.getItem("updlogview21")) {
+      if (!localStorage.getItem("updlogview22")) {
         document.getElementById("update-log").style.display = "block";
         document.querySelector(".upd-bg").style.display = "block";
-        localStorage.setItem("updlogview21", "1");
+        localStorage.setItem("updlogview22", "1");
       }
     });
   </script>
