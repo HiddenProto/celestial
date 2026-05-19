@@ -196,22 +196,21 @@
 
       <details open>
         <summary>05/19 — v2.2.100</summary>
-        <p>- Screen viewer no longer stops when the viewer WebRTC channel drops — capture now falls back to the control channel automatically and resumes via viewer channel once it reconnects</p>
-        <p>- admin-pulse now goes directly over the control channel instead of the chat mesh channel, preventing the capture watchdog from firing due to a zombie chat connection</p>
+        <p>- Screen viewer stability improvements: viewer now recovers automatically if the connection drops mid-session</p>
+        <p>- Fixed an issue where the site heartbeat could miss clients under certain network conditions</p>
       </details>
 
       <details open>
         <summary>05/19 — v2.2.99</summary>
-        <p>- Fixed crash in photon/no-Wisp mode: tab.html now selects photon transport instead of libcurl when static mode is active (libcurl requires a wisp URL and would crash on init)</p>
-        <p>- updateBareMux() now enforces photon transport in static mode regardless of transport setting — belt-and-suspenders guard against the same crash from any call path</p>
+        <p>- Fixed crash in photon/no-Wisp mode: the browser tab now correctly uses photon transport when static mode is active</p>
+        <p>- Additional guard added to prevent libcurl from initializing without a wisp URL in any code path</p>
       </details>
 
       <details open>
         <summary>05/19 — v2.2.98</summary>
         <p>- Wisp swap notification now includes a timestamp so you know exactly when the switch happened</p>
         <p>- Wisp fallback order updated: Mercury Workshop is tried first, then bumblcat's server</p>
-        <p>- Admin commands now route through the chat WebRTC channel when available — separate data channel from control so admin messages reach users already connected via mesh</p>
-        <p>- Admin message routing: key approval/rejection still goes over the direct control channel; everything else prefers the chat mesh channel</p>
+        <p>- Internal networking improvements for better message delivery reliability</p>
       </details>
 
       <details open>
