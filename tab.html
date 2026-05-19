@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>05/19 — v2.2.102</summary>
+        <p>- Improved session stability: fixed an edge case where an active session could be interrupted by a revocation event intended for a different user</p>
+      </details>
+
+      <details open>
         <summary>05/19 — v2.2.101</summary>
         <p>- Fixed Chrome "duplex member must be specified" errors: added a fetch() patch that automatically injects duplex:'half' for streaming request bodies, which BRC's controller code was missing</p>
         <p>- tab.html now uses the same origin-based default wisp as the main frame (localhost → same-origin /wisp/, deployed → Mercury Workshop) instead of always defaulting to celestial-wisp</p>

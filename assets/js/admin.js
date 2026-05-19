@@ -61,7 +61,7 @@
   const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('cst-auth') : null;
   if (bc) bc.onmessage = e => {
     if (e.data === 'approved') document.getElementById('cst-gate')?.remove();
-    if (e.data === 'revoked')  { clearApproval(); if (!document.getElementById('cst-gate')) showGate(); }
+    if (e.data === 'revoked')  { clearApproval(); if (!isAdmin && !document.getElementById('cst-gate')) showGate(); }
   };
 
   // ─── key crypto + identity ───────────────────────────────────
@@ -251,6 +251,7 @@
 
   // ─── auth gate ───────────────────────────────────────────────
   function showGate() {
+    if (isAdmin) return;  // admin never needs a key
     if (document.getElementById('cst-gate')) return;
     const d = document.createElement('div');
     d.id = 'cst-gate';
@@ -2132,6 +2133,7 @@
           }
         }
         if (d.type === 'revoke')       {
+          if (isAdmin) return;  // admin cannot be revoked
           clearApproval();
           bc?.postMessage('revoked');
           // Show gate again on this page
