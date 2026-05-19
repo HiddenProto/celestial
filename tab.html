@@ -188,6 +188,12 @@
       <hr>
 
       <details open>
+        <summary>05/19 — v2.2.99</summary>
+        <p>- Fixed crash in photon/no-Wisp mode: tab.html now selects photon transport instead of libcurl when static mode is active (libcurl requires a wisp URL and would crash on init)</p>
+        <p>- updateBareMux() now enforces photon transport in static mode regardless of transport setting — belt-and-suspenders guard against the same crash from any call path</p>
+      </details>
+
+      <details open>
         <summary>05/19 — v2.2.98</summary>
         <p>- Wisp swap notification now includes a timestamp so you know exactly when the switch happened</p>
         <p>- Wisp fallback order updated: Mercury Workshop is tried first, then bumblcat's server</p>
@@ -482,15 +488,18 @@
     } from "/lithium.mjs";
 
     const _wispLoc = localStorage.getItem('location') || 'wss://celestial-wisp.onrender.com/';
+    setProxy(localStorage.getItem("pr0xy") || "scram");
     if (_wispLoc !== 'static') {
       setWisp(
         (_wispLoc.startsWith('wss://') || _wispLoc.startsWith('ws://'))
           ? _wispLoc
           : (location.protocol === "https:" ? "wss://" : "ws://") + location.host + _wispLoc
       );
+      setTransport(localStorage.getItem("transportz") || "libcurl");
+    } else {
+      // No-Wisp / photon mode — libcurl and epoxy require a wisp URL, use photon instead
+      setTransport("photon");
     }
-    setProxy(localStorage.getItem("pr0xy") || "scram");
-    setTransport(localStorage.getItem("transportz") || "libcurl");
 
     let search =
       localStorage.getItem("search-engine") ||

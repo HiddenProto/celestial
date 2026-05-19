@@ -557,9 +557,12 @@ async function updateBareMux() {
 		console.log(`lethal.js: setting transport to ${transportURL} and wisp to ${wispURL}`);
 		await connection.setTransport(transportURL, [{ wisp: wispURL }]);
 	} else if (_isStatic) {
-		// Static / no-Wisp mode — photon works over HTTPS without a WebSocket server
-		console.log(`lethal.js: setting transport to ${transportURL} (no wisp / photon mode)`);
-		await connection.setTransport(transportURL, [{}]);
+		// Static / no-Wisp mode — photon works over HTTPS without a WebSocket server.
+		// Force photon URL here regardless of transportURL: libcurl/epoxy crash without
+		// a wisp URL, so any non-photon transport setting is ignored in static mode.
+		const _photonURL = transportOptions.photon || "/photon/index.mjs";
+		console.log(`lethal.js: setting transport to ${_photonURL} (no wisp / photon mode)`);
+		await connection.setTransport(_photonURL, [{}]);
 	}
 }
 
