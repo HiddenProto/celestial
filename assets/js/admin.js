@@ -1796,7 +1796,15 @@
         try {
           const conn = cPeer.connect(_adminPeerId, { reliable: true });
           adminConn = conn;
+          // Deadline: if 'open' never fires (WebSocket blip / ICE failure),
+          // unstick so the next 1-s tick can retry rather than hanging forever.
+          const _connDeadline = setTimeout(function () {
+            if (adminConn !== conn || conn.open) return;
+            try { conn.close(); } catch {}
+            adminConn = null; connecting = false;
+          }, 10000);
           conn.on('open', () => {
+            clearTimeout(_connDeadline);
             if (adminConn !== conn) { try { conn.close(); } catch {} return; }
             connecting = false;
             lastPulse  = 0;  // reset so zombie-check doesn't fire on a fresh connection
@@ -1817,6 +1825,7 @@
           });
           conn.on('data',  onAdminMsg);
           conn.on('close', () => {
+            clearTimeout(_connDeadline);
             if (adminConn === conn) {
               adminConn    = null;
               connecting   = false;
@@ -1825,6 +1834,7 @@
             }
           });
           conn.on('error', () => {
+            clearTimeout(_connDeadline);
             if (adminConn === conn) { adminConn = null; connecting = false; }
           });
         } catch { connecting = false; }
