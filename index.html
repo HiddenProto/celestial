@@ -224,11 +224,10 @@
       localStorage.setItem('cst-wisp-migrated-v2', '1');
     })();
     // Default Wisp: same-origin on localhost (direct, no internet roundtrip);
-    // bumblcat ultrapatch for everyone else (routes through cst-celestial.loca.lt).
-    // Only proxy WebSocket traffic uses the tunnel — celestial assets keep loading
-    // from the fast regular host the user navigated to.
+    // Mercury Workshop for everyone else. The ultrapatch (loca.lt) tunnel is only
+    // used when the user explicitly selects it via settings.
     var _wispOrigin  = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wisp/';
-    var _wispDefault = _cstIsLocal ? _wispOrigin : _ULTRAPATCH_WISP;
+    var _wispDefault = _cstIsLocal ? _wispOrigin : 'wss://wisp.mercurywork.shop/';
     const _wispLoc = localStorage.getItem('location') || _wispDefault;
     if (_wispLoc !== 'static') {
       setWisp(
@@ -1250,7 +1249,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.102";
+      var SITE_VER = "2.2.103";
 
       /**
        * Show a notification toast.

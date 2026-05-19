@@ -459,9 +459,10 @@ const _REMOTE_WISP  = "wss://celestial-wisp.onrender.com/";
 const _MERCURY_WISP = "wss://wisp.mercurywork.shop/";
 const _ULTRAPATCH_WISP = "wss://cst-celestial.loca.lt/wisp/";
 const _originWisp = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/wisp/";
-// Default mirrors index.html: same-origin on localhost (direct), ultrapatch everywhere else.
+// Default mirrors index.html: same-origin on localhost (direct), Mercury Workshop everywhere else.
+// The ultrapatch (loca.lt) tunnel is only used when explicitly set via localStorage.
 const _isLocalHostLjs = (location.hostname === "localhost" || location.hostname === "127.0.0.1");
-const _wispDefaultLjs = _isLocalHostLjs ? _originWisp : _ULTRAPATCH_WISP;
+const _wispDefaultLjs = _isLocalHostLjs ? _originWisp : _MERCURY_WISP;
 
 // Supported fallback servers, tried in order when the primary is unreachable.
 // Mercury Workshop first — lowest latency; bumblcat's server as secondary.
