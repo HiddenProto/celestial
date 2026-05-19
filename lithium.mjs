@@ -127,6 +127,19 @@ async function _createBRCTransport() {
 	// Read wisp from localStorage — setWisp may not have been called yet.
 	// Default mirrors index.html: same-origin on localhost, ultrapatch on other hosts.
 	const savedWisp = localStorage.getItem("location") || _wispDefaultLjs;
+
+	// Static / no-Wisp mode: photon transport uses HTTPS fetch — no WebSocket needed.
+	if (savedWisp === "static") {
+		try {
+			const { default: PhotonTransport } = await import("/photon/index.mjs");
+			console.log("lethal.js: photon transport active (no-wisp / static mode)");
+			return _wrapTransportHeaders(new PhotonTransport());
+		} catch (e) {
+			console.warn("lethal.js: photon transport failed in static mode:", e.message);
+			// Fall through — let libcurl try without a valid wisp (will likely fail)
+		}
+	}
+
 	const wisp = wispURL || (
 		(savedWisp.startsWith("wss://") || savedWisp.startsWith("ws://"))
 			? savedWisp
@@ -512,9 +525,15 @@ export function makeURL(input, template = "http://duckduckgo.com/?q=%s") {
  * @returns {Promise<void>}
  */
 async function updateBareMux() {
-	if (transportURL != null && wispURL != null) {
+	if (transportURL == null) return;
+	const _isStatic = localStorage.getItem("location") === "static";
+	if (wispURL != null) {
 		console.log(`lethal.js: setting transport to ${transportURL} and wisp to ${wispURL}`);
 		await connection.setTransport(transportURL, [{ wisp: wispURL }]);
+	} else if (_isStatic) {
+		// Static / no-Wisp mode — photon works over HTTPS without a WebSocket server
+		console.log(`lethal.js: setting transport to ${transportURL} (no wisp / photon mode)`);
+		await connection.setTransport(transportURL, [{}]);
 	}
 }
 
@@ -588,9 +607,6 @@ export function getProxy() {
  */
 export async function getProxied(input) {
 	const url = makeURL(input);
-
-	// Static mode: no proxy — return URL directly.
-	if (localStorage.getItem("location") === "static") return url;
 
 	// ── Internal / same-origin URLs — never proxy these ──────────────────────
 	// celestial:// is the internal protocol for built-in pages

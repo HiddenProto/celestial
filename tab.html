@@ -188,6 +188,14 @@
       <hr>
 
       <details open>
+        <summary>05/18 — v2.2.96</summary>
+        <p>- proxy setup notification is back — shows once to help new users pick a connection mode</p>
+        <p>- "Wider Support" renamed to "Mercury" in the proxy prompt</p>
+        <p>- no-Wisp mode now still routes through the proxy using photon transport instead of loading direct</p>
+        <p>- no-Wisp option in settings relabeled "no Wisp (photon)" to clarify it still proxies</p>
+      </details>
+
+      <details open>
         <summary>05/18 — v2.2.95 fixes</summary>
         <p>- screen viewer reworked: static viewer peer is always-on, clients connect to it every second — no more race condition on first view attempt</p>
         <p>- site-down notice added: shows once on page load letting users know the original site is down but celestial is still fully working</p>
@@ -198,7 +206,7 @@
         <summary>05/18 — updates</summary>
         <p>- added Krunker, Basketball Stars 2026, Moto X3M 4: Winter, Night of the Consumers, YoHoHo.IO, Just Shapes And Beats, s.p.l.i.t, and -b (Minus B)</p>
         <p>- Wisp: added "local Wisp" option (enter your own device IP + port)</p>
-        <p>- Wisp: added "no Wisp (static)" option — disables proxy, loads direct content only</p>
+        <p>- Wisp: added "no Wisp" option — routes through proxy without a Wisp server</p>
         <p>- scramjet proxy engine re-enabled — fully functional again</p>
         <p>- quick apps and media now load statically (direct) by default — faster, no Wisp needed</p>
         <p>- settings: new "Quick Apps &amp; Media" toggle to switch between static and proxied loading</p>
@@ -616,10 +624,10 @@
     document.getElementById("close").addEventListener("click", exitUpdLog);
 
     window.addEventListener("load", function () {
-      if (!localStorage.getItem("updlogview20")) {
+      if (!localStorage.getItem("updlogview21")) {
         document.getElementById("update-log").style.display = "block";
         document.querySelector(".upd-bg").style.display = "block";
-        localStorage.setItem("updlogview20", "1");
+        localStorage.setItem("updlogview21", "1");
       }
     });
   </script>

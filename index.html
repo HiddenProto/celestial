@@ -236,9 +236,11 @@
           ? _wispLoc
           : _wispDefault
       );
+      setTransport(localStorage.getItem("transportz") || "libcurl");
+    } else {
+      // No Wisp / static mode: photon transport works over HTTPS without a WebSocket
+      setTransport("photon");
     }
-
-    setTransport(localStorage.getItem("transportz") || "libcurl");
     async function autofill(url) {
       const urlToLoad = makeURL(url, search);
       const proxiedUrl = await getProxied(urlToLoad);
@@ -484,7 +486,7 @@
                 <option value="wss://anura.pro/wisp/">anura (free)</option>
                 <option value="wss://wisp.nodeppt.com/">nodeppt (free)</option>
                 <option value="__local__">local Wisp</option>
-                <option value="static">no Wisp (static)</option>
+                <option value="static">no Wisp (photon)</option>
                 <option value="custom">custom server...</option>
               </select>
               <button onclick="__testWisp()" style="margin-top:6px;" class="button">test &amp; auto-pick fastest</button>
@@ -1248,7 +1250,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.95";
+      var SITE_VER = "2.2.96";
 
       /**
        * Show a notification toast.
@@ -1400,16 +1402,17 @@
       };
 
       // ── Proxy config version ─────────────────────────────────────────────────
-      var PROXY_CFG_INTERNAL = 3;
+      var PROXY_CFG_INTERNAL = 1;
 
-      // Proxy config prompt disabled — users configure via Settings → Proxy.
+      // Proxy config prompt — show once per version to unconfigured users.
       setTimeout(function () {
-        if (true) return;
+        var _seenVer = parseInt(localStorage.getItem("proxy-config-seen") || "0");
+        if (_seenVer >= PROXY_CFG_INTERNAL) return;
 
-        // ── v2 buttons (with Wider Support animation) ──────────────────────
+        // ── v2 buttons (with Mercury animation) ───────────────────────────
         var buttons_v2 = [
           {
-            label: "Wider Support",
+            label: "Mercury",
             info: "libcurl + bumblcat rrc + bumblcat's Wisp server — best compatibility, routes through the host's residential IP",
             rawClick: true,
             onClick: function (btn, dismissFn) {
@@ -1428,7 +1431,7 @@
                 localStorage.setItem("transportz", "libcurl");
                 localStorage.setItem("pr0xy", "scram");
                 localStorage.setItem("location", _ULTRAPATCH_WISP);
-                window.notify("v2 Wider Support enabled — reloading…", "success", 6000);
+                window.notify("v2 Mercury enabled — reloading…", "success", 6000);
                 setTimeout(function () { location.reload(); }, 900);
                 return;
               }
@@ -1436,8 +1439,8 @@
               btn.disabled = true;
               btn.style.opacity = "0.45";
               window.notify("i'm joking", "info", 2500);
-              var original = "Wider Support";
-              var newName = "v2 Wider Support";
+              var original = "Mercury";
+              var newName = "v2 Mercury";
               setTimeout(function () {
                 var cur = original;
                 var backTimer = setInterval(function () {
@@ -1487,7 +1490,7 @@
         // ── v1 buttons (simple, no animation) ─────────────────────────────
         var buttons_v1 = [
           {
-            label: "Wider Support",
+            label: "Mercury",
             info: "libcurl + bumblcat rrc + bumblcat ultrapatch — best compatibility, routes through the host's residential IP",
             onClick: function () {
               if (!window._cstIsLocal) {
@@ -1496,7 +1499,7 @@
                 localStorage.setItem("transportz", "libcurl");
                 localStorage.setItem("pr0xy", "scram");
                 localStorage.setItem("location", _ULTRAPATCH_WISP);
-                window.notify("Wider Support enabled — reloading…", "success", 6000);
+                window.notify("Mercury enabled — reloading…", "success", 6000);
                 setTimeout(function () { location.reload(); }, 900);
               }
             }
@@ -1518,6 +1521,7 @@
             className: "opt-skip",
             onClick: function () {
               if (!localStorage.getItem("pr0xy")) localStorage.setItem("pr0xy", "scram");
+              localStorage.setItem("proxy-config-seen", String(PROXY_CFG_INTERNAL));
             }
           }
         ];
