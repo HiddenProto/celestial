@@ -1495,8 +1495,17 @@
 
     // Full control-channel clients
     const ctrlIds = Object.keys(clients).filter(id => !clients[id].isAdminPeer);
+    // Names already represented via control channel — used to suppress chat-only duplicates.
+    // The control channel and chat mesh use separate PeerJS peers (different IDs), so the
+    // same user can appear in both maps under different keys.  Deduplicate by name.
+    const ctrlNames = new Set(ctrlIds.map(id => clients[id]?.name).filter(Boolean));
     // Chat-only clients (connected via chat mesh but no control channel yet)
-    const chatOnlyIds = Object.keys(adminChatConns).filter(id => !clients[id] || clients[id].isAdminPeer);
+    const chatOnlyIds = Object.keys(adminChatConns).filter(id => {
+      if (clients[id] && !clients[id].isAdminPeer) return false; // same ID in both maps
+      const chatName = adminChatConns[id]?.name;
+      if (chatName && ctrlNames.has(chatName)) return false;     // same name in ctrl map
+      return true;
+    });
 
     const total = ctrlIds.length + chatOnlyIds.length;
     var cntEl = document.getElementById('cp-online-cnt');
