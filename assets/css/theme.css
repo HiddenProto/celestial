@@ -433,20 +433,21 @@ body[theme="apex"] .gradientthing {
 }
 
 /* ═══════════════════════════════════════════════════════
-   HIDDEN V1 — unscreenshotable flickering dot matrix
-   Colors: matrix-green (#00dd44) on near-black (#010d03).
+   HIDDEN V1 — ASCII dot-matrix cube over random noise
+   Inspired by vghvhg.oneapp.dev by bumblcat.
+   Colors: matrix-green (#00dd44) on pure black (#000).
    ═══════════════════════════════════════════════════════ */
 body[theme="hiddenV1"] {
-  --background:    #010d03;
-  --color:         #00cc3a;
-  --pallet:        rgba(2, 16, 6, 0.96);
-  --pallet-hover:  rgba(3, 24, 9, 0.98);
+  --background:    #000000;
+  --color:         #00dd44;
+  --pallet:        rgba(0, 12, 4, 0.97);
+  --pallet-hover:  rgba(0, 20, 7, 0.98);
   --button:        rgba(0, 160, 55, 0.22);
-  --border:        rgba(0, 200, 65, 0.32);
+  --border:        rgba(0, 200, 65, 0.35);
   --input:         rgba(0, 180, 60, 0.07);
-  --pallet2:       rgba(1, 10, 3, 0.97);
-  --settings:      rgba(0, 8, 2, 0.98);
-  background-color: #010d03;
+  --pallet2:       rgba(0, 8, 2, 0.98);
+  --settings:      rgba(0, 5, 1, 0.99);
+  background-color: #000000;
   color-scheme: dark;
 }
 
