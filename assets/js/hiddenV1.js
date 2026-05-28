@@ -1,121 +1,244 @@
 /* hiddenV1.js — HiddenV1 theme
-   A static grid of green square dots where FLICKER SPEED encodes BRIGHTNESS.
+   ──────────────────────────────────────────────────────────────
+   The entire UI is replaced by a field of flickering dots.
 
-   How it works:
-     Each dot is assigned a random brightness level (0.05 – 0.90).
-     That brightness level directly sets the dot's flicker frequency:
-       dim  (≈0.5–4 Hz)  → clearly visible slow pulse, perceived as dark
-       mid  (≈8–22 Hz)   → fast flutter, perceived as medium glow
-       bright (≈26–50 Hz) → above the ~24 Hz flicker-fusion threshold,
-                            the eye averages the cycles into a steady bright spot
+   Every 150 ms, an offscreen canvas samples the DOM: element
+   backgrounds + text positions are painted, then pixel luminance
+   at each dot centre drives that dot's flicker frequency.
 
-     Every dot uses a square-wave toggle (on / off) with a fully random phase
-     start, so no two dots are ever in sync.  A camera shutter captures a
-     single instant — each dot is randomly on or off — pure noise.
-     The human eye time-averages over ~100 ms and sees the full brightness map. */
+     Bright pixel → fast frequency (>24 Hz, above flicker-fusion)
+       → eye time-averages the flicker into a steady bright glow
+     Dark pixel  → slow frequency (<6 Hz)
+       → eye sees a slow pulsing dim dot
+
+   A camera shutter captures one frozen instant — every dot is
+   randomly on or off — pure noise.  Human vision integrates
+   ~100 ms and reads the full image.
+
+   Inspired by vghvhg.oneapp.dev by bumblcat. */
 
 (function () {
   if (localStorage.getItem('theme') !== 'hiddenV1') return;
 
-  /* ── Canvas ──────────────────────────────────────────────── */
+  /* ═══════════════════════════════════════════════════
+     CONFIG
+  ═══════════════════════════════════════════════════ */
+  const SPACING    = 5;     // px between dot centres
+  const DOT_S      = 2;     // square dot side (px)
+  const HALF       = (DOT_S / 2) | 0;
+  const FREQ_MIN   = 0.4;   // Hz — dimmest dots (slow visible pulse)
+  const FREQ_MAX   = 52;    // Hz — brightest dots (above flicker fusion)
+  const SAMPLE_MS  = 150;   // DOM re-sample interval (ms)
+  const DOT_COLOR  = '#00dd44'; // matrix green
+
+  /* ═══════════════════════════════════════════════════
+     CANVAS — covers everything, z-index above all UI
+  ═══════════════════════════════════════════════════ */
   const canvas = document.createElement('canvas');
+  canvas.id = 'hv1-canvas';
   canvas.style.cssText =
-    'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:0;';
+    'position:fixed;inset:0;width:100vw;height:100vh;' +
+    'pointer-events:none;z-index:2147483647;';
   document.body.appendChild(canvas);
   const ctx = canvas.getContext('2d');
 
-  const SPACING = 15;   // grid pitch (px between dot centres)
-  const DOT_S   = 3;    // square dot side-length (px)
-  const HALF    = (DOT_S / 2) | 0;
+  /* Offscreen canvas for DOM brightness sampling */
+  const off   = document.createElement('canvas');
+  const octx  = off.getContext('2d', { willReadFrequently: true });
 
-  /* Flicker-frequency range mapped linearly from brightness */
-  const FREQ_DIM    =  0.5;   // Hz for the dimmest dots
-  const FREQ_BRIGHT = 50;     // Hz for the brightest dots
-
-  /* Hue range: 108–137° = matrix-green to teal-green */
-  function hslStr(h) {    // s=100%, l=55% baked in
-    h /= 360;
-    const q = 1.0, p = 0.1;
-    const ch = t => {
-      t = ((t % 1) + 1) % 1;
-      if (t < 1 / 6) return p + (q - p) * 6 * t;
-      if (t < 0.5)   return q;
-      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-      return p;
-    };
-    return `rgb(${ch(h + 1/3) * 255 | 0},${ch(h) * 255 | 0},${ch(h - 1/3) * 255 | 0})`;
+  /* ═══════════════════════════════════════════════════
+     HIDE REAL UI
+  ═══════════════════════════════════════════════════ */
+  const hiddenEls = [];
+  function hideUI() {
+    for (const el of document.body.children) {
+      if (el === canvas) continue;
+      if (el.tagName === 'STYLE' || el.tagName === 'SCRIPT') continue;
+      hiddenEls.push({ el, opacity: el.style.opacity, pe: el.style.pointerEvents });
+      el.style.setProperty('opacity', '0', 'important');
+      el.style.setProperty('pointer-events', 'none', 'important');
+    }
   }
+  function showUI() {
+    for (const { el, opacity, pe } of hiddenEls) {
+      el.style.opacity      = opacity;
+      el.style.pointerEvents = pe;
+    }
+    hiddenEls.length = 0;
+  }
+  hideUI();
 
-  /* ── Build the dot grid ──────────────────────────────────── */
-  /* Dots are grouped by their colour string (one fillStyle change per
-     ~30 hue buckets instead of one per dot). */
-  let W, H, byStyle = [];
+  /* ═══════════════════════════════════════════════════
+     DOT GRID
+  ═══════════════════════════════════════════════════ */
+  let W = 0, H = 0;
+  /* One entry per dot (flat array for speed) */
+  let dotCount = 0;
+  let dotPx, dotPy;         // pixel positions (Int16Array)
+  let dotHz, dotPhase;      // flicker state (Float32Array)
+  let dotBright;            // alpha when ON (Float32Array)
+
   const TAU = Math.PI * 2;
 
   function buildGrid() {
-    W = canvas.width  = window.innerWidth;
-    H = canvas.height = window.innerHeight;
+    W = canvas.width  = off.width  = window.innerWidth;
+    H = canvas.height = off.height = window.innerHeight;
 
     const cols = Math.ceil(W / SPACING) + 1;
     const rows = Math.ceil(H / SPACING) + 1;
+    dotCount = cols * rows;
 
-    const map = new Map();
+    dotPx     = new Int16Array(dotCount);
+    dotPy     = new Int16Array(dotCount);
+    dotHz     = new Float32Array(dotCount).fill(FREQ_MIN);
+    dotBright = new Float32Array(dotCount).fill(0.12);
+    dotPhase  = new Float32Array(dotCount);
+
+    let i = 0;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-
-        /* Random brightness, then derive flicker frequency from it */
-        const brightness = 0.05 + Math.random() * 0.85;   // 0.05 – 0.90
-
-        /* Linear map: dim→slow, bright→fast */
-        const hz = FREQ_DIM + brightness * (FREQ_BRIGHT - FREQ_DIM);
-
-        /* Fully random phase: ensures no two dots are ever in sync */
-        const phase = Math.random() * TAU;
-
-        const hue = (108 + Math.random() * 30) | 0;   // 108–137°
-        if (!map.has(hue)) map.set(hue, { style: hslStr(hue), dots: [] });
-        map.get(hue).dots.push({
-          px:         Math.round((c + 0.5) * SPACING) - HALF,
-          py:         Math.round((r + 0.5) * SPACING) - HALF,
-          hz,
-          phase,
-          brightness, // alpha when the dot is in its ON half-cycle
-        });
+        dotPx[i] = Math.round((c + 0.5) * SPACING) - HALF;
+        dotPy[i] = Math.round((r + 0.5) * SPACING) - HALF;
+        dotPhase[i] = Math.random() * TAU; // random start phase
+        i++;
       }
     }
-
-    byStyle = [...map.values()];
   }
 
   buildGrid();
-  window.addEventListener('resize', buildGrid);
+  window.addEventListener('resize', () => { buildGrid(); sampleDOM(); });
 
-  /* ── Render loop ─────────────────────────────────────────── */
+  /* ═══════════════════════════════════════════════════
+     DOM BRIGHTNESS SAMPLER
+     Paints a simplified version of the real DOM into
+     an offscreen canvas, then reads pixel luminance.
+  ═══════════════════════════════════════════════════ */
+
+  /* Parse "rgb(r,g,b)" / "rgba(r,g,b,a)" → {r,g,b,a} or null */
+  function parseRGBA(str) {
+    if (!str || str === 'transparent') return null;
+    const m = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+    if (!m) return null;
+    return { r: +m[1], g: +m[2], b: +m[3], a: m[4] !== undefined ? +m[4] : 1 };
+  }
+
+  function lum(r, g, b) { return (0.299 * r + 0.587 * g + 0.114 * b) / 255; }
+
+  /* Recursively paint element backgrounds + borders onto offscreen ctx */
+  function paintEl(el) {
+    if (el === canvas || el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return;
+
+    const rect = el.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
+    if (rect.right < 0 || rect.bottom < 0 || rect.left > W || rect.top > H) return;
+
+    const style = getComputedStyle(el);
+    const bg    = parseRGBA(style.backgroundColor);
+
+    /* Paint background if non-trivially dark */
+    if (bg && bg.a > 0.02) {
+      const brightness = lum(bg.r, bg.g, bg.b) * bg.a;
+      if (brightness > 0.02) {
+        octx.fillStyle = `rgba(${bg.r},${bg.g},${bg.b},${(bg.a * 0.9).toFixed(2)})`;
+        octx.fillRect(rect.left, rect.top, rect.width, rect.height);
+      }
+    }
+
+    /* Paint each direct text node as a bright band */
+    const textCol = parseRGBA(style.color);
+    if (textCol) {
+      for (const node of el.childNodes) {
+        if (node.nodeType !== 3) continue;
+        const text = node.textContent.replace(/\s+/g, ' ').trim();
+        if (!text) continue;
+        const range = document.createRange();
+        range.selectNode(node);
+        for (const r of range.getClientRects()) {
+          if (r.width < 1 || r.height < 1) continue;
+          /* Fill text rect with the text colour — gives us brightness at text positions */
+          octx.fillStyle =
+            `rgba(${textCol.r},${textCol.g},${textCol.b},${Math.min(textCol.a, 0.95)})`;
+          octx.fillRect(r.left, r.top, r.width, r.height);
+        }
+      }
+    }
+
+    for (const child of el.children) paintEl(child);
+  }
+
+  function sampleDOM() {
+    /* Temporarily show UI so styles compute correctly,
+       sample, then hide again */
+    for (const { el } of hiddenEls) el.style.removeProperty('opacity');
+
+    octx.clearRect(0, 0, W, H);
+    for (const child of document.body.children) paintEl(child);
+
+    /* Re-hide */
+    for (const { el } of hiddenEls) el.style.setProperty('opacity', '0', 'important');
+
+    /* Read pixel luminance and update each dot's frequency */
+    const img  = octx.getImageData(0, 0, W, H);
+    const data = img.data;
+
+    for (let i = 0; i < dotCount; i++) {
+      const px = dotPx[i], py = dotPy[i];
+      if (px < 0 || py < 0 || px >= W || py >= H) continue;
+
+      /* Sample the 3x3 neighbourhood to smooth out single-pixel noise */
+      let sum = 0, cnt = 0;
+      for (let dy = 0; dy <= DOT_S; dy++) {
+        for (let dx = 0; dx <= DOT_S; dx++) {
+          const nx = px + dx, ny = py + dy;
+          if (nx >= W || ny >= H) continue;
+          const idx = (ny * W + nx) << 2;
+          sum += lum(data[idx], data[idx + 1], data[idx + 2]) * (data[idx + 3] / 255);
+          cnt++;
+        }
+      }
+      const brightness = cnt ? sum / cnt : 0;
+
+      /* Apply a gamma curve to increase contrast in the mid-range */
+      const curved = Math.pow(brightness, 0.55);
+
+      dotHz[i]     = FREQ_MIN + curved * (FREQ_MAX - FREQ_MIN);
+      dotBright[i] = 0.08 + curved * 0.82;
+    }
+  }
+
+  /* Initial sample (with a short delay so DOM is fully laid out) */
+  setTimeout(sampleDOM, 120);
+
+  /* Re-sample periodically for live UI changes */
+  const sampleTimer = setInterval(() => {
+    if (!alive) { clearInterval(sampleTimer); return; }
+    sampleDOM();
+  }, SAMPLE_MS);
+
+  /* Re-sample on DOM mutations (new chat messages, panel changes, etc.) */
+  const observer = new MutationObserver(() => sampleDOM());
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+
+  /* ═══════════════════════════════════════════════════
+     RENDER LOOP — square-wave flicker for every dot
+  ═══════════════════════════════════════════════════ */
   let frame = 0, alive = true;
 
   function loop() {
-    if (document.hidden) { requestAnimationFrame(loop); return; }
+    if (!alive) { canvas.remove(); showUI(); observer.disconnect(); return; }
     if (++frame % 90 === 0) alive = localStorage.getItem('theme') === 'hiddenV1';
-    if (!alive) { canvas.remove(); return; }
     requestAnimationFrame(loop);
 
     ctx.clearRect(0, 0, W, H);
     const t = performance.now() * 0.001;
 
-    for (const { style, dots } of byStyle) {
-      ctx.fillStyle = style;
+    ctx.fillStyle = DOT_COLOR;
 
-      for (const d of dots) {
-        /* Square wave: on during the positive half-cycle of the sine,
-           off during the negative half.  Duty cycle = 50 % for every dot,
-           but the FREQUENCY sets the perceived brightness:
-             < 10 Hz → eye tracks the blink  → dot looks dim / pulsing
-             > 24 Hz → eye averages the cycles → dot looks like a steady glow */
-        if (Math.sin(d.hz * TAU * t + d.phase) <= 0) continue;
-
-        ctx.globalAlpha = d.brightness;
-        ctx.fillRect(d.px, d.py, DOT_S, DOT_S);
-      }
+    for (let i = 0; i < dotCount; i++) {
+      /* Square-wave: ON during positive half of the sine cycle */
+      if (Math.sin(dotHz[i] * TAU * t + dotPhase[i]) <= 0) continue;
+      ctx.globalAlpha = dotBright[i];
+      ctx.fillRect(dotPx[i], dotPy[i], DOT_S, DOT_S);
     }
 
     ctx.globalAlpha = 1;
