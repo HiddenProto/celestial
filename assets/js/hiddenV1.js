@@ -1,163 +1,125 @@
 /* hiddenV1.js — HiddenV1 theme
-   ASCII art 3D rotating cube with a climbing dot texture over a full-screen
-   random-noise character grid.  Directly inspired by vghvhg.oneapp.dev by bumblcat.
+   A static grid of green square dots where FLICKER SPEED encodes BRIGHTNESS.
 
-   Background noise refreshes at 25 Hz (every ~40 ms).
-   Cube blink-state flips at 60 Hz (every ~16 ms).
-   The two independent rates mean no screenshot can ever capture a "clean" frame —
-   the live effect is the only way to see it. */
+   How it works:
+     Each dot is assigned a random brightness level (0.05 – 0.90).
+     That brightness level directly sets the dot's flicker frequency:
+       dim  (≈0.5–4 Hz)  → clearly visible slow pulse, perceived as dark
+       mid  (≈8–22 Hz)   → fast flutter, perceived as medium glow
+       bright (≈26–50 Hz) → above the ~24 Hz flicker-fusion threshold,
+                            the eye averages the cycles into a steady bright spot
+
+     Every dot uses a square-wave toggle (on / off) with a fully random phase
+     start, so no two dots are ever in sync.  A camera shutter captures a
+     single instant — each dot is randomly on or off — pure noise.
+     The human eye time-averages over ~100 ms and sees the full brightness map. */
+
 (function () {
   if (localStorage.getItem('theme') !== 'hiddenV1') return;
 
-  /* ── <pre> background layer ──────────────────────────────── */
-  const pre = document.createElement('pre');
-  pre.style.cssText =
-    'position:fixed;inset:0;margin:0;padding:8px 0 0 4px;overflow:hidden;' +
-    'pointer-events:none;z-index:0;' +
-    'color:#00dd44;background:transparent;' +
-    'font-family:monospace;font-size:11px;line-height:7px;' +
-    'font-weight:bold;letter-spacing:2px;white-space:pre;';
-  document.body.appendChild(pre);
+  /* ── Canvas ──────────────────────────────────────────────── */
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText =
+    'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:0;';
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
 
-  /* ── Grid sizing (recalculated on resize) ────────────────── */
-  /* Each character cell ≈ 8.5 px wide (6.6 px glyph + 2 px spacing),
-     7 px tall (line-height).  Round down so we never overflow the viewport. */
-  const CHAR_W = 8.5;
-  const CHAR_H = 7;
-  let W = 0, H = 0;
+  const SPACING = 15;   // grid pitch (px between dot centres)
+  const DOT_S   = 3;    // square dot side-length (px)
+  const HALF    = (DOT_S / 2) | 0;
 
-  function calcGrid() {
-    W = Math.max(40, Math.floor(window.innerWidth  / CHAR_W));
-    H = Math.max(20, Math.floor(window.innerHeight / CHAR_H));
-    initBg();
+  /* Flicker-frequency range mapped linearly from brightness */
+  const FREQ_DIM    =  0.5;   // Hz for the dimmest dots
+  const FREQ_BRIGHT = 50;     // Hz for the brightest dots
+
+  /* Hue range: 108–137° = matrix-green to teal-green */
+  function hslStr(h) {    // s=100%, l=55% baked in
+    h /= 360;
+    const q = 1.0, p = 0.1;
+    const ch = t => {
+      t = ((t % 1) + 1) % 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 0.5)   return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    return `rgb(${ch(h + 1/3) * 255 | 0},${ch(h) * 255 | 0},${ch(h - 1/3) * 255 | 0})`;
   }
 
-  /* ── Background noise state ──────────────────────────────── */
-  let bgStates = null;
+  /* ── Build the dot grid ──────────────────────────────────── */
+  /* Dots are grouped by their colour string (one fillStyle change per
+     ~30 hue buckets instead of one per dot). */
+  let W, H, byStyle = [];
+  const TAU = Math.PI * 2;
 
-  function initBg() {
-    bgStates = new Uint8Array(W * H);
-    for (let i = 0; i < bgStates.length; i++)
-      bgStates[i] = Math.random() > 0.5 ? 1 : 0;
-  }
+  function buildGrid() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
 
-  calcGrid();
-  window.addEventListener('resize', calcGrid);
+    const cols = Math.ceil(W / SPACING) + 1;
+    const rows = Math.ceil(H / SPACING) + 1;
 
-  /* ── Timing constants ────────────────────────────────────── */
-  const BG_INTERVAL   = 1000 / 25;   // 40 ms  — background noise rate
-  const CUBE_INTERVAL = 1000 / 60;   // ~16 ms — cube blink rate
+    const map = new Map();
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
 
-  let lastBg   = 0;
-  let lastCube = 0;
-  let cubeVisible = false;
+        /* Random brightness, then derive flicker frequency from it */
+        const brightness = 0.05 + Math.random() * 0.85;   // 0.05 – 0.90
 
-  /* ── 3D state ────────────────────────────────────────────── */
-  let angleX = 0;
-  let angleY = 0;
-  let textureShiftY = 0;
+        /* Linear map: dim→slow, bright→fast */
+        const hz = FREQ_DIM + brightness * (FREQ_BRIGHT - FREQ_DIM);
 
-  /* ── Theme-alive check ───────────────────────────────────── */
-  let tick = 0, alive = true;
+        /* Fully random phase: ensures no two dots are ever in sync */
+        const phase = Math.random() * TAU;
 
-  /* ── Main render loop ────────────────────────────────────── */
-  function render(ts) {
-    if (!alive) { pre.remove(); return; }
-    if (++tick % 90 === 0) alive = localStorage.getItem('theme') === 'hiddenV1';
-    requestAnimationFrame(render);
-
-    /* 1 ── Refresh background noise at 25 Hz */
-    if (ts - lastBg >= BG_INTERVAL) {
-      lastBg = ts;
-      for (let i = 0; i < bgStates.length; i++)
-        bgStates[i] = Math.random() > 0.5 ? 1 : 0;
-    }
-
-    /* 2 ── Flip cube blink at 60 Hz */
-    if (ts - lastCube >= CUBE_INTERVAL) {
-      lastCube  = ts;
-      cubeVisible = !cubeVisible;
-    }
-
-    /* 3 ── Build output grid from background noise */
-    // Using a flat array of single-character strings is faster than nested arrays
-    const grid = new Array(W * H).fill(' ');
-    const zBuf = new Float32Array(W * H).fill(-Infinity);
-
-    for (let i = 0; i < bgStates.length; i++) {
-      if (bgStates[i]) {
-        grid[i]  = '.';
-        zBuf[i]  = -100;
+        const hue = (108 + Math.random() * 30) | 0;   // 108–137°
+        if (!map.has(hue)) map.set(hue, { style: hslStr(hue), dots: [] });
+        map.get(hue).dots.push({
+          px:         Math.round((c + 0.5) * SPACING) - HALF,
+          py:         Math.round((r + 0.5) * SPACING) - HALF,
+          hz,
+          phase,
+          brightness, // alpha when the dot is in its ON half-cycle
+        });
       }
     }
 
-    /* 4 ── Advance 3D rotation & texture scroll */
-    angleX        += 0.020;
-    angleY        += 0.015;
-    textureShiftY -= 0.08;   // texture crawls upward over time
+    byStyle = [...map.values()];
+  }
 
-    const cosCx = Math.cos(angleX), sinCx = Math.sin(angleX);
-    const cosCy = Math.cos(angleY), sinCy = Math.sin(angleY);
+  buildGrid();
+  window.addEventListener('resize', buildGrid);
 
-    /* Cube scale: keep it readable but not overwhelming on large viewports */
-    const DIST   = 2.8;
-    const scaleX = Math.min(W * 0.38, 95);
-    const scaleY = Math.min(H * 0.38, 52);
-    const midX   = W / 2;
-    const midY   = H / 2;
+  /* ── Render loop ─────────────────────────────────────────── */
+  let frame = 0, alive = true;
 
-    /* 5 ── Rasterise the 6 cube faces */
-    const STEP = 0.04;
-    for (let u = -1; u <= 1; u += STEP) {
-      for (let v = -1; v <= 1; v += STEP) {
+  function loop() {
+    if (document.hidden) { requestAnimationFrame(loop); return; }
+    if (++frame % 90 === 0) alive = localStorage.getItem('theme') === 'hiddenV1';
+    if (!alive) { canvas.remove(); return; }
+    requestAnimationFrame(loop);
 
-        // Each face defined by its 3-D position; tu/tv are texture coords
-        const faces = [
-          u,  v,  1,  u,  v,   // front
-          u,  v, -1,  u,  v,   // back
-          u,  1,  v,  u,  v,   // top
-          u, -1,  v,  u,  v,   // bottom
-          1,  u,  v,  u,  v,   // right
-         -1,  u,  v,  u,  v,   // left
-        ];
+    ctx.clearRect(0, 0, W, H);
+    const t = performance.now() * 0.001;
 
-        for (let f = 0; f < 6; f++) {
-          const base = f * 5;
-          const fx = faces[base], fy = faces[base+1], fz = faces[base+2];
-          const tu = faces[base+3], tv = faces[base+4];
+    for (const { style, dots } of byStyle) {
+      ctx.fillStyle = style;
 
-          // Standard X-then-Y rotation
-          const y1 = fy * cosCx - fz * sinCx;
-          const z1 = fy * sinCx + fz * cosCx;
-          const x2 = fx * cosCy + z1 * sinCy;
-          const z2 = -fx * sinCy + z1 * cosCy;
+      for (const d of dots) {
+        /* Square wave: on during the positive half-cycle of the sine,
+           off during the negative half.  Duty cycle = 50 % for every dot,
+           but the FREQUENCY sets the perceived brightness:
+             < 10 Hz → eye tracks the blink  → dot looks dim / pulsing
+             > 24 Hz → eye averages the cycles → dot looks like a steady glow */
+        if (Math.sin(d.hz * TAU * t + d.phase) <= 0) continue;
 
-          // Perspective projection
-          const px = Math.round(midX + (x2 / (z2 + DIST)) * scaleX);
-          const py = Math.round(midY + (y1 / (z2 + DIST)) * scaleY);
-
-          if (px >= 0 && px < W && py >= 0 && py < H) {
-            const idx = py * W + px;
-            if (z2 > zBuf[idx]) {
-              zBuf[idx] = z2;
-              // Climbing dot texture: sin/cos pattern that scrolls upward
-              const shiftedV = tv + textureShiftY;
-              const isDot = (Math.abs(Math.sin(tu * 10) * Math.cos(shiftedV * 10)) > 0.2);
-              grid[idx] = (cubeVisible && isDot) ? '.' : ' ';
-            }
-          }
-        }
+        ctx.globalAlpha = d.brightness;
+        ctx.fillRect(d.px, d.py, DOT_S, DOT_S);
       }
     }
 
-    /* 6 ── Render flat array → string of newline-separated rows */
-    let out = '';
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) out += grid[y * W + x];
-      if (y < H - 1) out += '\n';
-    }
-    pre.textContent = out;
+    ctx.globalAlpha = 1;
   }
 
-  requestAnimationFrame(render);
+  loop();
 })();
