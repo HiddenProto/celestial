@@ -1,265 +1,258 @@
 /* hiddenV1.js — HiddenV1 theme
-   ──────────────────────────────────────────────────────────────
-   The entire UI is replaced by a field of flickering dots.
+   The entire UI is replaced by a flickering dot matrix.
+   An offscreen canvas samples the DOM every 150 ms; pixel brightness
+   at each dot's position drives its flicker frequency.
 
-   Every 150 ms, an offscreen canvas samples the DOM: element
-   backgrounds + text positions are painted, then pixel luminance
-   at each dot centre drives that dot's flicker frequency.
-
-     Bright pixel → fast frequency (>24 Hz, above flicker-fusion)
-       → eye time-averages the flicker into a steady bright glow
-     Dark pixel  → slow frequency (<6 Hz)
-       → eye sees a slow pulsing dim dot
-
-   A camera shutter captures one frozen instant — every dot is
-   randomly on or off — pure noise.  Human vision integrates
-   ~100 ms and reads the full image.
+     Fast (>24 Hz) = above flicker-fusion → eye sees steady bright glow
+     Slow (<6 Hz)  = eye sees slow dim pulse
+     Screenshot    = one frozen instant → random on/off noise
 
    Inspired by vghvhg.oneapp.dev by bumblcat. */
-
 (function () {
   if (localStorage.getItem('theme') !== 'hiddenV1') return;
 
-  /* ═══════════════════════════════════════════════════
-     CONFIG
-  ═══════════════════════════════════════════════════ */
-  const SPACING    = 5;     // px between dot centres
-  const DOT_S      = 2;     // square dot side (px)
-  const HALF       = (DOT_S / 2) | 0;
-  const FREQ_MIN   = 0.15;  // Hz — dimmest dots (very slow, barely perceptible)
-  const FREQ_MAX   = 60;    // Hz — brightest dots (well above flicker fusion)
-  const SAMPLE_MS  = 150;   // DOM re-sample interval (ms)
-  const DOT_COLOR  = '#00dd44'; // matrix green
+  /* ─── config ──────────────────────────────────────────────── */
+  const SPACING   = 7;     // px between dot centres
+  const DOT_S     = 3;     // square dot side (px)
+  const HALF      = 1;     // (DOT_S/2)|0
+  const FREQ_MIN  = 0.15;  // Hz — darkest dots
+  const FREQ_MAX  = 60;    // Hz — brightest dots (above flicker fusion)
+  const SAMPLE_MS = 150;   // ms between DOM re-samples
 
-  /* ═══════════════════════════════════════════════════
-     CANVAS — covers everything, z-index above all UI
-  ═══════════════════════════════════════════════════ */
+  /* ─── canvas (above ALL ui) ───────────────────────────────── */
   const canvas = document.createElement('canvas');
-  canvas.id = 'hv1-canvas';
+  canvas.id    = 'hv1-canvas';
   canvas.style.cssText =
     'position:fixed;inset:0;width:100vw;height:100vh;' +
     'pointer-events:none;z-index:2147483647;';
   document.body.appendChild(canvas);
   const ctx = canvas.getContext('2d');
 
-  /* Offscreen canvas for DOM brightness sampling */
-  const off   = document.createElement('canvas');
-  const octx  = off.getContext('2d', { willReadFrequently: true });
+  /* offscreen canvas for brightness sampling */
+  const off  = document.createElement('canvas');
+  const octx = off.getContext('2d', { willReadFrequently: true });
 
-  /* ═══════════════════════════════════════════════════
-     HIDE REAL UI
-  ═══════════════════════════════════════════════════ */
-  const hiddenEls = [];
+  /* ─── hide real UI ────────────────────────────────────────── */
+  const hidden = [];
   function hideUI() {
     for (const el of document.body.children) {
-      if (el === canvas) continue;
-      if (el.tagName === 'STYLE' || el.tagName === 'SCRIPT') continue;
-      hiddenEls.push({ el, opacity: el.style.opacity, pe: el.style.pointerEvents });
+      if (el === canvas || el.tagName === 'SCRIPT' || el.tagName === 'STYLE') continue;
+      hidden.push(el);
       el.style.setProperty('opacity', '0', 'important');
       el.style.setProperty('pointer-events', 'none', 'important');
     }
   }
-  function showUI() {
-    for (const { el, opacity, pe } of hiddenEls) {
-      el.style.opacity      = opacity;
-      el.style.pointerEvents = pe;
-    }
-    hiddenEls.length = 0;
+  function revealUI() {
+    hidden.forEach(el => { el.style.removeProperty('opacity'); el.style.removeProperty('pointer-events'); });
+    hidden.length = 0;
   }
   hideUI();
 
-  /* ═══════════════════════════════════════════════════
-     DOT GRID
-  ═══════════════════════════════════════════════════ */
-  let W = 0, H = 0;
-  /* One entry per dot (flat array for speed) */
-  let dotCount = 0;
-  let dotPx, dotPy;         // pixel positions (Int16Array)
-  let dotHz, dotPhase;      // flicker state (Float32Array)
-  let dotBright;            // alpha when ON (Float32Array)
-
+  /* ─── dot grid ────────────────────────────────────────────── */
+  let W = 0, H = 0, dotCount = 0;
+  let dotPx, dotPy, dotHz, dotPhase, dotBright;
   const TAU = Math.PI * 2;
 
   function buildGrid() {
-    W = canvas.width  = off.width  = window.innerWidth;
+    W = canvas.width = off.width  = window.innerWidth;
     H = canvas.height = off.height = window.innerHeight;
-
     const cols = Math.ceil(W / SPACING) + 1;
     const rows = Math.ceil(H / SPACING) + 1;
     dotCount = cols * rows;
-
     dotPx     = new Int16Array(dotCount);
     dotPy     = new Int16Array(dotCount);
     dotHz     = new Float32Array(dotCount).fill(FREQ_MIN);
-    dotBright = new Float32Array(dotCount).fill(0.12);
+    dotBright = new Float32Array(dotCount).fill(0);
     dotPhase  = new Float32Array(dotCount);
-
     let i = 0;
     for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
+      for (let c = 0; c < cols; c++, i++) {
         dotPx[i] = Math.round((c + 0.5) * SPACING) - HALF;
         dotPy[i] = Math.round((r + 0.5) * SPACING) - HALF;
-        dotPhase[i] = Math.random() * TAU; // random start phase
-        i++;
+        dotPhase[i] = Math.random() * TAU;
       }
     }
   }
-
   buildGrid();
-  window.addEventListener('resize', () => { buildGrid(); sampleDOM(); });
+  window.addEventListener('resize', () => { buildGrid(); scheduleSample(); });
 
-  /* ═══════════════════════════════════════════════════
-     DOM BRIGHTNESS SAMPLER
-     Paints a simplified version of the real DOM into
-     an offscreen canvas, then reads pixel luminance.
-  ═══════════════════════════════════════════════════ */
+  /* ─── DOM brightness sampler ──────────────────────────────── */
 
-  /* Parse "rgb(r,g,b)" / "rgba(r,g,b,a)" → {r,g,b,a} or null */
-  function parseRGBA(str) {
-    if (!str || str === 'transparent') return null;
+  /* Elements whose bounding rect should register as BRIGHT
+     (they contain primary readable content) */
+  const BRIGHT_TAGS = new Set([
+    'H1','H2','H3','H4','H5','H6',
+    'P','SPAN','A','BUTTON','LABEL','LI',
+    'TD','TH','B','I','EM','STRONG','CODE',
+    'INPUT','SELECT','TEXTAREA',
+  ]);
+
+  function parseRGB(str) {
+    if (!str) return null;
     const m = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-    if (!m) return null;
-    return { r: +m[1], g: +m[2], b: +m[3], a: m[4] !== undefined ? +m[4] : 1 };
+    return m ? { r:+m[1], g:+m[2], b:+m[3], a: m[4]!==undefined?+m[4]:1 } : null;
   }
-
-  function lum(r, g, b) { return (0.299 * r + 0.587 * g + 0.114 * b) / 255; }
-
-  /* Recursively paint element backgrounds + borders onto offscreen ctx */
-  function paintEl(el) {
-    if (el === canvas || el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return;
-
-    const rect = el.getBoundingClientRect();
-    if (rect.width < 1 || rect.height < 1) return;
-    if (rect.right < 0 || rect.bottom < 0 || rect.left > W || rect.top > H) return;
-
-    const style = getComputedStyle(el);
-    const bg    = parseRGBA(style.backgroundColor);
-
-    /* Paint background if non-trivially dark */
-    if (bg && bg.a > 0.02) {
-      const brightness = lum(bg.r, bg.g, bg.b) * bg.a;
-      if (brightness > 0.02) {
-        octx.fillStyle = `rgba(${bg.r},${bg.g},${bg.b},${(bg.a * 0.9).toFixed(2)})`;
-        octx.fillRect(rect.left, rect.top, rect.width, rect.height);
-      }
-    }
-
-    /* Paint each direct text node as PURE WHITE so text areas always
-       register as maximum brightness — the theme colour is often green
-       which has only ~54% luminance and would muddy the contrast map. */
-    for (const node of el.childNodes) {
-      if (node.nodeType !== 3) continue;
-      if (!node.textContent.trim()) continue;
-      const range = document.createRange();
-      range.selectNode(node);
-      for (const r of range.getClientRects()) {
-        if (r.width < 1 || r.height < 1) continue;
-        octx.fillStyle = 'rgba(255,255,255,0.92)';
-        octx.fillRect(r.left, r.top, r.width, r.height);
-      }
-    }
-
-    for (const child of el.children) paintEl(child);
-  }
+  const lum = (r,g,b) => (0.299*r + 0.587*g + 0.114*b) / 255;
 
   function sampleDOM() {
-    /* Temporarily show UI so styles compute correctly,
-       sample, then hide again */
-    for (const { el } of hiddenEls) el.style.removeProperty('opacity');
+    /* Temporarily restore opacity so styles compute correctly. */
+    hidden.forEach(el => el.style.removeProperty('opacity'));
 
-    octx.clearRect(0, 0, W, H);
-    for (const child of document.body.children) paintEl(child);
+    /* ── Paint offscreen canvas ─────────────────────────────── */
+    octx.fillStyle = '#000';
+    octx.fillRect(0, 0, W, H);
+
+    /* Walk every element once using querySelectorAll — faster
+       and simpler than manual recursion. */
+    for (const el of document.body.querySelectorAll('*')) {
+      if (el === canvas) continue;
+
+      const rect = el.getBoundingClientRect();
+      if (!rect.width || !rect.height) continue;
+      if (rect.right < 0 || rect.bottom < 0 || rect.left > W || rect.top > H) continue;
+
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+
+      /* --- background colour ---------------------------------- */
+      const bg = parseRGB(cs.backgroundColor);
+      if (bg && bg.a > 0.05) {
+        const l = lum(bg.r, bg.g, bg.b);
+        /* Boost: even very dark panel backgrounds get rendered at
+           a boosted level so they survive the contrast stretch. */
+        const boostedAlpha = Math.min(1, bg.a * (1 + l * 8));
+        if (l * bg.a > 0.005) {
+          octx.fillStyle =
+            `rgba(${bg.r},${bg.g},${bg.b},${boostedAlpha.toFixed(2)})`;
+          octx.fillRect(rect.left, rect.top, rect.width, rect.height);
+        }
+      }
+
+      /* --- text content → pure white -------------------------
+         1. Tag-based: known text-bearing tags
+         2. Leaf check: any element with no children but with text  */
+      const hasText = el.textContent.trim().length > 0;
+      const isTextTag = BRIGHT_TAGS.has(el.tagName);
+      const isLeaf    = el.children.length === 0 && hasText;
+
+      if (hasText && (isTextTag || isLeaf)) {
+        /* Use Range to get the precise bounding box of the actual
+           text glyphs rather than the whole element box. */
+        let painted = false;
+        for (const node of el.childNodes) {
+          if (node.nodeType !== 3 || !node.textContent.trim()) continue;
+          try {
+            const rng = document.createRange();
+            rng.selectNode(node);
+            for (const r of rng.getClientRects()) {
+              if (r.width < 1 || r.height < 1) continue;
+              octx.fillStyle = '#fff';
+              octx.fillRect(r.left, r.top, r.width, r.height);
+              painted = true;
+            }
+          } catch (_) {}
+        }
+        /* Fallback: if range gave nothing, paint the whole element
+           rect at medium-high brightness */
+        if (!painted) {
+          octx.fillStyle = 'rgba(255,255,255,0.75)';
+          octx.fillRect(rect.left, rect.top, rect.width, rect.height);
+        }
+      }
+    }
 
     /* Re-hide */
-    for (const { el } of hiddenEls) el.style.setProperty('opacity', '0', 'important');
+    hidden.forEach(el => el.style.setProperty('opacity', '0', 'important'));
 
-    /* Read pixel luminance and update each dot's frequency */
+    /* ── Read pixel brightness ──────────────────────────────── */
     const img  = octx.getImageData(0, 0, W, H);
     const data = img.data;
 
-    for (let i = 0; i < dotCount; i++) {
-      const px = dotPx[i], py = dotPy[i];
-      if (px < 0 || py < 0 || px >= W || py >= H) continue;
-
-      /* Sample the 3x3 neighbourhood to smooth out single-pixel noise */
-      let sum = 0, cnt = 0;
-      for (let dy = 0; dy <= DOT_S; dy++) {
-        for (let dx = 0; dx <= DOT_S; dx++) {
-          const nx = px + dx, ny = py + dy;
-          if (nx >= W || ny >= H) continue;
-          const idx = (ny * W + nx) << 2;
-          sum += lum(data[idx], data[idx + 1], data[idx + 2]) * (data[idx + 3] / 255);
-          cnt++;
-        }
-      }
-      const brightness = cnt ? sum / cnt : 0;
-
-      /* Store raw brightness for now; we'll stretch it below */
-      dotBright[i] = brightness;
-    }
-
-    /* ── Histogram stretching + S-curve ─────────────────────────
-       Find the actual min/max across all dots and remap to [0,1]
-       so we always exploit the full contrast range regardless of
-       how dark or uniform the current page looks.
-       Then push through a steep S-curve so dim is VERY dim and
-       bright is VERY bright with a sharp transition between them. */
+    /* First pass: store raw luminance per dot (skip OOB dots) */
     let lo = 1, hi = 0;
     for (let i = 0; i < dotCount; i++) {
-      if (dotBright[i] < lo) lo = dotBright[i];
-      if (dotBright[i] > hi) hi = dotBright[i];
+      const px = dotPx[i], py = dotPy[i];
+      if (px < 0 || py < 0 || px + DOT_S > W || py + DOT_S > H) {
+        dotBright[i] = -1; // mark as OOB
+        continue;
+      }
+      /* Average over the dot's own pixel footprint */
+      let sum = 0;
+      for (let dy = 0; dy < DOT_S; dy++) {
+        for (let dx = 0; dx < DOT_S; dx++) {
+          const idx = ((py + dy) * W + (px + dx)) << 2;
+          sum += lum(data[idx], data[idx+1], data[idx+2])
+               * (data[idx+3] / 255);
+        }
+      }
+      const b = sum / (DOT_S * DOT_S);
+      dotBright[i] = b;
+      if (b < lo) lo = b;
+      if (b > hi) hi = b;
     }
-    const span = Math.max(hi - lo, 0.04); // avoid divide-by-zero on flat pages
 
+    /* Second pass: histogram stretch + double smoothstep S-curve */
+    const span = Math.max(hi - lo, 0.03);
     for (let i = 0; i < dotCount; i++) {
-      /* Stretch to [0,1] */
-      let v = (dotBright[i] - lo) / span;
+      if (dotBright[i] < 0) {
+        /* OOB dot — keep at minimum */
+        dotHz[i]     = FREQ_MIN;
+        dotBright[i] = 0.03;
+        continue;
+      }
+      let v = (dotBright[i] - lo) / span;  // [0..1]
 
-      /* Steep S-curve: compresses the mid-range, exaggerates extremes.
-         Formula: smoothstep applied twice (cubic × cubic). */
-      v = v * v * (3 - 2 * v);          // first smoothstep
-      v = v * v * (3 - 2 * v);          // second pass — much steeper
+      /* Double smoothstep: crushes midtones, exaggerates extremes */
+      v = v * v * (3 - 2 * v);
+      v = v * v * (3 - 2 * v);
 
       dotHz[i]     = FREQ_MIN + v * (FREQ_MAX - FREQ_MIN);
-      dotBright[i] = 0.03 + v * 0.92;   // 0.03 (nearly invisible) → 0.95 (full)
+      dotBright[i] = 0.03 + v * 0.92;  // 0.03 (nearly invisible) → 0.95
     }
   }
 
-  /* Initial sample (with a short delay so DOM is fully laid out) */
-  setTimeout(sampleDOM, 120);
+  /* Debounced sample scheduler */
+  let samplePending = false;
+  function scheduleSample() {
+    if (samplePending) return;
+    samplePending = true;
+    setTimeout(() => { samplePending = false; if (alive) sampleDOM(); }, 16);
+  }
 
-  /* Re-sample periodically for live UI changes */
-  const sampleTimer = setInterval(() => {
-    if (!alive) { clearInterval(sampleTimer); return; }
-    sampleDOM();
-  }, SAMPLE_MS);
+  setTimeout(sampleDOM, 300);   // initial — wait for full layout
+  setTimeout(sampleDOM, 800);   // second pass — catch late-rendered content
+  const sampleTimer = setInterval(() => { if (alive) sampleDOM(); }, SAMPLE_MS);
 
-  /* Re-sample on DOM mutations (new chat messages, panel changes, etc.) */
-  const observer = new MutationObserver(() => sampleDOM());
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  /* Re-sample on DOM changes (debounced) */
+  const observer = new MutationObserver(scheduleSample);
+  observer.observe(document.body, {
+    childList: true, subtree: true, characterData: true,
+  });
 
-  /* ═══════════════════════════════════════════════════
-     RENDER LOOP — square-wave flicker for every dot
-  ═══════════════════════════════════════════════════ */
+  /* ─── render loop ─────────────────────────────────────────── */
   let frame = 0, alive = true;
 
   function loop() {
-    if (!alive) { canvas.remove(); showUI(); observer.disconnect(); return; }
+    if (!alive) {
+      canvas.remove();
+      revealUI();
+      observer.disconnect();
+      clearInterval(sampleTimer);
+      return;
+    }
     if (++frame % 90 === 0) alive = localStorage.getItem('theme') === 'hiddenV1';
     requestAnimationFrame(loop);
 
     ctx.clearRect(0, 0, W, H);
     const t = performance.now() * 0.001;
 
-    ctx.fillStyle = DOT_COLOR;
-
+    ctx.fillStyle = '#00dd44';
     for (let i = 0; i < dotCount; i++) {
-      /* Square-wave: ON during positive half of the sine cycle */
+      /* Square wave: ON during positive half-cycle */
       if (Math.sin(dotHz[i] * TAU * t + dotPhase[i]) <= 0) continue;
       ctx.globalAlpha = dotBright[i];
       ctx.fillRect(dotPx[i], dotPy[i], DOT_S, DOT_S);
     }
-
     ctx.globalAlpha = 1;
   }
 
