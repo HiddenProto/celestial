@@ -431,3 +431,89 @@ body[theme="apex"] .gradientthing {
   66%  { filter: hue-rotate(-8deg)  brightness(0.94); }
   100% { filter: hue-rotate(6deg)   brightness(1.04); }
 }
+
+/* ═══════════════════════════════════════════════════════
+   HIDDEN V1 — unscreenshotable flickering dot matrix
+   Colors: matrix-green (#00dd44) on near-black (#010d03).
+   ═══════════════════════════════════════════════════════ */
+body[theme="hiddenV1"] {
+  --background:    #010d03;
+  --color:         #00cc3a;
+  --pallet:        rgba(2, 16, 6, 0.96);
+  --pallet-hover:  rgba(3, 24, 9, 0.98);
+  --button:        rgba(0, 160, 55, 0.22);
+  --border:        rgba(0, 200, 65, 0.32);
+  --input:         rgba(0, 180, 60, 0.07);
+  --pallet2:       rgba(1, 10, 3, 0.97);
+  --settings:      rgba(0, 8, 2, 0.98);
+  background-color: #010d03;
+  color-scheme: dark;
+}
+
+/* Subtle vignette — darker green edges, keeps focus on centre */
+body[theme="hiddenV1"]::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  box-shadow: inset 0 0 120px 50px rgba(0, 0, 0, 0.60);
+}
+
+/* Headings — faint phosphor-green glow that slowly pulses */
+body[theme="hiddenV1"] h1,
+body[theme="hiddenV1"] h2,
+body[theme="hiddenV1"] h3 {
+  display: inline-block;
+  animation: hv1-glow 4s ease-in-out infinite;
+}
+body[theme="hiddenV1"] h2 { animation-delay: -1.5s; }
+body[theme="hiddenV1"] h3 { animation-delay: -3.0s; }
+
+@keyframes hv1-glow {
+  0%, 100% { text-shadow: 0 0 8px  rgba(0, 220, 60, 0.50); }
+  50%       { text-shadow: 0 0 14px rgba(0, 255, 80, 0.70),
+                           0 0 28px rgba(0, 200, 50, 0.25); }
+}
+
+/* Card border — dim green pulse, matching the dot rhythm */
+body[theme="hiddenV1"] .card {
+  animation: hv1-card 6s ease-in-out infinite;
+}
+body[theme="hiddenV1"] .card:nth-child(3n+1) { animation-delay: -1.8s; }
+body[theme="hiddenV1"] .card:nth-child(3n+2) { animation-delay: -3.9s; }
+body[theme="hiddenV1"] .card:nth-child(5n)   { animation-delay: -0.7s; }
+
+@keyframes hv1-card {
+  0%, 100% { box-shadow: 0 0 6px  rgba(0, 200, 55, 0.10); }
+  50%       { box-shadow: 0 0 10px rgba(0, 240, 75, 0.16); }
+}
+
+body[theme="hiddenV1"] .card:hover {
+  box-shadow:  0 0 22px rgba(0, 220, 60, 0.50),
+               0 0  8px rgba(0, 255, 80, 0.30) !important;
+  border-color: rgba(0, 210, 60, 0.80) !important;
+  transform: translateY(-2px);
+}
+
+/* Input / select focus ring */
+body[theme="hiddenV1"] input:focus,
+body[theme="hiddenV1"] select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 200, 60, 0.65), 0 0 14px rgba(0, 200, 60, 0.22);
+}
+
+/* Links */
+body[theme="hiddenV1"] a:hover {
+  color: #00ff55 !important;
+  text-shadow: 0 0 8px rgba(0, 220, 60, 0.55);
+}
+
+/* Gradient background element */
+body[theme="hiddenV1"] .gradientthing {
+  background: linear-gradient(360deg,
+    #010d03 0%,
+    #011a06 40%,
+    #022810 70%,
+    #03341a 100%);
+}

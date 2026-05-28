@@ -13,3 +13,9 @@ if (localStorage.getItem("theme") === "sovereign") {
   s.src = "/assets/js/sovereign.js";
   document.body.appendChild(s);
 }
+
+if (localStorage.getItem("theme") === "hiddenV1") {
+  const s = document.createElement("script");
+  s.src = "/assets/js/hiddenV1.js";
+  document.body.appendChild(s);
+}
