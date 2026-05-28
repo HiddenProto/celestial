@@ -26,8 +26,8 @@
   const SPACING    = 5;     // px between dot centres
   const DOT_S      = 2;     // square dot side (px)
   const HALF       = (DOT_S / 2) | 0;
-  const FREQ_MIN   = 0.4;   // Hz — dimmest dots (slow visible pulse)
-  const FREQ_MAX   = 52;    // Hz — brightest dots (above flicker fusion)
+  const FREQ_MIN   = 0.15;  // Hz — dimmest dots (very slow, barely perceptible)
+  const FREQ_MAX   = 60;    // Hz — brightest dots (well above flicker fusion)
   const SAMPLE_MS  = 150;   // DOM re-sample interval (ms)
   const DOT_COLOR  = '#00dd44'; // matrix green
 
@@ -144,22 +144,18 @@
       }
     }
 
-    /* Paint each direct text node as a bright band */
-    const textCol = parseRGBA(style.color);
-    if (textCol) {
-      for (const node of el.childNodes) {
-        if (node.nodeType !== 3) continue;
-        const text = node.textContent.replace(/\s+/g, ' ').trim();
-        if (!text) continue;
-        const range = document.createRange();
-        range.selectNode(node);
-        for (const r of range.getClientRects()) {
-          if (r.width < 1 || r.height < 1) continue;
-          /* Fill text rect with the text colour — gives us brightness at text positions */
-          octx.fillStyle =
-            `rgba(${textCol.r},${textCol.g},${textCol.b},${Math.min(textCol.a, 0.95)})`;
-          octx.fillRect(r.left, r.top, r.width, r.height);
-        }
+    /* Paint each direct text node as PURE WHITE so text areas always
+       register as maximum brightness — the theme colour is often green
+       which has only ~54% luminance and would muddy the contrast map. */
+    for (const node of el.childNodes) {
+      if (node.nodeType !== 3) continue;
+      if (!node.textContent.trim()) continue;
+      const range = document.createRange();
+      range.selectNode(node);
+      for (const r of range.getClientRects()) {
+        if (r.width < 1 || r.height < 1) continue;
+        octx.fillStyle = 'rgba(255,255,255,0.92)';
+        octx.fillRect(r.left, r.top, r.width, r.height);
       }
     }
 
@@ -198,11 +194,34 @@
       }
       const brightness = cnt ? sum / cnt : 0;
 
-      /* Apply a gamma curve to increase contrast in the mid-range */
-      const curved = Math.pow(brightness, 0.55);
+      /* Store raw brightness for now; we'll stretch it below */
+      dotBright[i] = brightness;
+    }
 
-      dotHz[i]     = FREQ_MIN + curved * (FREQ_MAX - FREQ_MIN);
-      dotBright[i] = 0.08 + curved * 0.82;
+    /* ── Histogram stretching + S-curve ─────────────────────────
+       Find the actual min/max across all dots and remap to [0,1]
+       so we always exploit the full contrast range regardless of
+       how dark or uniform the current page looks.
+       Then push through a steep S-curve so dim is VERY dim and
+       bright is VERY bright with a sharp transition between them. */
+    let lo = 1, hi = 0;
+    for (let i = 0; i < dotCount; i++) {
+      if (dotBright[i] < lo) lo = dotBright[i];
+      if (dotBright[i] > hi) hi = dotBright[i];
+    }
+    const span = Math.max(hi - lo, 0.04); // avoid divide-by-zero on flat pages
+
+    for (let i = 0; i < dotCount; i++) {
+      /* Stretch to [0,1] */
+      let v = (dotBright[i] - lo) / span;
+
+      /* Steep S-curve: compresses the mid-range, exaggerates extremes.
+         Formula: smoothstep applied twice (cubic × cubic). */
+      v = v * v * (3 - 2 * v);          // first smoothstep
+      v = v * v * (3 - 2 * v);          // second pass — much steeper
+
+      dotHz[i]     = FREQ_MIN + v * (FREQ_MAX - FREQ_MIN);
+      dotBright[i] = 0.03 + v * 0.92;   // 0.03 (nearly invisible) → 0.95 (full)
     }
   }
 
