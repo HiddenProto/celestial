@@ -142,19 +142,18 @@ body[theme="saywallahibro"] {
 }
 
 /* ═══════════════════════════════════════════════════════
-   DEMO — desaturated preview/demo-build state
+   DEMO — beta/WIP build state, incomplete elements
    ═══════════════════════════════════════════════════════ */
 body[theme="demo"] {
-  --background: #16161a;
-  --color: #8c8fa3;
-  --pallet: #1e1e26;
-  --pallet-hover: #27272f;
-  --button: #2c2c3a;
-  --border: rgba(140, 143, 163, 0.2);
-  --input: rgba(140, 143, 163, 0.06);
-  --pallet2: #1a1a22;
-  --settings: #242430;
-  filter: saturate(0.35) brightness(0.92);
+  --background: #0d0d0b;
+  --color: #c8b86a;
+  --pallet: #15130a;
+  --pallet-hover: #1e1c10;
+  --button: #211e08;
+  --border: rgba(200, 165, 45, 0.35);
+  --input: rgba(200, 165, 45, 0.05);
+  --pallet2: #111109;
+  --settings: #1a1810;
 }
 
 /* ═══════════════════════════════════════════════════════
