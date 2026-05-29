@@ -14,6 +14,12 @@ if (localStorage.getItem("theme") === "sovereign") {
   document.body.appendChild(s);
 }
 
+if (localStorage.getItem("theme") === "demo") {
+  const s = document.createElement("script");
+  s.src = "/assets/js/demo.js";
+  document.body.appendChild(s);
+}
+
 /* hiddenV1 removed — reset anyone who still has it */
 if (localStorage.getItem("theme") === "hiddenV1") {
   localStorage.setItem("theme", "default");
