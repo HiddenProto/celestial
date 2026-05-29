@@ -1249,7 +1249,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.112";
+      var SITE_VER = "2.2.113";
 
       /**
        * Show a notification toast.
@@ -1545,29 +1545,6 @@
         localStorage.setItem("cst-ver", SITE_VER);
       })();
 
-      // ── Mercury Workshop swap notice (persists until acknowledged) ───────
-      (function () {
-        var key = "mw-swap-notice-ack";
-        if (localStorage.getItem(key)) return;
-        setTimeout(function () {
-          window.notifyOption(
-            "notice",
-            "for everybody saying some stuff is broken like in quick apps or media: " +
-            "the issue was Mercury Workshop was stripped of support of its server architecture " +
-            "so it was swapped to fallback.",
-            [
-              {
-                label: "acknowledge",
-                info: "dismiss this notice permanently",
-                onClick: function () {
-                  localStorage.setItem(key, "1");
-                }
-              }
-            ],
-            { noAutoDismiss: true }
-          );
-        }, 2000);
-      })();
 
 
       // ── Site-down notice ────────────────────────────────────────────────
