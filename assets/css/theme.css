@@ -432,22 +432,3 @@ body[theme="apex"] .gradientthing {
   100% { filter: hue-rotate(6deg)   brightness(1.04); }
 }
 
-/* ═══════════════════════════════════════════════════════
-   HIDDEN V1 — whole-UI dot-matrix encoder
-   The JS hides all real UI and replaces it with a dot
-   canvas whose flicker frequencies encode the UI's
-   brightness — visible to the eye, invisible to cameras.
-   ═══════════════════════════════════════════════════════ */
-body[theme="hiddenV1"] {
-  --background:    #000000;
-  --color:         #00dd44;
-  --pallet:        rgba(0, 14, 5, 0.97);
-  --pallet-hover:  rgba(0, 22, 8, 0.98);
-  --button:        rgba(0, 160, 55, 0.22);
-  --border:        rgba(0, 200, 65, 0.35);
-  --input:         rgba(0, 180, 60, 0.07);
-  --pallet2:       rgba(0, 9, 3, 0.98);
-  --settings:      rgba(0, 6, 2, 0.99);
-  background-color: #000000;
-  color-scheme: dark;
-}
