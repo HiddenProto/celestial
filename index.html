@@ -278,6 +278,17 @@
       }
     });
 
+    // Lets the in-frame new-tab page (tab.html) load a proxied URL into THIS tab's
+    // frame using the main browser's own properly-registered BRC frame. tab.html
+    // can't host BRC content itself (its prefix isn't a registered frame), so it
+    // delegates here — same correct rewriting as the address bar, no nested UI.
+    window.cstLoadCurrent = async (url) => {
+      const urlToLoad = makeURL(url, search);
+      const proxiedUrl = await getProxied(urlToLoad);
+      const f = document.getElementById(`frame-${currentTab}`);
+      if (f) { f.src = proxiedUrl; addressInput.value = urlToLoad; }
+    };
+
     setFrames(document.getElementById("frames"));
     new Tab();
   </script>
@@ -1396,7 +1407,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.3.122";
+      var SITE_VER = "2.3.123";
 
       /**
        * Show a notification toast.

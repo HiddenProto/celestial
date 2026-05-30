@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>05/30 — v2.3.123</summary>
+        <p>- Proxied sites now load correctly from the new-tab page without the celestial-in-celestial nesting: the new-tab page delegates the load to the main browser, which hosts the site in this tab's own registered frame. (The nested version "worked" because index.html is what registers BRC frames; now you get that correctness without the nested UI.)</p>
+      </details>
+
+      <details open>
         <summary>05/30 — v2.3.122</summary>
         <p>- Quick Apps & Media now load over No-Wisp (photon) transport — no WebSocket relay needed, which is what fixed them.</p>
         <p>- Removed the quick proxy-engine switcher button from the address bar.</p>
@@ -636,23 +641,29 @@
 
     async function autofill(url) {
       // BRC (bumblcat rrc) proxies content inside a *registered iframe*; its prefix
-      // is bound to that frame via a MessagePort. Top-level-navigating straight to a
-      // BRC frame-prefix URL leaves the top document unregistered, so the rewriter
-      // can't map requests → "unrewriteurl: unexpected url" and the page fails.
+      // is bound to that frame via a MessagePort. tab.html on its own isn't a
+      // registered frame, so when it top-level-navigates to a BRC prefix URL the
+      // rewriter can't map requests → "unrewriteurl: unexpected url" → blank page.
+      // (Only the *main browser*, index.html, registers frames properly — which is
+      // why loading the site through index.html worked, even nested.)
       //
-      // Only an issue when tab.html is opened DIRECTLY as the top window
-      // (e.g. /tab.html?autofill=…). In that case hand off to the main browser UI,
-      // which loads the page in a proper proxied frame. When tab.html is the new-tab
-      // page *inside* an index.html frame (window.top !== self), it already lives in
-      // a registered frame — redirecting there would nest celestial-in-celestial, so
-      // keep the original in-frame path. Scramjet/UV tolerate top-level nav anyway.
+      //   • In-frame new-tab (window.top !== self): delegate to the parent browser
+      //     to load the URL into THIS tab's already-registered frame. Same correct
+      //     hosting index.html does, with no nested celestial-in-celestial UI.
+      //   • Opened directly as the top page: hand off to /index.html so it hosts
+      //     the page in a real frame.
       const engine = localStorage.getItem("pr0xy") || "scram";
-      // Carry the photon directive through the handoff so media/quick-app launches
-      // keep using No-Wisp (photon) on the main browser too.
       const photonQS = new URLSearchParams(location.search).get('photon') === '1' ? '&photon=1' : '';
-      if (engine === "scram" && window.top === window.self) {
-        location.href = "/index.html?autofill=" + encodeURIComponent(url) + photonQS;
-        return;
+      const inFrame  = window.top !== window.self;
+
+      if (engine === "scram") {
+        if (inFrame && window.top && typeof window.top.cstLoadCurrent === "function") {
+          try { await window.top.cstLoadCurrent(url); return; } catch (e) {}
+        }
+        if (!inFrame) {
+          location.href = "/index.html?autofill=" + encodeURIComponent(url) + photonQS;
+          return;
+        }
       }
       const urlToLoad = makeURL(url, search);
       const proxiedUrl = await getProxied(urlToLoad);
