@@ -82,6 +82,9 @@ if (window.$brc && !window.$brc.BrcHeaders && window.$brc.ScramjetHeaders) {
 
 /** @type {any} Active BRC Controller instance, null until initialized */
 let brcController = null;
+/** When true, BRC uses photon transport regardless of the saved Wisp.
+ *  Set by ?photon=1 (media/quick-app launches) or the runtime SSL fallback. */
+let _forcePhoton = false;
 /** @type {Map<number, any>} tabNumber → BRC Frame instance */
 const brcFrameMap = new Map();
 /** @type {Promise<void>|null} Singleton init promise */
@@ -142,14 +145,20 @@ async function _createBRCTransport() {
 	// Default mirrors index.html: same-origin on localhost, ultrapatch on other hosts.
 	const savedWisp = localStorage.getItem("location") || _wispDefaultLjs;
 
-	// Static / no-Wisp mode: photon transport uses HTTPS fetch — no WebSocket needed.
-	if (savedWisp === "static") {
+	// photon requested via ?photon=1 (media/quick-app launches) or runtime fallback
+	let _photonReq = _forcePhoton;
+	try { if (new URLSearchParams(location.search).get("photon") === "1") _photonReq = true; } catch (e) {}
+
+	// Static / no-Wisp mode OR an explicit photon request: photon uses HTTPS fetch,
+	// no WebSocket/Wisp relay, and bypasses the libcurl/epoxy TLS stack (which is
+	// what throws "SSL connect error / code 35" on some targets).
+	if (savedWisp === "static" || _photonReq) {
 		try {
 			const { default: PhotonTransport } = await import("/photon/index.mjs");
-			console.log("lethal.js: photon transport active (no-wisp / static mode)");
+			console.log("lethal.js: photon transport active" + (_photonReq && savedWisp !== "static" ? " (forced)" : " (no-wisp / static mode)"));
 			return _wrapTransportHeaders(new PhotonTransport());
 		} catch (e) {
-			console.warn("lethal.js: photon transport failed in static mode:", e.message);
+			console.warn("lethal.js: photon transport failed:", e.message);
 			// Fall through — let libcurl try without a valid wisp (will likely fail)
 		}
 	}
@@ -606,6 +615,32 @@ export async function setTransport(transport) {
  */
 export function getTransport() {
 	return transportURL;
+}
+
+/**
+ * Runtime switch to photon transport (No Wisp) — used by the SSL-error fallback.
+ * Swaps the LIVE BRC controller's transport (BRC has its own transport, separate
+ * from BareMux, which is why a plain setTransport didn't fix it), flips the
+ * _forcePhoton flag for any future BRC re-init, and updates BareMux for the
+ * scramjet/UV path too. In-memory only — nothing is persisted, so it reverts on
+ * the next normal page load.
+ * @returns {Promise<boolean>} true if a switch was applied
+ */
+export async function forcePhotonRuntime() {
+	_forcePhoton = true;
+	let ok = false;
+	try {
+		const { default: PhotonTransport } = await import("/photon/index.mjs");
+		if (brcController && typeof brcController.setTransport === "function") {
+			brcController.setTransport(_wrapTransportHeaders(new PhotonTransport()));
+			ok = true;
+			console.log("lethal.js: BRC transport switched to photon (runtime)");
+		}
+	} catch (e) {
+		console.warn("lethal.js: runtime photon switch failed:", e.message);
+	}
+	try { await setTransport("photon"); ok = true; } catch (e) {}
+	return ok;
 }
 
 /**

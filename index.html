@@ -295,12 +295,13 @@
 
   <!-- ── SSL-error auto-fallback to photon (temporary, this session only) ──── -->
   <script type="module">
-    import { setTransport, getTransport } from "/lithium.mjs";
+    import { forcePhotonRuntime } from "/lithium.mjs";
 
     // libcurl/epoxy over a Wisp relay can hit "error code 35: SSL connect error"
-    // on some targets. When we see it, switch the transport to No-Wisp (photon)
-    // at RUNTIME — this is in-memory only, never written to localStorage, so it
-    // reverts to the saved transport on the next normal page load.
+    // on some targets. When we see it, switch the proxy to No-Wisp (photon) at
+    // RUNTIME — this swaps the live BRC transport (BRC has its own, separate from
+    // BareMux) and is in-memory only: never written to localStorage, so it reverts
+    // to the saved transport on the next normal page load.
     let _photonSwitched = false;
     const RE = /error code 35|SSL connect error|Internal Service Worker Error/i;
 
@@ -308,8 +309,7 @@
       if (_photonSwitched) return;
       _photonSwitched = true;
       try {
-        const cur = (getTransport() || "").toString();
-        if (!cur.includes("photon")) await setTransport("photon"); // runtime only — not persisted
+        await forcePhotonRuntime(); // runtime only — not persisted
         window.notify && window.notify(
           "Connection error (SSL) — temporarily switched to No-Wisp (photon). Retrying…",
           "warning", 6000
@@ -1468,7 +1468,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.3.124";
+      var SITE_VER = "2.3.125";
 
       /**
        * Show a notification toast.

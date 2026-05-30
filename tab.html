@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>05/30 — v2.3.125</summary>
+        <p>- Made the SSL→photon auto-recovery actually work: BRC uses its own transport (separate from the general one), so the earlier switch never took effect. Now ?photon=1 and the SSL-error fallback swap BRC's live transport to photon directly. Quick Apps / Media photon routing now genuinely uses photon too.</p>
+      </details>
+
+      <details open>
         <summary>05/30 — v2.3.124</summary>
         <p>- Auto-recovery: if a page errors with "SSL connect error (code 35)" / Internal Service Worker Error, the proxy now automatically switches to No-Wisp (photon) for the rest of the session and retries — it reverts to your normal transport on the next page load (not a permanent change).</p>
       </details>
