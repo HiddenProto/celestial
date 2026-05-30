@@ -1,8 +1,11 @@
 // same thing as theme.js
 const themepicker = document.getElementById("themepicker");
 
-/* hiddenV1 removed — reset anyone who still has it */
-if (localStorage.getItem("theme") === "hiddenV1") {
+/* hiddenV1 / demo removed — reset anyone who still has them */
+if (
+  localStorage.getItem("theme") === "hiddenV1" ||
+  localStorage.getItem("theme") === "demo"
+) {
   localStorage.setItem("theme", "default");
 }
 

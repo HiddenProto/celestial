@@ -278,9 +278,152 @@
     new Tab();
   </script>
   <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
+
+  <!-- ── Loading screen styles (inline so it paints instantly) ───────────── -->
+  <style id="cst-loader-style">
+    #cst-loader {
+      position: fixed; inset: 0; z-index: 2147483647;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: radial-gradient(circle at 50% 42%, #15151c 0%, #08080b 68%, #050507 100%);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      transition: opacity .55s ease;
+      -webkit-user-select: none; user-select: none;
+    }
+    #cst-loader.cst-done { opacity: 0; pointer-events: none; }
+    .cst-l-logo { position: relative; width: 92px; height: 92px; margin-bottom: 26px; }
+    .cst-l-logo img {
+      width: 100%; height: 100%; display: block;
+      mix-blend-mode: screen;
+      filter: drop-shadow(0 0 16px rgba(255,255,255,.22));
+      animation: cst-l-spin 22s linear infinite;
+    }
+    .cst-l-ring {
+      position: absolute; inset: -13px; border-radius: 50%;
+      border: 2px solid transparent;
+      border-top-color: rgba(255,255,255,.9);
+      border-right-color: rgba(255,255,255,.22);
+      animation: cst-l-spin 1.05s linear infinite;
+    }
+    .cst-l-word {
+      font-size: 30px; font-weight: 700; letter-spacing: .5px;
+      color: #fff; margin-bottom: 5px;
+    }
+    .cst-l-word span { color: #7aa2ff; }
+    .cst-l-sub {
+      font-size: 11px; letter-spacing: 4px; text-transform: uppercase;
+      color: rgba(255,255,255,.32); margin-bottom: 30px;
+    }
+    .cst-l-track {
+      width: 264px; max-width: 72vw; height: 4px; border-radius: 4px;
+      background: rgba(255,255,255,.08); overflow: hidden;
+    }
+    .cst-l-fill {
+      height: 100%; width: 0; border-radius: 4px;
+      background: linear-gradient(90deg, #7aa2ff, #c9a8ff);
+      box-shadow: 0 0 10px rgba(122,162,255,.55);
+      transition: width .3s ease;
+    }
+    .cst-l-meta {
+      display: flex; justify-content: space-between;
+      width: 264px; max-width: 72vw; margin-top: 11px;
+      font-size: 11px; color: rgba(255,255,255,.4);
+    }
+    .cst-l-status {
+      max-width: 175px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+    @keyframes cst-l-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .cst-l-logo img, .cst-l-ring { animation: none; }
+    }
+  </style>
 </head>
 
 <body theme="default">
+  <!-- ── Loading screen ──────────────────────────────────────────────────── -->
+  <div id="cst-loader">
+    <div class="cst-l-logo">
+      <span class="cst-l-ring"></span>
+      <img src="/assets/img/logo-blackbg.png" alt="" />
+    </div>
+    <div class="cst-l-word">celestial<span>.</span></div>
+    <div class="cst-l-sub">loading</div>
+    <div class="cst-l-track"><div class="cst-l-fill" id="cst-l-fill"></div></div>
+    <div class="cst-l-meta">
+      <span class="cst-l-status" id="cst-l-status">starting&hellip;</span>
+      <span id="cst-l-pct">0%</span>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var fill   = document.getElementById('cst-l-fill');
+      var pct    = document.getElementById('cst-l-pct');
+      var status = document.getElementById('cst-l-status');
+      var loader = document.getElementById('cst-loader');
+      if (!loader) return;
+
+      document.documentElement.style.overflow = 'hidden';
+
+      /* Real resources the app needs — warming the cache so the page
+         is genuinely ready by the time the loader clears. */
+      var assets = [
+        '/assets/css/tabs.css', '/assets/css/theme.css',
+        '/lithium.mjs', '/assets/js/prox.js',
+        '/assets/js/theme.js', '/assets/js/s.js', '/assets/js/picker.js',
+        '/assets/js/func.js', '/assets/js/tabsmain.mjs', '/assets/js/userscript.mjs',
+        '/assets/js/icons.js', '/assets/js/peer-mgr.js',
+        '/assets/js/admin.js', '/assets/js/chat.js',
+        '/assets/img/logo-blackbg.png', '/assets/img/close.png',
+        '/assets/img/tools.png', '/assets/img/video.png', '/assets/img/announcement.png',
+        '/assets/img/icns/cloak.svg', '/assets/img/icns/globe.svg',
+        '/assets/img/icns/palette.svg', '/assets/img/icns/puzzle.svg',
+        '/assets/img/icns/info.svg',
+        'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap',
+        'https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css'
+      ];
+      var total = assets.length, done = 0, finished = false, pageLoaded = (document.readyState === 'complete');
+
+      function shortName(u) {
+        try { var p = u.split('?')[0].split('/'); return p[p.length - 1] || u; }
+        catch (e) { return u; }
+      }
+      function bump(name) {
+        done++;
+        var p = Math.min(100, Math.round(done / total * 100));
+        if (fill) fill.style.width = p + '%';
+        if (pct) pct.textContent = p + '%';
+        if (status && name) status.textContent = name;
+        maybeReveal();
+      }
+      function load(u) {
+        var cross = /^https?:\/\//.test(u) && u.indexOf(location.origin) !== 0;
+        fetch(u, { cache: 'force-cache', mode: cross ? 'no-cors' : 'cors' })
+          .then(function () { bump(shortName(u)); })
+          .catch(function () { bump(shortName(u)); });
+      }
+      assets.forEach(load);
+
+      function maybeReveal() { if (done >= total && pageLoaded) reveal(); }
+      function reveal() {
+        if (finished) return; finished = true;
+        if (fill) fill.style.width = '100%';
+        if (pct) pct.textContent = '100%';
+        if (status) status.textContent = 'ready';
+        setTimeout(function () {
+          loader.classList.add('cst-done');
+          document.documentElement.style.overflow = '';
+          setTimeout(function () {
+            if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+          }, 650);
+        }, 200);
+      }
+
+      window.addEventListener('load', function () { pageLoaded = true; maybeReveal(); });
+      /* Safety net — never trap the user if a resource hangs. */
+      setTimeout(reveal, 9000);
+    })();
+  </script>
   <div class="load">
     <div style="display: none">
       <h1>What is Drew's Learning Academy?</h1>
@@ -548,9 +691,6 @@
                 <option value="apex" style="color:#c084ff;background:#04000d" disabled>Exotic: Apex</option>
                 <option value="breakaway" style="color: #ff3333; background: #070707">
                   breakaway
-                </option>
-                <option value="demo" style="color:#ffc800;background:#16161a">
-                  demo
                 </option>
               </select>
             </div>
@@ -1252,7 +1392,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.115";
+      var SITE_VER = "2.2.116";
 
       /**
        * Show a notification toast.

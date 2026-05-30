@@ -142,21 +142,6 @@ body[theme="saywallahibro"] {
 }
 
 /* ═══════════════════════════════════════════════════════
-   DEMO — beta/WIP build state, incomplete elements
-   ═══════════════════════════════════════════════════════ */
-body[theme="demo"] {
-  --background: #0d0d0b;
-  --color: #c8b86a;
-  --pallet: #15130a;
-  --pallet-hover: #1e1c10;
-  --button: #211e08;
-  --border: rgba(200, 165, 45, 0.35);
-  --input: rgba(200, 165, 45, 0.05);
-  --pallet2: #111109;
-  --settings: #1a1810;
-}
-
-/* ═══════════════════════════════════════════════════════
    BREAKAWAY — glitched screen cracking apart
    ═══════════════════════════════════════════════════════ */
 body[theme="breakaway"] {
