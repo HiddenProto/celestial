@@ -5,7 +5,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="clst.guard.js"></script>
-  
+
+  <!-- Resource hints: open connections to external hosts early so fonts, icons,
+       proxy bundles and the Wisp relay don't pay full DNS+TLS cost on first use. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://unpkg.com" crossorigin />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="dns-prefetch" href="https://wisp.mercurywork.shop" />
+  <link rel="dns-prefetch" href="https://celestial.press" />
+
   <link rel="manifest" href="/manifest.json"/>
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-1Y12SRXG3F"></script>
@@ -1468,7 +1477,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.3.125";
+      var SITE_VER = "2.3.126";
 
       /**
        * Show a notification toast.

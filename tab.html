@@ -188,6 +188,12 @@
       <hr>
 
       <details open>
+        <summary>05/30 — v2.3.126</summary>
+        <p>- Hardened the back / forward / reload buttons so they no longer silently fail if the frame is mid-navigation (added guards + a reload fallback).</p>
+        <p>- Performance: added preconnect / dns-prefetch hints for fonts, icons, the proxy CDN and the Wisp relay so first connections are faster.</p>
+      </details>
+
+      <details open>
         <summary>05/30 — v2.3.125</summary>
         <p>- Made the SSL→photon auto-recovery actually work: BRC uses its own transport (separate from the general one), so the earlier switch never took effect. Now ?photon=1 and the SSL-error fallback swap BRC's live transport to photon directly. Quick Apps / Media photon routing now genuinely uses photon too.</p>
       </details>

@@ -2,19 +2,29 @@ document.title = "celestial.";
 
 // self-explanitory
 
+function _activeFrame() {
+  return document.querySelector('iframe.searchframe:not(.hidden)');
+}
+
 function reload() {
-  const iframe = document.querySelector('iframe.searchframe:not(.hidden)')
-  if (iframe) iframe.contentWindow.location.reload()
+  const iframe = _activeFrame();
+  if (!iframe) return;
+  try { iframe.contentWindow.location.reload(); }
+  catch { try { iframe.src = iframe.src; } catch {} } // fallback: re-assign src
 }
 
 function back() {
-  var iframe = document.querySelector('iframe.searchframe:not(.hidden)')
-  iframe.contentWindow.history.back()
+  const iframe = _activeFrame();
+  if (!iframe) return;
+  // contentWindow/history can throw if the frame is mid-navigation or in an
+  // error state — guard so the button never silently dies.
+  try { iframe.contentWindow.history.back(); } catch {}
 }
 
 function forward() {
-  var iframe = document.querySelector('iframe.searchframe:not(.hidden)')
-  iframe.contentWindow.history.forward()
+  const iframe = _activeFrame();
+  if (!iframe) return;
+  try { iframe.contentWindow.history.go(1); } catch {}
 }
 
 // alt + s to put whatever is in the iframe in another window
