@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>05/30 — v2.2.120</summary>
+        <p>- Fixed proxied sites failing to load when opened from tab.html under the bumblcat rrc engine: the page was top-level-navigating to a BRC frame-prefix URL (which only works inside a registered iframe), causing "unrewriteurl: unexpected url" and a blank load. It now hands off to the main browser, which loads the page in a proper proxied frame. Affects every site/game opened via the finder, not just one.</p>
+      </details>
+
+      <details open>
         <summary>05/30 — v2.2.119</summary>
         <p>- Added a quick proxy-engine switcher (🌐 icon in the address bar) — one click cycles bumblcat rrc → scramjet → ultraviolet and reloads. Handy when a site won't load under the current rewriter; hover it to see which engine is active.</p>
       </details>
@@ -608,6 +613,18 @@
       "https://search.brave.com/search?q=%s";
 
     async function autofill(url) {
+      // BRC (bumblcat rrc) proxies content inside a *registered iframe*; its prefix
+      // is bound to that frame via a MessagePort. Top-level-navigating tab.html
+      // straight to a BRC frame-prefix URL means the top document isn't a registered
+      // frame, so the rewriter can't map requests → "unrewriteurl: unexpected url"
+      // and the page fails to load. Hand off to the main browser UI, which loads the
+      // page in a proper proxied frame. Scramjet/UV tolerate top-level nav, so leave
+      // those on the original (lighter, chrome-less) path.
+      const engine = localStorage.getItem("pr0xy") || "scram";
+      if (engine === "scram") {
+        location.href = "/index.html?autofill=" + encodeURIComponent(url);
+        return;
+      }
       const urlToLoad = makeURL(url, search);
       const proxiedUrl = await getProxied(urlToLoad);
       location.href = proxiedUrl;
