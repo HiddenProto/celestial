@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>05/30 — v2.3.128</summary>
+        <p>- Performance: for already-approved users, the presence/monitoring beacon (which loads PeerJS + a WebRTC connection) is now deferred to browser idle time instead of loading during initial page load — snappier startup, monitoring still connects a moment later. Users at the access gate are unaffected (the hub stays immediate for key validation).</p>
+      </details>
+
+      <details open>
         <summary>05/30 — v2.3.127</summary>
         <p>- Fixed the Back button landing on a blank page / the same page: the SSL→photon auto-retry was reloading via an about:blank src-swap, which polluted the frame's history. It now reloads in place with no extra history entries, so Back works normally.</p>
       </details>

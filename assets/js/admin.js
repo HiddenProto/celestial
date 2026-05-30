@@ -2422,14 +2422,20 @@
       }
       // Start hub for admin
       startHub();
+    } else if (isApproved()) {
+      // Already approved: the beacon is just passive presence/monitoring, and it
+      // pulls in PeerJS + a WebRTC connection. Defer it to idle so it doesn't
+      // compete with initial render/interactivity — admin monitoring still comes
+      // up a moment later, imperceptibly.
+      renderBadgeButton();
+      const _startBeacon = () => startBeacon();
+      if (window.requestIdleCallback) requestIdleCallback(_startBeacon, { timeout: 3000 });
+      else setTimeout(_startBeacon, 1200);
     } else {
+      // Unapproved: need the hub promptly to validate the access key — start now.
       startBeacon();
-      if (isApproved()) {
-        renderBadgeButton();
-      } else {
-        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showGate);
-        else showGate();
-      }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showGate);
+      else showGate();
     }
   }
 
