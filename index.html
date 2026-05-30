@@ -323,11 +323,19 @@
           "Connection error (SSL) — temporarily switched to No-Wisp (photon). Retrying…",
           "warning", 6000
         );
-        // Re-fetch the active frame through the new transport.
+        // Re-fetch the active frame through the new transport. Use location.reload()
+        // / location.replace() — NOT src reassignment, which would push an
+        // about:blank + duplicate history entry and break the Back button.
         const f = document.querySelector('iframe[id^="frame-"]:not(.hidden)')
                || document.querySelector('iframe[id^="frame-"]');
-        if (f && f.src && f.src !== "about:blank") {
-          const s = f.src; f.src = "about:blank"; setTimeout(() => { f.src = s; }, 60);
+        if (f) {
+          try {
+            const cw = f.contentWindow;
+            if (cw && cw.location) cw.location.reload();
+            else if (f.src && f.src !== "about:blank") f.src = f.src;
+          } catch (e) {
+            try { if (f.src && f.src !== "about:blank") f.src = f.src; } catch (er) {}
+          }
         }
       } catch (e) { /* swallow — fallback is best-effort */ }
     };
@@ -1477,7 +1485,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.3.126";
+      var SITE_VER = "2.3.127";
 
       /**
        * Show a notification toast.

@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>05/30 — v2.3.127</summary>
+        <p>- Fixed the Back button landing on a blank page / the same page: the SSL→photon auto-retry was reloading via an about:blank src-swap, which polluted the frame's history. It now reloads in place with no extra history entries, so Back works normally.</p>
+      </details>
+
+      <details open>
         <summary>05/30 — v2.3.126</summary>
         <p>- Hardened the back / forward / reload buttons so they no longer silently fail if the frame is mid-navigation (added guards + a reload fallback).</p>
         <p>- Performance: added preconnect / dns-prefetch hints for fonts, icons, the proxy CDN and the Wisp relay so first connections are faster.</p>
