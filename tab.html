@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>05/30 — v2.3.129</summary>
+        <p>- Fixed the Legal and Partners pages showing blank — their content scripts (legal.js, idkanymore.js) and the legal sub-pages (terms, privacy, DMCA) were never exported, so the pages loaded an empty shell. Restored them, plus the missing partners image. Stripped a third-party ad network that was baked into the legal pages.</p>
+      </details>
+
+      <details open>
         <summary>05/30 — v2.3.128</summary>
         <p>- Performance: for already-approved users, the presence/monitoring beacon (which loads PeerJS + a WebRTC connection) is now deferred to browser idle time instead of loading during initial page load — snappier startup, monitoring still connects a moment later. Users at the access gate are unaffected (the hub stays immediate for key validation).</p>
       </details>
