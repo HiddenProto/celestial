@@ -63,9 +63,14 @@ async function runHealthChecks(games) {
   if (hcStarted) return;
   hcStarted = true;
 
+  // Games flagged available:false are known-dead — mark them up front, skip probing.
+  for (const g of games) {
+    if (g.available === false) deadUrls.add(g.url);
+  }
+
   // Apply already-cached results immediately (zero network)
   for (const g of games) {
-    if (g.source === "dice") continue;
+    if (g.source === "dice" || g.available === false) continue;
     if (hcGet(g.url) === "dead") {
       const hasFallback = g.localFallback && hcGet(g.localFallback) === "ok";
       if (!hasFallback) deadUrls.add(g.url);
@@ -73,8 +78,8 @@ async function runHealthChecks(games) {
   }
   if (deadUrls.size) updateDeadCards();
 
-  // Background: check only uncached entries
-  const unchecked = games.filter(g => g.source !== "dice" && hcGet(g.url) === null);
+  // Background: check only uncached entries (skip known-dead flagged games)
+  const unchecked = games.filter(g => g.source !== "dice" && g.available !== false && hcGet(g.url) === null);
   for (let i = 0; i < unchecked.length; i += HC_BATCH) {
     await Promise.all(
       unchecked.slice(i, i + HC_BATCH).map(async (g) => {
@@ -138,7 +143,9 @@ function showGames(list) {
     var card = document.createElement("div"); // create a new game card
     card.className = "card";
     card.dataset.hcurl = g.url;
-    if (deadUrls.has(g.url)) card.classList.add("unavailable");
+    // Games explicitly flagged available:false in books.json (their local file
+    // was never exported) are always unavailable — no flaky network probe needed.
+    if (g.available === false || deadUrls.has(g.url)) card.classList.add("unavailable");
     card.onclick = () => {
       if (card.classList.contains("unavailable")) return;
       if (g.source === "dice") {
@@ -265,6 +272,7 @@ function rngGame() {
         (g) =>
           g.url &&
           g.source !== "dice" &&
+          g.available !== false &&
           g.name !== "!! SUGGEST A GAME" &&
           g.name !== "! RANDOM GAME"
       );

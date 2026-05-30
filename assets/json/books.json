@@ -42,7 +42,8 @@
             "sports",
             "2player"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "1 on 1 Football",
@@ -1963,7 +1964,8 @@
             "port",
             "platformer"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Your Only Move Is HUSTLE (yomi hustle)",
@@ -2241,7 +2243,8 @@
             "sandbox",
             "port"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "They Are Coming",
@@ -2678,7 +2681,8 @@
         "categories": [
             "puzzle"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Who's Your Daddy?",
@@ -2753,7 +2757,8 @@
             "adventure",
             "port"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Tung Sahur Horror",
@@ -2765,7 +2770,8 @@
             "adventure",
             "port"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Tung Tung Tung Sahur Obby",
@@ -2776,7 +2782,8 @@
             "platformer",
             "port"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Gacha Life",
@@ -2787,7 +2794,8 @@
             "other",
             "adventure"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Gacha Club",
@@ -2798,7 +2806,8 @@
             "other",
             "adventure"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Gachaverse",
@@ -2809,7 +2818,8 @@
             "other",
             "adventure"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Epstein Clicker",
@@ -2823,7 +2833,7 @@
         "source": "proxied"
     },
     {
-        "name": "T\u00c2\u00b3 (T3, Triple T's Basics)",
+        "name": "TÂ³ (T3, Triple T's Basics)",
         "img": "/assets/img/gms/t3.png",
         "type": "exclusive",
         "url": "/assets/src/t3/index.html#t3",
@@ -2831,7 +2841,8 @@
             "other",
             "port"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "20 Minutes Till Dawn",
@@ -2842,7 +2853,8 @@
             "other",
             "port"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "10 Minutes Till Dawn",
@@ -2852,7 +2864,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Spaceflight Simulator",
@@ -2863,7 +2876,8 @@
             "other",
             "port"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Five Nights At Frickbears 3",
@@ -2874,7 +2888,8 @@
             "horror",
             "port"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "60 Seconds Burger Run",
@@ -2884,7 +2899,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "60 Seconds Santa Run",
@@ -2894,7 +2910,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "4th And Goal 2022",
@@ -2904,7 +2921,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Raft; Survival",
@@ -2915,7 +2933,8 @@
             "other",
             "port"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "The Baby In Yellow",
@@ -2948,7 +2967,8 @@
             "adventure",
             "port"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Grow a Garden",
@@ -2970,7 +2990,8 @@
             "other",
             "port"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Blade Ball",
@@ -2980,7 +3001,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Tattletail",
@@ -2990,7 +3012,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Stickman Dragon Fight",
@@ -3020,7 +3043,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Super Liquid Soccer",
@@ -3040,7 +3064,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Space Waves",
@@ -3050,7 +3075,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Needy Streamer Overload",
@@ -3060,7 +3086,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "UvuvwevwevweOnye<br>tenvewveUgwemubw<br>emOssas",
@@ -3072,7 +3099,8 @@
             "port",
             "horror"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Fih",
@@ -3082,7 +3110,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Academytale",
@@ -3092,7 +3121,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Cruelty Squad",
@@ -3102,7 +3132,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "MiSide",
@@ -3114,7 +3145,8 @@
             "port",
             "horror"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Deepest Sword",
@@ -3124,7 +3156,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Slendytubbies",
@@ -3134,7 +3167,8 @@
         "categories": [
             "horror"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Slendytubbies 2",
@@ -3144,7 +3178,8 @@
         "categories": [
             "horror"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Slendytubbies 2d",
@@ -3154,7 +3189,8 @@
         "categories": [
             "horror"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Fears To Fathom; Home Alone",
@@ -3164,7 +3200,8 @@
         "categories": [
             "horror"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Re:Run (Re Run)",
@@ -3174,7 +3211,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Sonic Mania",
@@ -3194,7 +3232,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Sonic 2",
@@ -3204,7 +3243,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Sonic 3",
@@ -3214,7 +3254,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Sonic.EXE",
@@ -3224,7 +3265,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Soccer Skills Euro Cup",
@@ -3244,7 +3286,8 @@
         "categories": [
             "other"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Rocket Goal.io",
@@ -3266,7 +3309,8 @@
             "port",
             "indie"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "Schoolboy Runaway",
@@ -3278,7 +3322,8 @@
             "port",
             "indie"
         ],
-        "source": "local"
+        "source": "local",
+        "available": false
     },
     {
         "name": "-!! RANDOM GAME",
@@ -3304,7 +3349,11 @@
         "img": "https://celestial.press/assets/img/gms/krunker.jpg",
         "type": "exclusive",
         "url": "https://io.krunker.zip",
-        "categories": ["shooter", "2player", "indie"],
+        "categories": [
+            "shooter",
+            "2player",
+            "indie"
+        ],
         "source": "proxied"
     },
     {
@@ -3312,7 +3361,10 @@
         "img": "https://celestial.press/assets/img/gms/bs2026.png",
         "type": "exclusive",
         "url": "https://html5.gamedistribution.com/516d6908fbc848bdb89e65a58a43a7dc/?gd_sdk_referrer_url=https://basketballstars2026.io/basketball-stars-2026",
-        "categories": ["sports", "2player"],
+        "categories": [
+            "sports",
+            "2player"
+        ],
         "source": "proxied"
     },
     {
@@ -3320,7 +3372,10 @@
         "img": "https://celestial.press/assets/img/gms/motox3m-winter.png",
         "type": "regular",
         "url": "https://celestial.press/assets/src/moto-x3m/winter/index.html",
-        "categories": ["adventure", "indie"],
+        "categories": [
+            "adventure",
+            "indie"
+        ],
         "source": "proxied"
     },
     {
@@ -3328,7 +3383,11 @@
         "img": "https://celestial.press/assets/img/gms/notc.png",
         "type": "exclusive",
         "url": "https://celestial.press/assets/src/notc/index.html",
-        "categories": ["horror", "port", "indie"],
+        "categories": [
+            "horror",
+            "port",
+            "indie"
+        ],
         "source": "proxied"
     },
     {
@@ -3336,7 +3395,11 @@
         "img": "https://celestial.press/assets/img/gms/yohoho.png",
         "type": "exclusive",
         "url": "https://celestial.press/assets/src/yohoho/index.html",
-        "categories": ["shooter", "port", "indie"],
+        "categories": [
+            "shooter",
+            "port",
+            "indie"
+        ],
         "source": "proxied"
     },
     {
@@ -3344,7 +3407,11 @@
         "img": "https://celestial.press/assets/img/gms/jsab.png",
         "type": "exclusive",
         "url": "https://celestial.press/assets/src/jsab/index.html",
-        "categories": ["rhythm", "port", "indie"],
+        "categories": [
+            "rhythm",
+            "port",
+            "indie"
+        ],
         "source": "proxied"
     },
     {
@@ -3352,7 +3419,11 @@
         "img": "https://celestial.press/assets/img/gms/split.png",
         "type": "exclusive",
         "url": "https://celestial.press/assets/src/split/index.html",
-        "categories": ["horror", "port", "indie"],
+        "categories": [
+            "horror",
+            "port",
+            "indie"
+        ],
         "source": "proxied"
     },
     {
@@ -3360,7 +3431,11 @@
         "img": "https://celestial.press/assets/img/gms/-b.png",
         "type": "exclusive",
         "url": "https://tutoring-services.org/games/minusbbog/index.html",
-        "categories": ["adventure", "port", "indie"],
+        "categories": [
+            "adventure",
+            "port",
+            "indie"
+        ],
         "source": "proxied"
     }
 ]
