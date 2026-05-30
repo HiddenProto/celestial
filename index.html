@@ -1418,7 +1418,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.121";
+      var SITE_VER = "2.3.121";
 
       /**
        * Show a notification toast.
@@ -1452,6 +1452,19 @@
         setTimeout(dismiss, duration);
 
         container.appendChild(el);
+      };
+
+      /**
+       * "Show" notification type — only displays for PRE-EXISTING users
+       * (people who have loaded the site before), never for brand-new users
+       * who just entered via a key on their first visit. Used for announcements
+       * that only make sense to the existing userbase.
+       * @returns {boolean} true if it was actually shown
+       */
+      window.notifyShow = function (message, duration = 8000) {
+        if (!window.__cstPreexisting) return false;
+        window.notify(message, "info", duration);
+        return true;
       };
 
       // Listen for custom events from lithium.mjs
@@ -1704,6 +1717,9 @@
       // ── Version update check ─────────────────────────────────────────────
       (function () {
         var stored = localStorage.getItem("cst-ver");
+        // Pre-existing user = has loaded the site before (a prior cst-ver exists).
+        // Brand-new visitors who just unlocked via a key have no prior cst-ver.
+        window.__cstPreexisting = !!stored;
         setTimeout(function () {
           if (!stored) {
             window.notify("This is the new version system, current is v" + SITE_VER + ".", "info", 8000);
@@ -1712,6 +1728,17 @@
           }
         }, 1200);
         localStorage.setItem("cst-ver", SITE_VER);
+      })();
+
+      // ── Quick Apps & Media fix notice (pre-existing users only, once) ────
+      (function () {
+        var KEY = "cst-qa-fix-seen";
+        if (localStorage.getItem(KEY)) return;
+        setTimeout(function () {
+          if (window.notifyShow("Quick Apps and Media have been fixed by Bumblcat :3", 9000)) {
+            localStorage.setItem(KEY, "1");
+          }
+        }, 2000);
       })();
 
 
