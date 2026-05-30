@@ -846,6 +846,9 @@
         <a id="inspect" class="fc" onclick="inspect();">
           <img src="/assets/img/icns/code.svg" alt="inspect" style="width: 17px" />
         </a>
+        <a id="proxyswap" class="fc" onclick="swapProxy();" title="switch proxy engine — try this if a site won't load">
+          <img src="/assets/img/icns/globe.svg" alt="proxy engine" style="width: 17px" />
+        </a>
         <a id="fullscreen" class="fc" onclick="full();">
           <img src="/assets/img/icns/expand.svg" alt="fullscreen" style="width: 17px" />
         </a>
@@ -866,6 +869,29 @@
         ? document.exitFullscreen()
         : e.requestFullscreen().catch(() => { });
     };
+  </script>
+  <script>
+    // Quick proxy-engine switcher — cycles bumblcat rrc → scramjet → ultraviolet.
+    // Same setting as Settings → Proxy, just one click from the address bar for
+    // when a site won't load under the current rewriter.
+    (function () {
+      var ORDER  = ["scram", "scramjet", "violet"];
+      var LABELS = { scram: "bumblcat rrc", scramjet: "scramjet", violet: "ultraviolet" };
+
+      window.swapProxy = function () {
+        var cur  = localStorage.getItem("pr0xy") || "scram";
+        var next = ORDER[(ORDER.indexOf(cur) + 1) % ORDER.length];
+        localStorage.setItem("pr0xy", next);
+        try { window.notify && window.notify("Proxy engine → " + LABELS[next] + " — reloading…", "info", 1500); } catch (e) {}
+        setTimeout(function () { location.reload(); }, 600);
+      };
+
+      window.addEventListener("DOMContentLoaded", function () {
+        var cur = localStorage.getItem("pr0xy") || "scram";
+        var btn = document.getElementById("proxyswap");
+        if (btn) btn.title = "proxy engine: " + (LABELS[cur] || cur) + " — click to switch (try if a site won't load)";
+      });
+    })();
   </script>
   <script src="clst.instant.js" type="module" integrity="sha384-jnZyxPjiipYXnSU0ygqeac2q7CVYMbh84q0uHVRRxEtvFPiQYbXWUorga2aqZJ0z"></script>
 
@@ -1392,7 +1418,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.2.118";
+      var SITE_VER = "2.2.119";
 
       /**
        * Show a notification toast.
