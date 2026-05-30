@@ -188,8 +188,13 @@
       <hr>
 
       <details open>
+        <summary>05/30 — v2.2.121</summary>
+        <p>- Fixed the v2.2.120 handoff nesting celestial-inside-celestial: the main-browser handoff now only happens when tab.html is opened directly as the top page; when it's the new-tab page inside a frame it keeps the in-frame path, so no nested UI.</p>
+      </details>
+
+      <details open>
         <summary>05/30 — v2.2.120</summary>
-        <p>- Fixed proxied sites failing to load when opened from tab.html under the bumblcat rrc engine: the page was top-level-navigating to a BRC frame-prefix URL (which only works inside a registered iframe), causing "unrewriteurl: unexpected url" and a blank load. It now hands off to the main browser, which loads the page in a proper proxied frame. Affects every site/game opened via the finder, not just one.</p>
+        <p>- Fixed proxied sites failing to load when opened directly via tab.html under the bumblcat rrc engine: the page was top-level-navigating to a BRC frame-prefix URL (which only works inside a registered iframe), causing "unrewriteurl: unexpected url" and a blank load. It now hands off to the main browser, which loads the page in a proper proxied frame.</p>
       </details>
 
       <details open>
@@ -614,14 +619,18 @@
 
     async function autofill(url) {
       // BRC (bumblcat rrc) proxies content inside a *registered iframe*; its prefix
-      // is bound to that frame via a MessagePort. Top-level-navigating tab.html
-      // straight to a BRC frame-prefix URL means the top document isn't a registered
-      // frame, so the rewriter can't map requests → "unrewriteurl: unexpected url"
-      // and the page fails to load. Hand off to the main browser UI, which loads the
-      // page in a proper proxied frame. Scramjet/UV tolerate top-level nav, so leave
-      // those on the original (lighter, chrome-less) path.
+      // is bound to that frame via a MessagePort. Top-level-navigating straight to a
+      // BRC frame-prefix URL leaves the top document unregistered, so the rewriter
+      // can't map requests → "unrewriteurl: unexpected url" and the page fails.
+      //
+      // Only an issue when tab.html is opened DIRECTLY as the top window
+      // (e.g. /tab.html?autofill=…). In that case hand off to the main browser UI,
+      // which loads the page in a proper proxied frame. When tab.html is the new-tab
+      // page *inside* an index.html frame (window.top !== self), it already lives in
+      // a registered frame — redirecting there would nest celestial-in-celestial, so
+      // keep the original in-frame path. Scramjet/UV tolerate top-level nav anyway.
       const engine = localStorage.getItem("pr0xy") || "scram";
-      if (engine === "scram") {
+      if (engine === "scram" && window.top === window.self) {
         location.href = "/index.html?autofill=" + encodeURIComponent(url);
         return;
       }
