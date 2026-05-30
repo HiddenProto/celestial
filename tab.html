@@ -188,6 +188,12 @@
       <hr>
 
       <details open>
+        <summary>05/30 — v2.3.122</summary>
+        <p>- Quick Apps & Media now load over No-Wisp (photon) transport — no WebSocket relay needed, which is what fixed them.</p>
+        <p>- Removed the quick proxy-engine switcher button from the address bar.</p>
+      </details>
+
+      <details open>
         <summary>05/30 — v2.3.121</summary>
         <p>- Major fix shipped: proxied sites/games that were failing to load under the bumblcat rrc engine now work — bumped to v2.3.</p>
         <p>- Quick Apps and Media have been fixed by Bumblcat :3</p>
@@ -608,7 +614,10 @@
       : 'wss://wisp.mercurywork.shop/';
     const _wispLoc = localStorage.getItem('location') || _tabWispDefault;
     setProxy(localStorage.getItem("pr0xy") || "scram");
-    if (_wispLoc !== 'static') {
+    // Media / quick-app launches append ?photon=1 → force No-Wisp (photon) transport
+    // for this load, regardless of the saved Wisp server.
+    const _photonForce = new URLSearchParams(location.search).get('photon') === '1';
+    if (!_photonForce && _wispLoc !== 'static') {
       setWisp(
         (_wispLoc.startsWith('wss://') || _wispLoc.startsWith('ws://'))
           ? _wispLoc
@@ -616,7 +625,8 @@
       );
       setTransport(localStorage.getItem("transportz") || "libcurl");
     } else {
-      // No-Wisp / photon mode — libcurl and epoxy require a wisp URL, use photon instead
+      // No Wisp (photon) — libcurl/epoxy require a wisp URL; photon works over HTTPS.
+      // Used for static mode and for media/quick-app launches (?photon=1).
       setTransport("photon");
     }
 
@@ -637,8 +647,11 @@
       // a registered frame — redirecting there would nest celestial-in-celestial, so
       // keep the original in-frame path. Scramjet/UV tolerate top-level nav anyway.
       const engine = localStorage.getItem("pr0xy") || "scram";
+      // Carry the photon directive through the handoff so media/quick-app launches
+      // keep using No-Wisp (photon) on the main browser too.
+      const photonQS = new URLSearchParams(location.search).get('photon') === '1' ? '&photon=1' : '';
       if (engine === "scram" && window.top === window.self) {
-        location.href = "/index.html?autofill=" + encodeURIComponent(url);
+        location.href = "/index.html?autofill=" + encodeURIComponent(url) + photonQS;
         return;
       }
       const urlToLoad = makeURL(url, search);
@@ -667,10 +680,15 @@
       if (top) {
         if (top.source === "local") {
           location.href = top.url; // same-origin: navigate directly
-        } else if (top.badge === "app" && localStorage.getItem("proxy-tools") !== "1") {
-          location.href = makeURL(top.url, search); // apps: direct by default
+        } else if (top.badge === "app") {
+          if (localStorage.getItem("proxy-tools") === "1") {
+            // proxied media/quick-app → load over No-Wisp (photon)
+            location.href = "/tab.html?autofill=" + encodeURIComponent(top.url) + "&photon=1";
+          } else {
+            location.href = makeURL(top.url, search); // apps: direct by default
+          }
         } else {
-          location.href = await getProxied(makeURL(top.url, search));
+          location.href = await getProxied(makeURL(top.url, search)); // games etc.
         }
       }
       // If nothing matches, do nothing — this bar is for celestial content, not web search
@@ -740,10 +758,15 @@
           acClose();
           if (it.source === "local") {
             location.href = it.url; // same-origin: navigate directly
-          } else if (it.badge === "app" && localStorage.getItem("proxy-tools") !== "1") {
-            location.href = makeURL(it.url, search); // apps: direct by default
+          } else if (it.badge === "app") {
+            if (localStorage.getItem("proxy-tools") === "1") {
+              // proxied media/quick-app → load over No-Wisp (photon)
+              location.href = "/tab.html?autofill=" + encodeURIComponent(it.url) + "&photon=1";
+            } else {
+              location.href = makeURL(it.url, search); // apps: direct by default
+            }
           } else {
-            location.href = await getProxied(makeURL(it.url, search));
+            location.href = await getProxied(makeURL(it.url, search)); // games etc.
           }
         });
       });

@@ -12,7 +12,9 @@ fetch("/assets/json/tools.json").then(r => r.json())
         var card = document.createElement("div");
         card.className = "card";
         card.onclick = () => {
-          location.href = "/tab.html?autofill=" + encodeURIComponent(g.url);
+          // Quick apps & media load over No-Wisp (photon) — photon=1 tells the
+          // loader to use photon transport regardless of the saved Wisp server.
+          location.href = "/tab.html?autofill=" + encodeURIComponent(g.url) + "&photon=1";
         };
         card.innerHTML = `<div class="thumb" style="background-image:url('${g.img || "/assets/img/placeholder.png"}')"></div><p>${g.name}</p>`;
         grid.appendChild(card);
