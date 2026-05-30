@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>05/30 — v2.3.130</summary>
+        <p>- Fixed bumblcat's favorite songs: play/pause (and the progress bar) didn't work for most songs because the player never completed the YouTube API handshake, so it never registered as "ready". The relay now registers for player events on load, so pause/play, seeking, and track progress all respond.</p>
+      </details>
+
+      <details open>
         <summary>05/30 — v2.3.129</summary>
         <p>- Fixed the Legal and Partners pages showing blank — their content scripts (legal.js, idkanymore.js) and the legal sub-pages (terms, privacy, DMCA) were never exported, so the pages loaded an empty shell. Restored them, plus the missing partners image. Stripped a third-party ad network that was baked into the legal pages.</p>
       </details>

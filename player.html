@@ -22,6 +22,17 @@ window.addEventListener('message', function(e) {
     yt.contentWindow.postMessage(e.data, '*');
   }
 });
+
+// Register this relay as an API listener so the YT iframe actually emits
+// onReady / onStateChange / infoDelivery. Without this handshake the parent
+// never learns the player is ready, so play/pause never works. The widget
+// initialises async, so retry a few times until it starts responding.
+function ytListen() {
+  try { yt.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'); } catch (e) {}
+}
+yt.addEventListener('load', function () {
+  var n = 0, iv = setInterval(function () { ytListen(); if (++n >= 10) clearInterval(iv); }, 400);
+});
 </script>
 </body>
 </html>

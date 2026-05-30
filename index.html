@@ -1260,6 +1260,13 @@
           document.body.appendChild(bfsProxyEl);
         }
         bfsProxyEl.src = '/player.html?id=' + encodeURIComponent(videoId) + '&play=1';
+        // Backstop the API handshake (player.html also self-registers) so onReady
+        // fires and play/pause becomes responsive even on a slow load.
+        bfsProxyEl.onload = function () {
+          setTimeout(function () {
+            try { bfsProxyEl.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'); } catch (e) {}
+          }, 400);
+        };
       }
 
       function bfsLoad(idx, autoplay) {
@@ -1485,7 +1492,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.3.129";
+      var SITE_VER = "2.3.130";
 
       /**
        * Show a notification toast.
