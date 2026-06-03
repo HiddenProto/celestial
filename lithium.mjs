@@ -44,7 +44,11 @@ const transportOptions = {
 //////////////////////////////
 ///           SW           ///
 //////////////////////////////
-const stockSW = "/ultraworker.js";
+// Scramjet gets a DEDICATED service worker (scramjet + UV only, no BRC). BRC's
+// own SW messaging collided with scramjet v2's config channel in the shared
+// worker, breaking scramjet routing. ultraworker.js still serves BRC (+ UV).
+const _swEngine = (typeof localStorage !== "undefined" && localStorage.getItem("pr0xy")) || "scram";
+const stockSW = _swEngine === "scramjet" ? "/scramworker.js" : "/ultraworker.js";
 const swAllowedHostnames = ["localhost", "127.0.0.1"];
 
 /**
