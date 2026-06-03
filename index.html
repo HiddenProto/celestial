@@ -320,7 +320,13 @@
     // BareMux) and is in-memory only: never written to localStorage, so it reverts
     // to the saved transport on the next normal page load.
     let _photonSwitched = false;
-    const RE = /error code 35|SSL connect error|Internal Service Worker Error/i;
+    // Only switch to photon on a HARD failure (the SW error page that fully
+    // replaces the page). A transient "error code 35 / SSL connect error" in the
+    // console is normally recovered by the libcurl→epoxy fallback, and many sites
+    // — especially video streaming (cineby, regular YouTube) — work on libcurl/
+    // epoxy but NOT on photon. Forcing photon on every console error-35 was
+    // breaking those (they'd switch to photon mid-stream and stop playing).
+    const RE = /Internal Service Worker Error/i;
 
     window.cstPhotonFallback = async function () {
       if (_photonSwitched) return;
@@ -1548,7 +1554,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.3.137";
+      var SITE_VER = "2.3.138";
 
       /**
        * Show a notification toast.
