@@ -305,6 +305,8 @@
   <!-- ── SSL-error auto-fallback to photon (temporary, this session only) ──── -->
   <script type="module">
     import { forcePhotonRuntime } from "/lithium.mjs";
+    // Expose for non-module scripts (e.g. the BFS player's photon fallback).
+    window.cstForcePhoton = forcePhotonRuntime;
 
     // libcurl/epoxy over a Wisp relay can hit "error code 35: SSL connect error"
     // on some targets. When we see it, switch the proxy to No-Wisp (photon) at
@@ -1093,6 +1095,20 @@
       // proxyOnly songs → /service/ultra/ UV embed.
       var bfsProxied = false, bfsProxyEl = null, bfsProxyReady = false;
       var bfsCurTime = 0, bfsDur = 0;
+      var bfsProxyWatchdog = null, bfsProxyPhotonTried = false;
+
+      // Make the OS / keyboard media controls do nothing — the only way to control
+      // playback should be the in-app player. (Best-effort: the audio lives in a
+      // cross-origin YouTube iframe, so this can't fully claim the system session,
+      // but it neutralises the media-key handlers our page would otherwise expose.)
+      function bfsKillMediaSession() {
+        if (!('mediaSession' in navigator)) return;
+        try {
+          navigator.mediaSession.metadata = null;
+          ['play','pause','stop','seekto','seekbackward','seekforward','previoustrack','nexttrack']
+            .forEach(function (a) { try { navigator.mediaSession.setActionHandler(a, function () {}); } catch (e) {} });
+        } catch (e) {}
+      }
 
       function bfsThumb(id) { return 'https://img.youtube.com/vi/' + id + '/hqdefault.jpg'; }
       function bfsCover(s) {
@@ -1145,12 +1161,14 @@
           if (!d) return;
           if (d.event === 'onReady') {
             bfsProxyReady = true;
+            clearTimeout(bfsProxyWatchdog); // proxied embed came up — cancel photon fallback
             bfsPM('playVideo');
             // Start receiving currentTime / duration updates
             try { bfsProxyEl.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'); } catch(e) {}
           }
           if (d.event === 'onStateChange') {
             var st = d.info;
+            bfsKillMediaSession(); // keep OS media controls neutralised
             if (st === 1) {
               bfsSetPlaying(true);
               if (!bfsTick) bfsTick = setInterval(bfsUpdateBar, 250);
@@ -1231,17 +1249,34 @@
           document.body.appendChild(bfsProxyEl);
         }
         var params = 'enablejsapi=1&autoplay=1&controls=0&rel=0&modestbranding=1&origin=' + encodeURIComponent(location.origin);
-        bfsProxyEl.src = '/service/ultra/' + window.__uv$config.encodeUrl('https://www.youtube.com/embed/' + videoId + '?' + params);
+        var embed = 'https://www.youtube.com/embed/' + videoId + '?' + params;
+        bfsProxyEl.src = '/service/ultra/' + window.__uv$config.encodeUrl(embed);
         bfsProxyEl.onload = function() {
           setTimeout(function() {
             try { bfsProxyEl.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'); } catch(e) {}
           }, 300);
         };
+        // Photon fallback: if the proxied embed never reports ready, switch the
+        // proxy transport to No-Wisp (photon) and reload it once. Photon still
+        // routes through the proxy (HTTPS, no WebSocket relay) — the request isn't
+        // a direct/visible fetch.
+        clearTimeout(bfsProxyWatchdog);
+        bfsProxyWatchdog = setTimeout(function () {
+          if (bfsProxyReady || bfsProxyPhotonTried || !bfsProxied) return;
+          bfsProxyPhotonTried = true;
+          Promise.resolve(window.cstForcePhoton ? window.cstForcePhoton() : null).then(function () {
+            if (!bfsProxyEl) return;
+            var s = bfsProxyEl.src;
+            bfsProxyEl.src = 'about:blank';
+            setTimeout(function () { if (bfsProxyEl) bfsProxyEl.src = s; }, 80);
+          });
+        }, 6000);
       }
 
       function bfsExitProxy() {
         bfsProxied = false; bfsProxyReady = false;
         bfsCurTime = 0; bfsDur = 0;
+        clearTimeout(bfsProxyWatchdog); bfsProxyPhotonTried = false;
         bfsSetPlaying(false);
         clearInterval(bfsTick); bfsTick = null;
         if (bfsProxyEl) bfsProxyEl.src = 'about:blank';
@@ -1298,6 +1333,7 @@
         var p = document.getElementById('bfs-player');
         p.style.display = 'block';
         p.style.animation = 'none'; p.offsetHeight; p.style.animation = '';
+        bfsKillMediaSession();
         var s = BFS_SONGS[bfsIdx];
         bfsSetCover(s);
         document.getElementById('bfs-title').textContent = s.title;
@@ -1492,7 +1528,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.3.132";
+      var SITE_VER = "2.3.133";
 
       /**
        * Show a notification toast.

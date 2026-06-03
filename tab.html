@@ -188,6 +188,12 @@
       <hr>
 
       <details open>
+        <summary>05/30 — v2.3.133</summary>
+        <p>- bumblcat's favorite songs: proxy-only songs now fall back to No-Wisp (photon) if the proxied stream doesn't come up (photon still routes through the proxy, so it's not a visible direct request); thumbnails load through the proxy too.</p>
+        <p>- Media controls: the OS / keyboard media keys are now neutralised so the only way to control a song is the in-app player (best-effort — the audio runs in a cross-origin YouTube frame).</p>
+      </details>
+
+      <details open>
         <summary>05/30 — v2.3.132</summary>
         <p>- bumblcat's favorite songs: pause/unpause now works. The player was rebuilt on YouTube's official IFrame Player API, so play-state events arrive reliably (before, autoplay started the track before the player could register the listener, so it never knew the song was playing and the button only ever sent "play").</p>
       </details>
