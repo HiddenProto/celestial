@@ -12,9 +12,11 @@ fetch("/assets/json/tools.json").then(r => r.json())
         var card = document.createElement("div");
         card.className = "card";
         card.onclick = () => {
-          // Quick apps & media load over No-Wisp (photon) — photon=1 tells the
-          // loader to use photon transport regardless of the saved Wisp server.
-          location.href = "/tab.html?autofill=" + encodeURIComponent(g.url) + "&photon=1";
+          // Load on the normal transport (libcurl/epoxy). Do NOT force photon:
+          // photon can't carry video streams, so forcing it broke media/streaming
+          // sites (e.g. cineby). If a site genuinely needs photon, the SSL-error
+          // auto-fallback switches to it on a hard failure.
+          location.href = "/tab.html?autofill=" + encodeURIComponent(g.url);
         };
         card.innerHTML = `<div class="thumb" style="background-image:url('${g.img || "/assets/img/placeholder.png"}')"></div><p>${g.name}</p>`;
         grid.appendChild(card);

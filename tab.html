@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>06/02 — v2.3.141</summary>
+        <p>- Quick Apps & Media no longer force the No-Wisp (photon) connection — photon can't carry video, so it was breaking streaming sites. They now use the normal transport (which streams), and only fall back to photon if a page actually hard-fails.</p>
+      </details>
+
+      <details open>
         <summary>06/02 — v2.3.140</summary>
         <p>- The SSL error page is no longer left in your tab history — when a page is recovered, the error screen is replaced by the working page, so Back/Forward never lands on it.</p>
       </details>
@@ -778,13 +783,14 @@
 
     // Launch a game/app exactly like clicking it in the games / quick-apps grid,
     // so the search bar and the grids behave identically:
-    //   • apps           → /tab.html?autofill=URL&photon=1   (matches t.js)
+    //   • apps           → /tab.html?autofill=URL   (matches t.js)
     //   • local games    → /news/frame.html?mbed=URL          (matches newscards.js)
     //   • proxied games  → /tab.html?autofill=URL, with a localFallback reachability check
     function launchItem(it) {
       if (!it || !it.url) return;
       if (it.badge === "app") {
-        location.href = "/tab.html?autofill=" + encodeURIComponent(it.url) + "&photon=1";
+        // Normal transport (not photon — it can't stream video).
+        location.href = "/tab.html?autofill=" + encodeURIComponent(it.url);
         return;
       }
       if (it.source === "local") {
