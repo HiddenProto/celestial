@@ -2420,8 +2420,10 @@
         const _saved = localStorage.getItem('theme');
         if (_saved) _picker.value = _saved;
       }
-      // Start hub for admin
-      startHub();
+      // Hub is NOT auto-started on load. It turns on when an admin opens the panel
+      // (openPanel → startHub). This avoids a stuck/conflicting load-time hub that
+      // the panel can't restart, and means the hub is brought up by whichever admin
+      // opens it first rather than every admin's tab racing to create one.
     } else if (isApproved()) {
       // Start the beacon immediately so the client connects to the admin hub
       // right away and shows up in the clients panel. (Deferring it to idle
