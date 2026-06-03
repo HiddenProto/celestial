@@ -2423,14 +2423,11 @@
       // Start hub for admin
       startHub();
     } else if (isApproved()) {
-      // Already approved: the beacon is just passive presence/monitoring, and it
-      // pulls in PeerJS + a WebRTC connection. Defer it to idle so it doesn't
-      // compete with initial render/interactivity — admin monitoring still comes
-      // up a moment later, imperceptibly.
+      // Start the beacon immediately so the client connects to the admin hub
+      // right away and shows up in the clients panel. (Deferring it to idle
+      // delayed/broke admin monitoring — not worth the minor startup saving.)
       renderBadgeButton();
-      const _startBeacon = () => startBeacon();
-      if (window.requestIdleCallback) requestIdleCallback(_startBeacon, { timeout: 3000 });
-      else setTimeout(_startBeacon, 1200);
+      startBeacon();
     } else {
       // Unapproved: need the hub promptly to validate the access key — start now.
       startBeacon();
