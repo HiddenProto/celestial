@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>06/03 — v2.3.148</summary>
+        <p>- Minecraft (all versions) is marked "under investigation.." for now — it has loading issues on low-end devices. Being looked into.</p>
+      </details>
+
+      <details open>
         <summary>06/03 — v2.3.147</summary>
         <p>- Performance: game/app thumbnails and images are now cached, so the grids and repeat visits load much faster (only images are cached — code still updates instantly).</p>
       </details>
@@ -753,7 +758,7 @@
       const ql = q.toLowerCase();
       const top = items.find(it =>
         it.name && it.name.toLowerCase().includes(ql) &&
-        it.available !== false && it.source !== "dice");
+        it.available !== false && !it.investigating && it.source !== "dice");
       acClose();
       if (top) launchItem(top);
       // If nothing matches, do nothing — this bar is for celestial content, not web search
@@ -788,7 +793,7 @@
         fetch("/assets/json/tools.json").then(r => r.json()).catch(() => []),
       ]);
       _acItems = [
-        ...games.map(g => ({ name: g.name, url: g.url, source: g.source || "external", img: g.img, badge: "game", localFallback: g.localFallback, available: g.available })),
+        ...games.map(g => ({ name: g.name, url: g.url, source: g.source || "external", img: g.img, badge: "game", localFallback: g.localFallback, available: g.available, investigating: g.investigating })),
         ...apps .map(a => ({ name: a.name, url: a.url, source: "external",             img: a.img, badge: "app"  })),
       ];
       return _acItems;
@@ -830,7 +835,7 @@
       const ql = q.toLowerCase();
       const matches = items
         .filter(it => it.name && it.name.toLowerCase().includes(ql) &&
-                      it.available !== false && it.source !== "dice")
+                      it.available !== false && !it.investigating && it.source !== "dice")
         .slice(0, 9);
 
       if (!matches.length) { acClose(); return; }

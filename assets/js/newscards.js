@@ -11,6 +11,7 @@ var order = document.querySelectorAll("select")[1];
 const HC_TTL  = 5 * 60 * 1000;
 const HC_BATCH = 5;
 const UNAVAIL_MSG = "when the original site got obliterated I never expected it and I had no time to export the games that were original exclusive, therefore these will not be available until i find a solution.";
+const INVESTIGATING_MSG = "this one is under investigation — it has loading issues (especially on low-end devices). it'll be sorted out later.";
 
 const deadUrls = new Set();   // populated once; read by showGames on every render
 let   hcStarted = false;
@@ -79,7 +80,7 @@ async function runHealthChecks(games) {
   if (deadUrls.size) updateDeadCards();
 
   // Background: check only uncached entries (skip known-dead flagged games)
-  const unchecked = games.filter(g => g.source !== "dice" && g.available !== false && hcGet(g.url) === null);
+  const unchecked = games.filter(g => g.source !== "dice" && g.available !== false && !g.investigating && hcGet(g.url) === null);
   for (let i = 0; i < unchecked.length; i += HC_BATCH) {
     await Promise.all(
       unchecked.slice(i, i + HC_BATCH).map(async (g) => {
@@ -133,19 +134,22 @@ function showGames(list) {
      * I know it seems a bit unoptimized, having a new SVG for every card, but since it's
      * just math and the size of it is pretty small, it shouldn't really matter much
      */
+    const _unavailLabel = g.investigating ? "under investigation.." : "unavailable";
+    const _unavailTip   = g.investigating ? INVESTIGATING_MSG : UNAVAIL_MSG;
     let cardHTML = `
     <div class="thumb"><img loading="${imageLoading}" decoding="async" fetchpriority="${imagePriority}" src="${g.img}" alt="${g.name}"></div>
     <p>${g.name}</p>
     <svg class="favoriteBook" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="24" height="24" fill="currentColor"> <path d="${heartPath}"/> </svg>
-    <div class="card-unavail"><span>unavailable</span><span class="card-unavail-i" data-tip="${UNAVAIL_MSG}">ⓘ</span></div>
+    <div class="card-unavail"><span>${_unavailLabel}</span><span class="card-unavail-i" data-tip="${_unavailTip}">ⓘ</span></div>
     `;
 
     var card = document.createElement("div"); // create a new game card
     card.className = "card";
     card.dataset.hcurl = g.url;
-    // Games explicitly flagged available:false in books.json (their local file
-    // was never exported) are always unavailable — no flaky network probe needed.
-    if (g.available === false || deadUrls.has(g.url)) card.classList.add("unavailable");
+    // Unavailable: flagged available:false (file never exported) or health-check dead.
+    // Investigating: known loading issues (e.g. Minecraft on low-end devices) — shown
+    // as "under investigation.." and not launchable until sorted.
+    if (g.investigating || g.available === false || deadUrls.has(g.url)) card.classList.add("unavailable");
     card.onclick = () => {
       if (card.classList.contains("unavailable")) return;
       if (g.source === "dice") {
@@ -273,6 +277,7 @@ function rngGame() {
           g.url &&
           g.source !== "dice" &&
           g.available !== false &&
+          !g.investigating &&
           g.name !== "!! SUGGEST A GAME" &&
           g.name !== "! RANDOM GAME"
       );
