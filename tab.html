@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>06/02 — v2.3.135</summary>
+        <p>- Fixed Back doing nothing after opening an app/quick app — the launcher left a throwaway page in history that immediately re-opened the app when you went back to it. It's now replaced rather than stacked, so Back returns to where you were.</p>
+      </details>
+
+      <details open>
         <summary>06/02 — v2.3.134</summary>
         <p>- New AI assistant — open it from Media → access AI. Multiple models, markdown + code formatting, chat history, screen-share, and flashcard/quiz generation (ask it to "make flashcards about (topic)").</p>
       </details>
@@ -677,13 +682,15 @@
           try { await window.top.cstLoadCurrent(url); return; } catch (e) {}
         }
         if (!inFrame) {
-          location.href = "/index.html?autofill=" + encodeURIComponent(url) + photonQS;
+          // replace() so this throwaway tab.html?autofill page doesn't linger in
+          // history and bounce Back forward into the app again.
+          location.replace("/index.html?autofill=" + encodeURIComponent(url) + photonQS);
           return;
         }
       }
       const urlToLoad = makeURL(url, search);
       const proxiedUrl = await getProxied(urlToLoad);
-      location.href = proxiedUrl;
+      location.replace(proxiedUrl); // replace, not href — see note above
     }
 
     try {

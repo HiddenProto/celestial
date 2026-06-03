@@ -295,7 +295,13 @@
       const urlToLoad = makeURL(url, search);
       const proxiedUrl = await getProxied(urlToLoad);
       const f = document.getElementById(`frame-${currentTab}`);
-      if (f) { f.src = proxiedUrl; addressInput.value = urlToLoad; }
+      if (!f) return;
+      // REPLACE the frame's current entry (the throwaway tab.html?autofill page)
+      // instead of pushing a new one. Otherwise Back lands on tab.html?autofill,
+      // which immediately re-runs autofill() and bounces forward to the app again.
+      try { f.contentWindow.location.replace(proxiedUrl); }
+      catch (e) { f.src = proxiedUrl; }
+      addressInput.value = urlToLoad;
     };
 
     setFrames(document.getElementById("frames"));
@@ -1528,7 +1534,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.3.134";
+      var SITE_VER = "2.3.135";
 
       /**
        * Show a notification toast.
