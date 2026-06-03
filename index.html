@@ -1472,6 +1472,20 @@
       opacity: 0.6; text-transform: uppercase; letter-spacing: 0.04em;
     }
     .notif-msg { font-size: 0.82rem; }
+    .notif-link {
+      color: #5b9dff;
+      text-decoration: underline;
+      cursor: pointer;
+      font-weight: 600;
+      border-radius: 3px;
+      padding: 0 2px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .notif-link:hover, .notif-link:focus {
+      background: rgba(91, 157, 255, 0.18);
+      color: #8bbcff;
+      outline: none;
+    }
     .notif-close {
       background: none; border: none; cursor: pointer; color: inherit;
       opacity: 0.4; font-size: 1rem; padding: 0 0 0 6px; line-height: 1;
@@ -1534,7 +1548,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.3.135";
+      var SITE_VER = "2.3.136";
 
       /**
        * Show a notification toast.
@@ -1542,19 +1556,40 @@
        * @param {"success"|"error"|"warning"|"info"} [type="info"]
        * @param {number} [duration=6000] ms
        */
-      window.notify = function (message, type = "info", duration = 6000) {
+      // Navigate the active tab's frame to an in-site location (used by
+      // notification links). Falls back to a top-level navigation.
+      window.cstGoTo = function (href) {
+        try {
+          var f = document.querySelector('iframe.searchframe:not(.hidden)')
+               || document.querySelector('iframe.searchframe');
+          if (f) { f.src = href; return; }
+        } catch (e) {}
+        location.href = href;
+      };
+
+      /**
+       * @param {object} [opts] Optional. Adds a clickable blue link to the toast:
+       *   { linkText:"Media", linkHref:"/path" }  or  { linkText, onClick:fn }
+       *   Clicking it runs onClick (or navigates via cstGoTo) then dismisses.
+       */
+      window.notify = function (message, type = "info", duration = 6000, opts) {
         if (!["success","error","warning","info"].includes(type)) type = "info";
+        opts = opts || {};
+        const esc = (s) => String(s).replace(/</g, "&lt;");
 
         const el = document.createElement("div");
         el.className = "notif";
         el.setAttribute("data-t", type);
         el.setAttribute("role", "alert");
+        const linkHtml = opts.linkText
+          ? ` <span class="notif-link" role="link" tabindex="0">${esc(opts.linkText)}</span>`
+          : "";
         el.innerHTML = `
           <div class="notif-top">
             <span class="notif-icon">${ICONS[type]}</span>
             <div class="notif-body">
               <div class="notif-title">${LABELS[type]}</div>
-              <div class="notif-msg">${message.replace(/</g,"&lt;")}</div>
+              <div class="notif-msg">${esc(message)}${linkHtml}</div>
             </div>
             <button class="notif-close" aria-label="dismiss">✕</button>
           </div>
@@ -1565,8 +1600,22 @@
           setTimeout(() => el.remove(), 320);
         };
         el.querySelector(".notif-close").addEventListener("click", dismiss);
-        setTimeout(dismiss, duration);
 
+        const linkEl = el.querySelector(".notif-link");
+        if (linkEl) {
+          const act = (e) => {
+            e.stopPropagation();
+            try {
+              if (typeof opts.onClick === "function") opts.onClick();
+              else if (opts.linkHref) window.cstGoTo(opts.linkHref);
+            } catch (err) {}
+            dismiss();
+          };
+          linkEl.addEventListener("click", act);
+          linkEl.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") act(e); });
+        }
+
+        setTimeout(dismiss, duration);
         container.appendChild(el);
       };
 
@@ -1577,9 +1626,9 @@
        * that only make sense to the existing userbase.
        * @returns {boolean} true if it was actually shown
        */
-      window.notifyShow = function (message, duration = 8000) {
+      window.notifyShow = function (message, duration = 8000, opts) {
         if (!window.__cstPreexisting) return false;
-        window.notify(message, "info", duration);
+        window.notify(message, "info", duration, opts);
         return true;
       };
 
@@ -1855,6 +1904,20 @@
             localStorage.setItem(KEY, "1");
           }
         }, 2000);
+      })();
+
+      // ── AI release notice (pre-existing users only, once) — "Media" is a link ─
+      (function () {
+        var KEY = "cst-ai-notice-seen";
+        if (localStorage.getItem(KEY)) return;
+        setTimeout(function () {
+          var shown = window.notifyShow(
+            "AI has now been implemented, you can find it in",
+            10000,
+            { linkText: "Media", linkHref: "/contact/index.html?type=m" }
+          );
+          if (shown) localStorage.setItem(KEY, "1");
+        }, 3500);
       })();
 
 
