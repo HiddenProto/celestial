@@ -44,11 +44,20 @@ const transportOptions = {
 //////////////////////////////
 ///           SW           ///
 //////////////////////////////
-// Scramjet gets a DEDICATED service worker (scramjet + UV only, no BRC). BRC's
-// own SW messaging collided with scramjet v2's config channel in the shared
-// worker, breaking scramjet routing. ultraworker.js still serves BRC (+ UV).
+// Scramjet AND UV (violet) use a DEDICATED service worker (scramworker.js:
+// scramjet + UV eagerly imported, no BRC). Two reasons it must be dedicated and
+// eager:
+//   1) BRC's own SW messaging collided with scramjet v2's config channel in the
+//      shared worker, breaking scramjet routing.
+//   2) importScripts() can only load a NEW script during the SW's initial
+//      evaluation — calling it later from inside the fetch handler throws
+//      InvalidStateError. ultraworker.js lazy-loaded scramjet/UV that way, so
+//      _uvSW / scramjet stayed null and every /service/ultra/ + /scramjet/
+//      request fell through to a Vercel 404. scramworker.js imports them at the
+//      top level, so they're always ready.
+// ultraworker.js stays lean for BRC only (the default engine).
 const _swEngine = (typeof localStorage !== "undefined" && localStorage.getItem("pr0xy")) || "scram";
-const stockSW = _swEngine === "scramjet" ? "/scramworker.js" : "/ultraworker.js";
+const stockSW = (_swEngine === "scramjet" || _swEngine === "violet") ? "/scramworker.js" : "/ultraworker.js";
 const swAllowedHostnames = ["localhost", "127.0.0.1"];
 
 /**
