@@ -358,11 +358,13 @@
         // Safety: if the load event never fires, revert + re-arm anyway.
         setTimeout(onLoaded, 12000);
 
-        // Reload via photon (reload/replace — NOT src reassignment, which would
-        // push an about:blank + duplicate history entry and break Back).
+        // Re-fetch via photon using location.replace() — this REPLACES the SSL
+        // error-page entry with the recovered page, so it's not left sitting in
+        // history (Back/Forward won't land on the error page). reload() would keep
+        // the entry; src reassignment would push about:blank + dupes and break Back.
         try {
           const cw = f.contentWindow;
-          if (cw && cw.location) cw.location.reload();
+          if (cw && cw.location) cw.location.replace(cw.location.href);
           else if (f.src && f.src !== "about:blank") f.src = f.src;
         } catch (e) {
           try { if (f.src && f.src !== "about:blank") f.src = f.src; } catch (er) {}
@@ -1570,7 +1572,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.3.139";
+      var SITE_VER = "2.3.140";
 
       /**
        * Show a notification toast.
