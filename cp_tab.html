@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Home - Compton Early College High School</title>
+  <link rel="shortcut icon" type="image/png" href="/assets/img/logo-blackbg.png" />
+  <link rel="stylesheet" href="/assets/css/home.css" />
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
+  <meta name="Home - Compton Early College High School" />
+  <meta content="Home - Compton Early College High School" property="og:title" />
+  <meta content="Home - Compton Early College High School" />
+  <meta property="og:description" content="Home - Compton Early College High School">
+  <style>
+    .updlog {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: var(--color);
+      cursor: pointer;
+      width: 40px;
+    }
+
+    .updlog img {
+      width: 40px;
+    }
+
+    body[theme="light"] .updlog img {
+      filter: invert(1);
+    }
+
+    body[theme="light"] .card img {
+      filter: invert(1);
+    }
+
+    body[theme="saywallahibro"] .card img {
+      filter: invert(1);
+    }
+
+    .upd-bg {
+      position: fixed;
+      inset: 0;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      background: rgba(0, 0, 0, 0.2);
+      z-index: 999;
+      display: none;
+    }
+
+    .card img {
+      width: 50px;
+      height: 50px;
+      object-fit: contain;
+    }
+
+    #update-log {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--pallet2);
+      border: 0.7px solid var(--border);
+      color: var(--color);
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 1000;
+      width: 40vw;
+      height: 350px;
+      overflow-y: auto;
+    }
+  </style>
+    <script src="//js.rev.iq/celestial.press" defer></script>
+<style id="rev-iq-placement-styles">
+  .rev-ad-slot{box-sizing:border-box;z-index:2147482000;pointer-events:none}
+  .rev-ad-slot[data-ad]{display:block}
+  .rev-ad-slot iframe,.rev-ad-slot a,.rev-ad-slot button{pointer-events:auto}
+  .rev-ad-rail{position:fixed;right:16px;top:104px;width:300px;min-height:250px}
+  .rev-ad-mobile-anchor{display:none}
+  @media (max-width: 1180px){.rev-ad-rail{display:none!important}}
+  @media (max-width: 760px){
+    body{padding-bottom:58px}
+    .rev-ad-mobile-anchor{display:block;position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:320px;min-height:50px}
+  }
+</style>
+</head>
+
+<body theme="default">
+  <div class="upd-bg"></div>
+  <div id="update-log" style="display: none">
+    <p id="close" onclick="exitUpdLog();" style="
+          font-size: 40px;
+          top: 0;
+          right: 0;
+          position: fixed;
+          margin: 15px;
+          cursor: pointer;
+        ">
+      <img src="/assets/img/close.png" alt="close" style="width: 35px" />
+    </p>
+    <div align="center">
+      <h1>update log 06/02 part 1</h1>
+      <hr>
+    </div>
+    <hr>
+    <hr>
+    <h2>content:</h2>
+    <p>- added a new AI system in media, go check it out!</p>
+    <p>- added screensharing to the ai</p>
+    <p>- added flashcards to the ai (trigger it by saying "make flashcards about (topic)")</p>
+    <p>- added 4 models (gpt-5.4, gpt-5.4-mini, claude-sonnet-4.6, gemini-3-flash-preview)</p>
+    <p>- added quiz generating (trigger it by saying "make a quiz about (topic)")</p>
+    <hr>
+    <hr>
+    <p>
+      - join the d<span>isc</span>ord for more links!
+      <a href="https://dsc.gg/gnetwork" style="color: var(--color)" target="_blank">.gg/gSjNsVxX5y</a>
+    </p>
+    <p>
+      - proxied ver:
+      <a href="/tab.html?autofill=https://discord.gg/gSjNsVxX5y" style="color: var(--color)">.gg/gSjNsVxX5y</a>
+    </p>
+  </div>
+  <video style="
+        background: rgba(0, 0, 0, 0.566);
+        backdrop-filter: blur(10px);
+        z-index: 999999999999999999;
+      " class="params" autoplay muted playsinline loop src="/assets/img/loading.mp4"></video>
+  <div class="gradientthing">
+    <a class="updlog" onclick="showUpdLog();"><img src="/assets/img/announcement.png" alt="Update Log" /></a>
+    <div class="main">
+      <div class="bg-match">
+        <h1 id="main">Compton Early College High School</h1>
+        <form id="form">
+          <input class="url" id="address" placeholder="search for online lessons" />
+        </form>
+        <div class="row-thing">
+          <div class="card" id="card" onclick="window.location.href='/news/index.html?type=g'">
+            <img src="/assets/img/gms.png" />
+            <p>Contact</p>
+          </div>
+          <div class="card" id="card2" onclick="window.location.href='/tools/index.html?type=ap'">
+            <img src="/assets/img/tools.png" />
+            <p>Tools</p>
+          </div>
+          <div class="card" id="card3" onclick="window.location.href='/contact/index.html?type=m'">
+            <img src="/assets/img/video.png" />
+            <p>Showcase</p>
+          </div>
+        </div>
+      </div>
+      <footer class="footer">
+        <!--idk why it puts 2 directories soo here we go-->
+        <a class="a2" href="">Phone Number</a>
+        <a style="text-decoration: none">•</a>
+        <a class="a3" onclick="window.location.href='/legal/index.html?type=l'">Enroll Now!</a>
+        <a style="text-decoration: none">•</a>
+        <a class="ap" onclick="window.location.href='/partners/index.html?type=part'">Staff List</a>
+      </footer>
+    </div>
+  </div>
+  <div style="display: none">
+    <h1>What is Compton Early College High School?</h1>
+    <p>
+      Compton Early College High School is a modern educational institution focused
+      on preparing students for both college and future careers. The school provides
+      a supportive learning environment where students can strengthen their academic
+      skills in subjects such as math, science, reading, and writing while also
+      gaining valuable college experience.
+    </p>
+
+    <h1>How does Compton Early College High School teach students?</h1>
+    <p>
+      The school combines high school coursework with college-level opportunities,
+      allowing students to earn college credits while completing their education.
+      Teachers provide personalized instruction and encourage collaboration,
+      critical thinking, and hands-on learning to help students succeed at their
+      own pace.
+    </p>
+
+    <h1>Why is Compton Early College High School beneficial?</h1>
+    <p>
+      Beyond academics, Compton Early College High School helps students build
+      confidence, responsibility, and leadership skills. Students learn how to
+      manage their time, stay organized, and prepare for higher education and
+      long-term success in their future careers.
+    </p>
+  </div>
+</body>
+<script src="/assets/js/tabmain.js" type="module"></script>
+<script>
+  document.title = "new tab";
+</script>
+<script defer type="module">
+  import {
+    setWisp,
+    makeURL,
+    setProxy,
+    getProxied,
+    setTransport,
+  } from "/lithium.mjs";
+
+  setWisp(
+    (location.protocol === "https:" ? "wss://" : "ws://") +
+    location.host +
+    (localStorage.getItem('location') || '/wisp/')
+  );
+  setProxy(localStorage.getItem("pr0xy") || "scram");
+  setTransport(localStorage.getItem("transportz") || "libcurl");
+
+  let search =
+    localStorage.getItem("search-engine") ||
+    "https://duckduckgo.com/?q=%s";
+
+  async function autofill(url) {
+    const urlToLoad = makeURL(url, search);
+    const proxiedUrl = await getProxied(urlToLoad);
+    location.href = proxiedUrl;
+  }
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const url = params.get("autofill");
+    if (url) autofill(url);
+  } catch { }
+
+  const form = document.getElementById("form");
+  const input = document.getElementById("address");
+
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const proxiedUrl = await getProxied(makeURL(input.value, search));
+    location.href = proxiedUrl;
+  });
+</script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const screen = document.querySelector(".params");
+  if (params.has("autofill")) {
+    screen.style.display = "block";
+  }
+</script>
+<script src="/assets/js/theme.js"></script>
+<script>
+  function showUpdLog() {
+    document.getElementById("update-log").style.display = "block";
+    document.querySelector(".upd-bg").style.display = "block";
+  }
+
+  function exitUpdLog() {
+    document.getElementById("update-log").style.display = "none";
+    document.querySelector(".upd-bg").style.display = "none";
+  }
+
+  document.getElementById("close").addEventListener("click", exitUpdLog);
+
+  window.addEventListener("load", function () {
+    if (!localStorage.getItem("updlogview13")) {
+      document.getElementById("update-log").style.display = "block";
+      document.querySelector(".upd-bg").style.display = "block";
+      localStorage.setItem("updlogview13", "1");
+    }
+  });
+</script>
+
+</html>
