@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>06/03 — v2.3.142</summary>
+        <p>- On an SSL connection error, the proxy now falls back to No-Wisp (photon) and stays there for the session, instead of repeatedly switching transports. Resets to your normal connection on the next page load.</p>
+      </details>
+
+      <details open>
         <summary>06/02 — v2.3.141</summary>
         <p>- Quick Apps & Media no longer force the No-Wisp (photon) connection — photon can't carry video, so it was breaking streaming sites. They now use the normal transport (which streams), and only fall back to photon if a page actually hard-fails.</p>
       </details>
