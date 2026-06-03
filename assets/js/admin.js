@@ -2436,6 +2436,27 @@
     }
   }
 
+  // ── One-time 30-day grace ────────────────────────────────────────────
+  // Key expiry is being properly enforced now. Without this, every currently-
+  // approved user whose key had lapsed would drop straight to the access gate
+  // on this update. Bump everyone's access to 30 days out, ONCE, so nobody loses
+  // access — and tell them. Must run BEFORE init()'s isApproved() check.
+  (function grace30d() {
+    if (localStorage.getItem('cst-grace-30d-v1')) return;
+    localStorage.setItem('cst-grace-30d-v1', '1');
+    try {
+      var raw = localStorage.getItem('cst-approved');
+      if (!raw) return;
+      var a = JSON.parse(raw);
+      if (!a) return;
+      a.expires = Date.now() + 30 * 86400000;
+      localStorage.setItem('cst-approved', JSON.stringify(a));
+      setTimeout(function () {
+        try { window.notify && window.notify('Your key has been extended by 30 days', 'success', 9000); } catch (e) {}
+      }, 1800);
+    } catch (e) {}
+  })();
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
