@@ -2,37 +2,80 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<style>*{margin:0;padding:0;}html,body{width:320px;height:180px;overflow:hidden;background:#000;}</style>
+<style>*{margin:0;padding:0;}html,body{width:320px;height:180px;overflow:hidden;background:#000;}#yt{width:320px;height:180px;}</style>
 </head>
 <body>
-<iframe id="yt" allow="autoplay;encrypted-media" frameborder="0"
-  style="position:absolute;top:0;left:0;width:320px;height:180px;border:none;"></iframe>
+<div id="yt"></div>
 <script>
-var yt = document.getElementById('yt');
-var m = location.search.match(/[?&]id=([^&]+)/);
-var autoplay = /[?&]play=1/.test(location.search) ? 1 : 0;
-if (m) {
-  yt.src = 'https://www.youtube.com/embed/' + decodeURIComponent(m[1]) +
-    '?enablejsapi=1&autoplay=' + autoplay + '&rel=0&iv_load_policy=3';
-}
-window.addEventListener('message', function(e) {
-  if (e.source === yt.contentWindow) {
-    window.parent.postMessage(e.data, '*');
-  } else if (e.source === window.parent && yt.contentWindow) {
-    yt.contentWindow.postMessage(e.data, '*');
-  }
-});
+/* BFS audio host — uses the official YouTube IFrame Player API (YT.Player) so
+   play/pause/state events are delivered reliably through the API callbacks.
+   The previous raw-iframe postMessage relay missed the initial play state
+   (autoplay started before the listener registered), so the parent never knew
+   the track was playing and could never pause it.
 
-// Register this relay as an API listener so the YT iframe actually emits
-// onReady / onStateChange / infoDelivery. Without this handshake the parent
-// never learns the player is ready, so play/pause never works. The widget
-// initialises async, so retry a few times until it starts responding.
-function ytListen() {
-  try { yt.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*'); } catch (e) {}
-}
-yt.addEventListener('load', function () {
-  var n = 0, iv = setInterval(function () { ytListen(); if (++n >= 10) clearInterval(iv); }, 400);
-});
+   Protocol with the parent is unchanged:
+     parent → here : {event:'command', func:'playVideo'|'pauseVideo'|'stopVideo'|
+                       'seekTo'|'loadVideoById'|'cueVideoById', args:...}
+     here → parent : {event:'onReady'} / {event:'onStateChange', info:<state>} /
+                     {event:'infoDelivery', info:{currentTime,duration}} */
+(function () {
+  var m = location.search.match(/[?&]id=([^&]+)/);
+  var videoId  = m ? decodeURIComponent(m[1]) : '';
+  var autoplay = /[?&]play=1/.test(location.search) ? 1 : 0;
+  var player = null, tick = null;
+
+  function send(obj) { try { parent.postMessage(JSON.stringify(obj), '*'); } catch (e) {} }
+
+  function startTick() {
+    if (tick) return;
+    tick = setInterval(function () {
+      if (player && player.getCurrentTime) {
+        try { send({ event: 'infoDelivery', info: { currentTime: player.getCurrentTime(), duration: player.getDuration() } }); } catch (e) {}
+      }
+    }, 400);
+  }
+
+  // Load the IFrame Player API.
+  var tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(tag);
+
+  window.onYouTubeIframeAPIReady = function () {
+    player = new YT.Player('yt', {
+      width: 320, height: 180, videoId: videoId,
+      playerVars: {
+        autoplay: autoplay, controls: 0, rel: 0, iv_load_policy: 3,
+        modestbranding: 1, playsinline: 1, fs: 0, disablekb: 1
+      },
+      events: {
+        onReady: function () {
+          send({ event: 'onReady' });
+          if (autoplay) { try { player.playVideo(); } catch (e) {} }
+          startTick();
+        },
+        onStateChange: function (e) { send({ event: 'onStateChange', info: e.data }); }
+      }
+    });
+  };
+
+  // Commands from the parent → call the corresponding YT.Player method.
+  window.addEventListener('message', function (e) {
+    if (e.source !== parent) return;
+    var d; try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch (_) { return; }
+    if (!d || d.event !== 'command' || !player) return;
+    var a = Array.isArray(d.args) ? d.args : [d.args];
+    try {
+      switch (d.func) {
+        case 'playVideo':     player.playVideo && player.playVideo(); break;
+        case 'pauseVideo':    player.pauseVideo && player.pauseVideo(); break;
+        case 'stopVideo':     player.stopVideo && player.stopVideo(); break;
+        case 'seekTo':        player.seekTo && player.seekTo(a[0], a[1] !== undefined ? a[1] : true); break;
+        case 'loadVideoById': player.loadVideoById && player.loadVideoById(a[0], a[1]); break;
+        case 'cueVideoById':  player.cueVideoById && player.cueVideoById(a[0], a[1]); break;
+      }
+    } catch (err) {}
+  });
+})();
 </script>
 </body>
 </html>

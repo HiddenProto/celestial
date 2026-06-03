@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>05/30 — v2.3.132</summary>
+        <p>- bumblcat's favorite songs: pause/unpause now works. The player was rebuilt on YouTube's official IFrame Player API, so play-state events arrive reliably (before, autoplay started the track before the player could register the listener, so it never knew the song was playing and the button only ever sent "play").</p>
+      </details>
+
+      <details open>
         <summary>05/30 — v2.3.131</summary>
         <p>- Start-page search bar now launches games/apps through the exact same path as clicking them in the games or quick-apps grids: local games open via the game frame, proxied games via autofill (with local-copy fallback), and apps over photon. Unavailable games no longer show up as search results.</p>
       </details>
