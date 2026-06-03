@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>06/02 — v2.3.139</summary>
+        <p>- Photon is now only used to get a stuck page loaded, then the connection hands back to the normal transport — so a site that needed photon to open still streams video afterward. It re-arms automatically if another page gets stuck.</p>
+      </details>
+
+      <details open>
         <summary>06/02 — v2.3.138</summary>
         <p>- Fixed video sites (e.g. cineby) not playing on Mercury Workshop — a transient SSL hiccup was switching the connection to photon mid-stream, which can't carry video. It now only switches on a true hard failure, so streaming keeps using the transport that actually works.</p>
       </details>

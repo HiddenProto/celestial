@@ -310,9 +310,10 @@
 
   <!-- ── SSL-error auto-fallback to photon (temporary, this session only) ──── -->
   <script type="module">
-    import { forcePhotonRuntime } from "/lithium.mjs";
+    import { forcePhotonRuntime, revertPhotonRuntime } from "/lithium.mjs";
     // Expose for non-module scripts (e.g. the BFS player's photon fallback).
-    window.cstForcePhoton = forcePhotonRuntime;
+    window.cstForcePhoton  = forcePhotonRuntime;
+    window.cstRevertPhoton = revertPhotonRuntime;
 
     // libcurl/epoxy over a Wisp relay can hit "error code 35: SSL connect error"
     // on some targets. When we see it, switch the proxy to No-Wisp (photon) at
@@ -334,24 +335,39 @@
       try {
         await forcePhotonRuntime(); // runtime only — not persisted
         window.notify && window.notify(
-          "Connection error (SSL) — temporarily switched to No-Wisp (photon). Retrying…",
-          "warning", 6000
+          "Connection error (SSL) — retrying over No-Wisp (photon)…",
+          "warning", 5000
         );
-        // Re-fetch the active frame through the new transport. Use location.reload()
-        // / location.replace() — NOT src reassignment, which would push an
-        // about:blank + duplicate history entry and break the Back button.
         const f = document.querySelector('iframe[id^="frame-"]:not(.hidden)')
                || document.querySelector('iframe[id^="frame-"]');
-        if (f) {
-          try {
-            const cw = f.contentWindow;
-            if (cw && cw.location) cw.location.reload();
-            else if (f.src && f.src !== "about:blank") f.src = f.src;
-          } catch (e) {
-            try { if (f.src && f.src !== "about:blank") f.src = f.src; } catch (er) {}
-          }
+        if (!f) { _photonSwitched = false; return; }
+
+        // Photon is only used to GET THE CONTENT IN. Once the page has loaded
+        // through photon, hand back to the normal transport (libcurl/epoxy) so
+        // heavier traffic photon can't carry (e.g. video streams) keeps working.
+        // Re-arm afterward so a later hard failure can switch to photon again.
+        let _reverted = false;
+        const onLoaded = async () => {
+          if (_reverted) return;
+          _reverted = true;
+          f.removeEventListener("load", onLoaded);
+          try { await window.cstRevertPhoton(); } catch (e) {}
+          _photonSwitched = false;
+        };
+        f.addEventListener("load", onLoaded, { once: true });
+        // Safety: if the load event never fires, revert + re-arm anyway.
+        setTimeout(onLoaded, 12000);
+
+        // Reload via photon (reload/replace — NOT src reassignment, which would
+        // push an about:blank + duplicate history entry and break Back).
+        try {
+          const cw = f.contentWindow;
+          if (cw && cw.location) cw.location.reload();
+          else if (f.src && f.src !== "about:blank") f.src = f.src;
+        } catch (e) {
+          try { if (f.src && f.src !== "about:blank") f.src = f.src; } catch (er) {}
         }
-      } catch (e) { /* swallow — fallback is best-effort */ }
+      } catch (e) { _photonSwitched = false; /* best-effort */ }
     };
 
     // Detect the error wherever it surfaces.
@@ -1554,7 +1570,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.3.138";
+      var SITE_VER = "2.3.139";
 
       /**
        * Show a notification toast.

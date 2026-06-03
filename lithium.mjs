@@ -644,6 +644,29 @@ export async function forcePhotonRuntime() {
 }
 
 /**
+ * Reverts a runtime photon switch back to the normal transport (libcurl/epoxy).
+ * Used after photon has loaded a page that hard-failed on the normal transport —
+ * we only want photon to get the content in, then hand back to libcurl/epoxy so
+ * heavier traffic (video streams) that photon can't carry keeps working.
+ * In-memory only. Re-runnable: a later hard failure can switch to photon again.
+ */
+export async function revertPhotonRuntime() {
+	_forcePhoton = false;
+	try {
+		if (brcController && typeof brcController.setTransport === "function") {
+			// _forcePhoton is now false → rebuilds libcurl/epoxy (honours ?photon=1
+			// for media/quick-app launches, which legitimately want photon).
+			const t = await _createBRCTransport();
+			brcController.setTransport(t);
+			console.log("lethal.js: BRC transport reverted from photon (runtime)");
+		}
+	} catch (e) {
+		console.warn("lethal.js: runtime photon revert failed:", e.message);
+	}
+	try { await setTransport(localStorage.getItem("transportz") || "libcurl"); } catch (e) {}
+}
+
+/**
  * Sets the wisp URL and updates BareMux.
  * @param {string} wisp - Wisp URL.
  * @returns {Promise<void>}
