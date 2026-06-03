@@ -22,7 +22,7 @@ export const addressInput = document.getElementById("address");
 
 
 const transportOptions = {
-	epoxy:   "/epoxy/index.mjs",
+	epoxy:   "/epoxy/index.mjs?v=2154",
 	libcurl: "/curl/index.mjs",
 	photon:  "/photon/index.mjs",
 };
@@ -200,7 +200,7 @@ async function _createBRCTransport() {
 		}
 	} else if (savedTransport === "epoxy") {
 		try {
-			const { default: EpoxyTransport } = await import("/epoxy/index.mjs");
+			const { default: EpoxyTransport } = await import("/epoxy/index.mjs?v=2154");
 			transport = new EpoxyTransport({ wisp });
 		} catch (e) {
 			console.warn("lethal.js: epoxy transport failed, trying libcurl:", e.message);
@@ -212,7 +212,7 @@ async function _createBRCTransport() {
 
 		// Silently pre-load epoxy; fall back to it on SSL error 35
 		let _sslFallback = null;
-		import("/epoxy/index.mjs").then(({ default: EpoxyTransport }) => {
+		import("/epoxy/index.mjs?v=2154").then(({ default: EpoxyTransport }) => {
 			_sslFallback = new EpoxyTransport({ wisp });
 		}).catch(() => {});
 		const _lcReq = transport.request.bind(transport);
