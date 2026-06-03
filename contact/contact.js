@@ -48,7 +48,7 @@ document.write(`
       <h2>watch movies</h2>
       <p>access movies, for free, no charge.</p>
     </div>
-    <div class="menu-box" data-url="https://duck.ai">
+    <div class="menu-box" data-url="/support/index.html?type=ai">
       <img src="/assets/img/icns/ai.png" />
       <h2>access AI</h2>
       <p>access AI with multiple models, no charge.</p>
@@ -59,7 +59,10 @@ document.write(`
   document.querySelectorAll(".menu-box[data-url]").forEach(function(box) {
     box.addEventListener("click", function() {
       var url = box.getAttribute("data-url");
-      if (url) window.location.href = "/tab.html?autofill=" + encodeURIComponent(url);
+      if (!url) return;
+      // Same-origin pages (e.g. the AI) load directly; external URLs go through the proxy.
+      if (url.charAt(0) === "/") window.location.href = url;
+      else window.location.href = "/tab.html?autofill=" + encodeURIComponent(url);
     });
   });
 </script>

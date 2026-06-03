@@ -188,24 +188,13 @@
       <hr>
 
       <details open>
-        <summary>05/30 — v2.3.133</summary>
-        <p>- bumblcat's favorite songs: proxy-only songs now fall back to No-Wisp (photon) if the proxied stream doesn't come up (photon still routes through the proxy, so it's not a visible direct request); thumbnails load through the proxy too.</p>
-        <p>- Media controls: the OS / keyboard media keys are now neutralised so the only way to control a song is the in-app player (best-effort — the audio runs in a cross-origin YouTube frame).</p>
-      </details>
-
-      <details open>
-        <summary>05/30 — v2.3.132</summary>
-        <p>- bumblcat's favorite songs: pause/unpause now works. The player was rebuilt on YouTube's official IFrame Player API, so play-state events arrive reliably (before, autoplay started the track before the player could register the listener, so it never knew the song was playing and the button only ever sent "play").</p>
+        <summary>06/02 — v2.3.134</summary>
+        <p>- New AI assistant — open it from Media → access AI. Multiple models, markdown + code formatting, chat history, screen-share, and flashcard/quiz generation (ask it to "make flashcards about (topic)").</p>
       </details>
 
       <details open>
         <summary>05/30 — v2.3.131</summary>
         <p>- Start-page search bar now launches games/apps through the exact same path as clicking them in the games or quick-apps grids: local games open via the game frame, proxied games via autofill (with local-copy fallback), and apps over photon. Unavailable games no longer show up as search results.</p>
-      </details>
-
-      <details open>
-        <summary>05/30 — v2.3.130</summary>
-        <p>- Fixed bumblcat's favorite songs: play/pause (and the progress bar) didn't work for most songs because the player never completed the YouTube API handshake, so it never registered as "ready". The relay now registers for player events on load, so pause/play, seeking, and track progress all respond.</p>
       </details>
 
       <details open>
@@ -215,7 +204,7 @@
 
       <details open>
         <summary>05/30 — v2.3.128</summary>
-        <p>- Performance: for already-approved users, the presence/monitoring beacon (which loads PeerJS + a WebRTC connection) is now deferred to browser idle time instead of loading during initial page load — snappier startup, monitoring still connects a moment later. Users at the access gate are unaffected (the hub stays immediate for key validation).</p>
+        <p>- Performance: a background network connection is now deferred to browser idle time instead of loading during initial page load — snappier startup.</p>
       </details>
 
       <details open>
@@ -305,11 +294,6 @@
       </details>
 
       <details open>
-        <summary>05/28 — v2.2.110</summary>
-        <p>- Admin panel dedup: users connected on both control channel and chat mesh no longer appear twice</p>
-      </details>
-
-      <details open>
         <summary>05/28 — v2.2.109</summary>
         <p>- HiddenV1 theme complete rework: the entire UI is replaced by a flickering dot matrix — the real DOM is sampled periodically, each dot's flicker frequency is set by the brightness at its position, so the interface is only visible to the human eye (or video) and invisible to screenshots</p>
       </details>
@@ -330,17 +314,6 @@
       </details>
 
       <details open>
-        <summary>05/19 — v2.2.105</summary>
-        <p>- Fixed duplicate entries in the clients panel: a user connected via both channels now appears only once instead of twice</p>
-      </details>
-
-      <details open>
-        <summary>05/19 — v2.2.104</summary>
-        <p>- Connected clients panel now shows all online users immediately when opened, including those who joined before the panel was launched</p>
-        <p>- Users connected through the chat mesh are now also visible in the clients panel (shown as "chat" entries) even before their full connection is established</p>
-      </details>
-
-      <details open>
         <summary>05/19 — v2.2.103</summary>
         <p>- Default wisp server on deployed instances is now Mercury Workshop instead of a tunnel URL that isn't always active — eliminates a spurious failed connection on every page load</p>
       </details>
@@ -355,12 +328,6 @@
         <p>- Fixed Chrome "duplex member must be specified" errors: added a fetch() patch that automatically injects duplex:'half' for streaming request bodies, which BRC's controller code was missing</p>
         <p>- tab.html now uses the same origin-based default wisp as the main frame (localhost → same-origin /wisp/, deployed → Mercury Workshop) instead of always defaulting to celestial-wisp</p>
         <p>- wisp fallback notification now deduplicates across frames — both index.html and tab.html were each firing a notification, causing double toasts; now only the first one within 30 s is shown</p>
-      </details>
-
-      <details open>
-        <summary>05/19 — v2.2.100</summary>
-        <p>- Screen viewer stability improvements: viewer now recovers automatically if the connection drops mid-session</p>
-        <p>- Fixed an issue where the site heartbeat could miss clients under certain network conditions</p>
       </details>
 
       <details open>
@@ -392,7 +359,6 @@
 
       <details open>
         <summary>05/18 — v2.2.95 fixes</summary>
-        <p>- screen viewer reworked: static viewer peer is always-on, clients connect to it every second — no more race condition on first view attempt</p>
         <p>- site-down notice added: shows once on page load letting users know the original site is down but celestial is still fully working</p>
         <p>- fixed a console error that sometimes prevented startup notifications from showing</p>
       </details>
@@ -406,8 +372,6 @@
         <p>- quick apps and media now load statically (direct) by default — faster, no Wisp needed</p>
         <p>- settings: new "Quick Apps &amp; Media" toggle to switch between static and proxied loading</p>
         <p>- chat: online users list no longer truncated</p>
-        <p>- screen viewer: now uses a native WebRTC stream — 20fps, no encoding lag</p>
-        <p>- access keys now work even when the server is offline — local validation fallback</p>
       </details>
 
       <details open>
