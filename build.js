@@ -43,11 +43,15 @@ cp(join(muxSrc, "index.mjs.map"),   out("mux/index.mjs.map"));
 cp(join(muxSrc, "worker.js"),       out("mux/worker.js"));
 cp(join(muxSrc, "worker.js.map"),   out("mux/worker.js.map"));
 
-// ── epoxy-tls ─────────────────────────────────────────────────
-section("@mercuryworkshop/epoxy-tls → epoxy/");
-const epxSrc = join(nm("@mercuryworkshop/epoxy-tls"), "full");
-cp(join(epxSrc, "epoxy-bundled.js"), out("epoxy/index.mjs"));
-cp(join(epxSrc, "epoxy.wasm"),       out("epoxy/epoxy.wasm"));
+// ── epoxy ─────────────────────────────────────────────────────
+// NOTE: epoxy/index.mjs is VENDORED — it is @mercuryworkshop/epoxy-transport
+// (the BareMux transport wrapper whose default export is the EpoxyTransport
+// class), committed directly. Do NOT copy @mercuryworkshop/epoxy-tls here:
+// that package is the RAW wasm-bindgen output whose default export is
+// __wbg_init (an async fn, not a constructor), so BareMux's setTransport threw
+// "a is not a constructor" and silently fell back to libcurl. Leave epoxy/ as-is.
+section("epoxy → epoxy/ (vendored epoxy-transport, skipped)");
+console.log("  ·  using committed epoxy/index.mjs (epoxy-transport, self-contained)");
 
 // ── Ultraviolet (as violet/) ───────────────────────────────────
 section("@titaniumnetwork-dev/ultraviolet → violet/");
