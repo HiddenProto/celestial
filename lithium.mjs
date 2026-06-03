@@ -107,18 +107,22 @@ async function ensureScramjet() {
 		try {
 			await _loadScript("/sj/scramjet.all.js");
 			const { ScramjetController } = window.$scramjetLoadController();
+			// v2.0.0-alpha config — matches celestial.press's working setup.
 			_scramjetController = new ScramjetController({
 				files: {
 					wasm: "/sj/scramjet.wasm.wasm",
-					all: "/sj/scramjet.all.js",
+					all:  "/sj/scramjet.all.js",
 					sync: "/sj/scramjet.sync.js",
 				},
 				flags: {
-					strictRewrites: false,  // relaxed mode — wider site compat
-					scramitize: false,
-					captureErrors: true,
-					allowInvalidJs: true,
-					allowFailedIntercepts: true,
+					rewriterLogs:   false,
+					naiiveRewriter: false,
+					scramitize:     false,
+				},
+				siteFlags: {
+					"https://www.google.com/(search|sorry).*": {
+						naiiveRewriter: true,
+					},
 				},
 			});
 			// init() is async — must be awaited so the config channel is established

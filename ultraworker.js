@@ -115,14 +115,15 @@ async function handleRequest(event) {
     _ensureScramjetSW();
     if (scramjet) {
       try {
-        // loadConfig() blocks waiting for the main page to respond with scramjet config.
-        // Guard with a 4s timeout so a dead/reloading tab doesn't hang the fetch forever.
+        // scramjet v2: loadConfig() then route()/fetch() — matches celestial.press.
+        // Do NOT gate on scramjet.config (v2 doesn't expose it the same way; gating
+        // there made every request fall through to a 404). Keep a timeout guard so a
+        // dead/reloading tab can't hang the fetch forever.
         await Promise.race([
           scramjet.loadConfig(),
           new Promise((_, reject) => setTimeout(() => reject(new Error("loadConfig timeout")), 4000)),
         ]);
-        // config must be set before calling route() — it accesses this.config.prefix directly
-        if (scramjet.config && scramjet.route(event)) {
+        if (scramjet.route(event)) {
           return scramjet.fetch(event);
         }
       } catch(e) {

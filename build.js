@@ -29,13 +29,11 @@ function section(name) {
 }
 
 // ── Scramjet ──────────────────────────────────────────────────
-section("@mercuryworkshop/scramjet → sj/");
-const sjSrc = join(nm("@mercuryworkshop/scramjet"), "dist");
-cp(join(sjSrc, "scramjet.all.js"),      out("sj/scramjet.all.js"));
-cp(join(sjSrc, "scramjet.all.js.map"),  out("sj/scramjet.all.js.map"));
-cp(join(sjSrc, "scramjet.sync.js"),     out("sj/scramjet.sync.js"));
-cp(join(sjSrc, "scramjet.sync.js.map"), out("sj/scramjet.sync.js.map"));
-cp(join(sjSrc, "scramjet.wasm.wasm"),   out("sj/scramjet.wasm.wasm"));
+// NOTE: scramjet in sj/ is VENDORED at v2.0.0-alpha (the build celestial.press
+// runs) and committed directly — do NOT copy from node_modules here, or the
+// older npm v1 would clobber it. Leave sj/ as-is.
+section("scramjet → sj/ (vendored v2, skipped)");
+console.log("  ·  using committed sj/ files (scramjet v2.0.0-alpha)");
 
 // ── bare-mux ──────────────────────────────────────────────────
 section("@mercuryworkshop/bare-mux → mux/");
