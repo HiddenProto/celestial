@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>05/30 — v2.3.131</summary>
+        <p>- Start-page search bar now launches games/apps through the exact same path as clicking them in the games or quick-apps grids: local games open via the game frame, proxied games via autofill (with local-copy fallback), and apps over photon. Unavailable games no longer show up as search results.</p>
+      </details>
+
+      <details open>
         <summary>05/30 — v2.3.130</summary>
         <p>- Fixed bumblcat's favorite songs: play/pause (and the progress bar) didn't work for most songs because the player never completed the YouTube API handshake, so it never registered as "ready". The relay now registers for player events on load, so pause/play, seeking, and track progress all respond.</p>
       </details>
@@ -719,25 +724,15 @@
       e.preventDefault();
       const q = input.value.trim();
       if (!q) return;
-      // Search within celestial — navigate to the top matching game/app
+      // Search within celestial — launch the top matching game/app the same way
+      // the games / quick-apps grids do.
       const items = await acLoad();
       const ql = q.toLowerCase();
-      const top = items.find(it => it.name && it.name.toLowerCase().includes(ql));
+      const top = items.find(it =>
+        it.name && it.name.toLowerCase().includes(ql) &&
+        it.available !== false && it.source !== "dice");
       acClose();
-      if (top) {
-        if (top.source === "local") {
-          location.href = top.url; // same-origin: navigate directly
-        } else if (top.badge === "app") {
-          if (localStorage.getItem("proxy-tools") === "1") {
-            // proxied media/quick-app → load over No-Wisp (photon)
-            location.href = "/tab.html?autofill=" + encodeURIComponent(top.url) + "&photon=1";
-          } else {
-            location.href = makeURL(top.url, search); // apps: direct by default
-          }
-        } else {
-          location.href = await getProxied(makeURL(top.url, search)); // games etc.
-        }
-      }
+      if (top) launchItem(top);
       // If nothing matches, do nothing — this bar is for celestial content, not web search
     });
 
@@ -770,13 +765,38 @@
         fetch("/assets/json/tools.json").then(r => r.json()).catch(() => []),
       ]);
       _acItems = [
-        ...games.map(g => ({ name: g.name, url: g.url, source: g.source || "external", img: g.img, badge: "game" })),
+        ...games.map(g => ({ name: g.name, url: g.url, source: g.source || "external", img: g.img, badge: "game", localFallback: g.localFallback, available: g.available })),
         ...apps .map(a => ({ name: a.name, url: a.url, source: "external",             img: a.img, badge: "app"  })),
       ];
       return _acItems;
     }
     // Preload silently so first keypress is instant
     acLoad().catch(() => {});
+
+    // Launch a game/app exactly like clicking it in the games / quick-apps grid,
+    // so the search bar and the grids behave identically:
+    //   • apps           → /tab.html?autofill=URL&photon=1   (matches t.js)
+    //   • local games    → /news/frame.html?mbed=URL          (matches newscards.js)
+    //   • proxied games  → /tab.html?autofill=URL, with a localFallback reachability check
+    function launchItem(it) {
+      if (!it || !it.url) return;
+      if (it.badge === "app") {
+        location.href = "/tab.html?autofill=" + encodeURIComponent(it.url) + "&photon=1";
+        return;
+      }
+      if (it.source === "local") {
+        location.href = "/news/frame.html?mbed=" + encodeURIComponent(it.url);
+      } else if (it.localFallback) {
+        Promise.race([
+          fetch(it.url, { method: "HEAD", mode: "no-cors" }),
+          new Promise((_, r) => setTimeout(() => r(new Error("timeout")), 2500)),
+        ])
+          .then(()  => { location.href = "/tab.html?autofill=" + encodeURIComponent(it.url); })
+          .catch(() => { location.href = "/news/frame.html?mbed=" + encodeURIComponent(it.localFallback); });
+      } else {
+        location.href = "/tab.html?autofill=" + encodeURIComponent(it.url);
+      }
+    }
 
     input?.addEventListener("input", async () => {
       const q = input.value.trim();
@@ -785,7 +805,8 @@
       const items = await acLoad();
       const ql = q.toLowerCase();
       const matches = items
-        .filter(it => it.name && it.name.toLowerCase().includes(ql))
+        .filter(it => it.name && it.name.toLowerCase().includes(ql) &&
+                      it.available !== false && it.source !== "dice")
         .slice(0, 9);
 
       if (!matches.length) { acClose(); return; }
@@ -800,21 +821,10 @@
       // Wire up click handlers
       acDrop.querySelectorAll(".ac-item").forEach((el, i) => {
         const it = matches[i];
-        el.addEventListener("mousedown", async (e) => {
+        el.addEventListener("mousedown", (e) => {
           e.preventDefault(); // prevent input blur before click fires
           acClose();
-          if (it.source === "local") {
-            location.href = it.url; // same-origin: navigate directly
-          } else if (it.badge === "app") {
-            if (localStorage.getItem("proxy-tools") === "1") {
-              // proxied media/quick-app → load over No-Wisp (photon)
-              location.href = "/tab.html?autofill=" + encodeURIComponent(it.url) + "&photon=1";
-            } else {
-              location.href = makeURL(it.url, search); // apps: direct by default
-            }
-          } else {
-            location.href = await getProxied(makeURL(it.url, search)); // games etc.
-          }
+          launchItem(it); // same launch path as the games / quick-apps grids
         });
       });
 
