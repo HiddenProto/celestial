@@ -1,4 +1,4 @@
-const CHAT_API      = 'https://celestial.press/api/chat';
+const CHAT_API      = '/api/chat';   // same-origin passthrough (see /api/chat.js)
 const LIMIT_KEY     = 'celestial_prompt_limit';
 const STORAGE_KEY   = 'celestial_chat_sessions';
 const LIMIT_TS_KEY  = 'celestial_prompt_ts';
