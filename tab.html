@@ -188,6 +188,12 @@
       <hr>
 
       <details open>
+        <summary>06/03 — v2.3.154</summary>
+        <p>- The "ultraviolet" proxy engine works again — it was 404'ing on every request because its service worker code never loaded; it now loads sites reliably.</p>
+        <p>- The "epoxy" transport works again. It was silently falling back to libcurl because its module was the wrong build; it's been replaced with a working one. Pick it under transport in settings.</p>
+      </details>
+
+      <details open>
         <summary>06/03 — v2.3.152</summary>
         <p>- The "scramjet" proxy engine works again. It was running on an end-of-life build that broke; it's now on a current version with its own dedicated service worker, so it loads sites reliably. Pick it under proxy engine in settings.</p>
       </details>
