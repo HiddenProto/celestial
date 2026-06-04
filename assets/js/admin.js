@@ -179,6 +179,76 @@
     setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, dur);
   }
 
+  // ─── test profile (admin sandbox) ────────────────────────────
+  // Flip into a temporary sandbox: the real profile (keys, identity, approval,
+  // settings) is snapshotted, the admin can freely create/delete/change anything
+  // to test, and "exit & restore" puts the snapshot back exactly. Snapshot + flag
+  // live in localStorage, so a refresh mid-test keeps the sandbox until the admin
+  // explicitly exits. Note: because the live hub keeps writing during test mode,
+  // anything that happens while sandboxed (incl. a real user activating a key) is
+  // reverted on exit — so use it deliberately and exit when done.
+  const _TEST_SNAP_KEY = 'cst-test-snapshot';
+  const _TEST_MODE_KEY = 'cst-test-mode';
+  const _TEST_PROFILE_KEYS = [
+    'cst-keys', 'cst-admin-id', 'cst-approved', 'cst-key',
+    'cst-appearance', 'cst-tts', 'cst-tts-vol',
+    'theme', 'cst-prev-theme', 'pr0xy', 'transportz', 'location',
+  ];
+  function isTestMode() { return localStorage.getItem(_TEST_MODE_KEY) === '1'; }
+  function enterTestMode() {
+    if (isTestMode()) return;
+    const snap = {};
+    _TEST_PROFILE_KEYS.forEach(function (k) { snap[k] = localStorage.getItem(k); });
+    localStorage.setItem(_TEST_SNAP_KEY, JSON.stringify(snap));
+    localStorage.setItem(_TEST_MODE_KEY, '1');
+    showTestBanner();
+    _updateTestBtn();
+    try { renderKeys(); } catch (e) {}
+    showToast('Test mode ON — real profile saved. Changes here are discarded on exit.');
+  }
+  function exitTestMode() {
+    const raw = localStorage.getItem(_TEST_SNAP_KEY);
+    if (raw) {
+      try {
+        const snap = JSON.parse(raw);
+        _TEST_PROFILE_KEYS.forEach(function (k) {
+          const v = snap[k];
+          if (v === null || v === undefined) localStorage.removeItem(k);
+          else localStorage.setItem(k, v);
+        });
+      } catch (e) {}
+    }
+    localStorage.removeItem(_TEST_SNAP_KEY);
+    localStorage.removeItem(_TEST_MODE_KEY);
+    removeTestBanner();
+    showToast('Restoring your real profile…');
+    // Reload so everything re-initializes from the restored real profile.
+    setTimeout(function () { location.reload(); }, 300);
+  }
+  function showTestBanner() {
+    // Top-level page only — don't render a duplicate inside the searchframe.
+    try { if (window.top && window.top !== window) return; } catch (e) {}
+    if (document.getElementById('cst-test-banner')) return;
+    const b = document.createElement('div');
+    b.id = 'cst-test-banner';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483647;' +
+      'background:#3a2600;border-bottom:1px solid #6b4a00;color:#ffcc66;' +
+      'font-family:system-ui,sans-serif;font-size:.8rem;padding:7px 14px;' +
+      'display:flex;align-items:center;justify-content:center;gap:14px;box-shadow:0 2px 10px rgba(0,0,0,.5);';
+    b.innerHTML = '<span>⚠ TEST MODE — your real admin profile is saved; anything you change here is discarded on exit.</span>' +
+      '<button id="cst-test-exit" style="background:#5a3d00;border:1px solid #8a6500;color:#ffdd99;' +
+      'border-radius:5px;padding:4px 12px;cursor:pointer;font-size:.76rem;flex-shrink:0;">⤺ exit &amp; restore</button>';
+    document.body.appendChild(b);
+    b.querySelector('#cst-test-exit').onclick = exitTestMode;
+  }
+  function removeTestBanner() { document.getElementById('cst-test-banner')?.remove(); }
+  function _updateTestBtn() {
+    const btn = document.getElementById('ca-test-toggle');
+    if (!btn) return;
+    if (isTestMode()) { btn.textContent = '⤺ exit test mode (restore)'; btn.classList.add('r'); }
+    else { btn.textContent = '🧪 enter test mode'; btn.classList.remove('r'); }
+  }
+
   // ─── badge system ────────────────────────────────────────────
   const BADGE_DEFS = {
     'first-user': { label: 'First User', icon: '★', desc: 'Among the very first users of Celestial.' },
@@ -740,6 +810,13 @@
         </div>
         <div id="ca-color-ok" style="display:none;font-size:.72rem;color:#44ff77;margin-top:6px;">saved.</div>
       </div>
+      <div class="cb">
+        <h3>Test Profile <span style="font-size:.7rem;color:#444;font-weight:normal;">sandbox</span></h3>
+        <p style="font-size:.74rem;color:#444;margin:0 0 10px;">switch to a temporary sandbox to try things — create/delete keys, change settings — without touching your real data. your real profile is saved and restored when you exit. anything you do here is discarded on exit.</p>
+        <div class="crow">
+          <button class="cbtn" id="ca-test-toggle">🧪 enter test mode</button>
+        </div>
+      </div>
     </div>
     <div class="cs" id="cs-info">
       <div class="cb">
@@ -955,6 +1032,13 @@
       caColor.value = '#c9a84c';
       const o = getAdminId(); o.color = '#c9a84c'; saveAdminId(o);
     };
+
+    // ── test profile toggle ──
+    const caTestBtn = panelEl.querySelector('#ca-test-toggle');
+    if (caTestBtn) {
+      caTestBtn.onclick = () => { if (isTestMode()) exitTestMode(); else enterTestMode(); };
+      _updateTestBtn();
+    }
 
     // ── Enter shortcut: focus message input when viewing a client ──
     panelEl.addEventListener('keydown', function (e) {
@@ -2488,6 +2572,9 @@
         const _saved = localStorage.getItem('theme');
         if (_saved) _picker.value = _saved;
       }
+      // If a test-mode sandbox is still active from before a refresh, re-show the
+      // banner so the admin always knows they're sandboxed.
+      if (isTestMode()) showTestBanner();
       // Hub is NOT auto-started on load. It turns on when an admin opens the panel
       // (openPanel → startHub). This avoids a stuck/conflicting load-time hub that
       // the panel can't restart, and means the hub is brought up by whichever admin
