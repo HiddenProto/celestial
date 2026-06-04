@@ -104,35 +104,29 @@
   function initChat() {
     if (myPeer) return;
     loadPeerJS(() => {
-      if (amAdmin()) {
-        // Admin: reuse the hub peer from admin.js so there's only ONE PeerJS
-        // instance for both control and chat.
-        if (window.__cstHubPeer && !window.__cstHubPeer.destroyed) {
-          _bootMesh(window.__cstHubPeer, window.__cstHubPeerId);
-        } else {
-          // Hub not ready yet — wait for the event admin.js fires
-          window.addEventListener('cst-hub-ready', () => {
-            if (!myPeer) _bootMesh(window.__cstHubPeer, window.__cstHubPeerId);
-          }, { once: true });
-        }
-      } else {
-        // Regular user: own ephemeral peer via PeerMgr (handles reconnect/fallback)
-        PeerMgr.connect(undefined, {
-          onOpen: function (peer, id) {
-            // If the peer was recreated (e.g. server fallback), re-boot the mesh.
-            // _bootMesh sets myPeer, so compare against the new peer.
-            if (myPeer && myPeer !== peer) {
-              // Tear down old mesh connections (don't destroy myPeer — PeerMgr owns it)
-              if (registryConn)  { try { registryConn.close();   } catch {} registryConn = null; }
-              if (registryMgr)   { registryMgr.destroy(); registryMgr = null; }
-              registryPeer = null; isRegistry = false;
-              meshPeers.forEach(function (p) { try { p.conn.close(); } catch {} });
-              meshPeers.clear();
-            }
-            _bootMesh(peer, id);
-          },
-        });
-      }
+      // EVERYONE — admin included — uses their own ephemeral chat peer via
+      // PeerMgr. Admin chat used to reuse the hub peer to share one PeerJS
+      // instance, but that tied chat to OWNING the fixed hub ID: a second admin
+      // tab, a stale lock after a crash, or another admin online would leave the
+      // admin unable to claim the hub, and chat would silently never start
+      // (couldn't send/receive, showed "1"). A dedicated peer makes chat work no
+      // matter who owns the hub — and it leaves/rejoins cleanly through the
+      // registry like any other member.
+      PeerMgr.connect(undefined, {
+        onOpen: function (peer, id) {
+          // If the peer was recreated (e.g. server fallback), re-boot the mesh.
+          // _bootMesh sets myPeer, so compare against the new peer.
+          if (myPeer && myPeer !== peer) {
+            // Tear down old mesh connections (don't destroy myPeer — PeerMgr owns it)
+            if (registryConn)  { try { registryConn.close();   } catch {} registryConn = null; }
+            if (registryMgr)   { registryMgr.destroy(); registryMgr = null; }
+            registryPeer = null; isRegistry = false;
+            meshPeers.forEach(function (p) { try { p.conn.close(); } catch {} });
+            meshPeers.clear();
+          }
+          _bootMesh(peer, id);
+        },
+      });
     });
   }
 
@@ -140,12 +134,9 @@
   function _bootMesh(peer, id) {
     myPeer = peer;
     myId   = id;
-    if (amAdmin()) {
-      // Admin.js routes incoming mesh-hello connections here
-      window.__cstChatIncoming = handleIncoming;
-    } else {
-      myPeer.on('connection', handleIncoming);
-    }
+    // Admin now has its OWN chat peer too, so it accepts incoming mesh
+    // connections directly like everyone else (no hub routing needed).
+    myPeer.on('connection', handleIncoming);
 
     // Clean shutdown on tab close: send WS close frames so the registry ID
     // is freed immediately on the signaling server (not after 60 s expiry).
@@ -426,23 +417,13 @@
       seen.add(k); return true;
     });
 
-    // Show hub's real total (from admin-pulse) when fresh — it counts every
-    // beacon-connected client, not just chat mesh members.
-    // For admin, the hub heartbeat updates window.__cstHubOnline directly so
-    // admin also gets the accurate total without needing to receive a pulse.
-    // Fall back to local mesh count when admin is offline or pulse is stale.
-    var hubCount = window.__cstHubOnline;
-    var hubTs    = window.__cstHubOnlineTs;
-    var hubAge   = hubTs ? (Date.now() - hubTs) : Infinity;
-    var useHub   = typeof hubCount === 'number' && hubAge < 3000;
-
+    // Count = actual NAMED chat participants (this list). Previously this used
+    // the hub's site-wide beacon total (window.__cstHubOnline), which counts
+    // everyone browsing — not just people in chat — so the bubble read higher
+    // than the names in the tooltip, looking like a phantom "extra user with no
+    // name". The admin still sees the full client count in the admin panel.
     const cnt = document.getElementById('cst-chat-online-cnt');
-    if (cnt) cnt.textContent = useHub ? hubCount : onlineList.length;
-
-    // Schedule a stale-check so the bubble number snaps back to mesh count
-    // ~3.5 s after the last hub pulse, even if no mesh event fires first.
-    if (_hubExpTimer) clearTimeout(_hubExpTimer);
-    if (useHub) _hubExpTimer = setTimeout(updateOnline, 3500);
+    if (cnt) cnt.textContent = onlineList.length;
 
     const tip = document.getElementById('cst-chat-online-tip');
     if (tip) {
@@ -502,9 +483,11 @@
 #cst-chat-head-title{font-size:.83rem;color:#888;flex:1;}
 #cst-online-wrap{position:relative;display:inline-flex;align-items:center;gap:4px;
   font-size:.72rem;color:#444;cursor:default;}
-#cst-chat-online-tip{position:absolute;bottom:calc(100%+6px);right:0;
+#cst-chat-online-tip{position:fixed;left:0;top:0;
   background:#111;border:1px solid #1e1e1e;border-radius:7px;padding:8px 12px;
-  min-width:140px;z-index:2;opacity:0;pointer-events:none;transition:opacity .15s;}
+  min-width:140px;max-width:240px;max-height:50vh;overflow-y:auto;
+  z-index:2147483646;opacity:0;pointer-events:none;transition:opacity .15s;
+  box-shadow:0 4px 18px rgba(0,0,0,.6);}
 #cst-online-wrap:hover #cst-chat-online-tip{opacity:1;}
 #cst-chat-msgs{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;
   scrollbar-width:thin;scrollbar-color:#222 transparent;}
@@ -560,6 +543,24 @@
     const orig  = widgetEl.querySelector('#cst-chat-online-cnt');
     new MutationObserver(() => { if (cnt2) cnt2.textContent = orig.textContent; })
       .observe(orig, { childList: true, characterData: true, subtree: true });
+
+    // Position the online-list tooltip on hover. It's position:fixed so the
+    // chat panel's overflow:hidden can't clip it; we compute viewport coords
+    // here (above the ⓘ icon, right-aligned, clamped — drops below if there's
+    // no room above).
+    const _onlineWrap = widgetEl.querySelector('#cst-online-wrap');
+    const _tipEl      = widgetEl.querySelector('#cst-chat-online-tip');
+    if (_onlineWrap && _tipEl) {
+      _onlineWrap.addEventListener('mouseenter', () => {
+        const r = _onlineWrap.getBoundingClientRect();
+        const w = _tipEl.offsetWidth  || 160;
+        const h = _tipEl.offsetHeight || 60;
+        let left = r.right - w; if (left < 8) left = 8;
+        let top  = r.top - h - 6; if (top < 8) top = r.bottom + 6;
+        _tipEl.style.left = left + 'px';
+        _tipEl.style.top  = top  + 'px';
+      });
+    }
 
     widgetEl.querySelector('#cst-chat-bubble').onclick = togglePanel;
     widgetEl.querySelector('#cst-chat-close').onclick = () => {
@@ -712,10 +713,9 @@
     registryPeer = null;
     meshPeers.forEach(function (p) { try { p.conn.close(); } catch {} });
     meshPeers.clear();
-    // Admin: do NOT destroy myPeer — it's the admin hub, admin.js owns its lifetime
-    if (!amAdmin() && myPeer) { try { myPeer.destroy(); } catch {} }
+    // myPeer is now a dedicated chat peer (admin included) — safe to destroy.
+    if (myPeer) { try { myPeer.destroy(); } catch {} }
     myPeer = null; myId = null; isRegistry = false;
-    if (amAdmin()) window.__cstChatIncoming = null;
     if (widgetEl) { widgetEl.remove(); widgetEl = null; }
     onlineList = []; unread = 0; chatOpen = false;
   }
@@ -741,14 +741,13 @@
       notifTog.addEventListener('change', () => setNotifsOn(notifTog.checked));
     }
     maybeShowNotif();
-    // Admin always joins the chat mesh so the hub peer ID is discoverable by
-    // clients via _discoverHub(), even when the chat UI toggle is off.
-    if (amAdmin() || (isChatOn() && canChat())) {
+    // Join chat only when the chat toggle is on (admin included). Clients no
+    // longer discover the admin via the chat mesh — they dial the fixed hub ID
+    // directly — so the admin doesn't need to sit in the mesh with chat off.
+    if (isChatOn() && canChat()) {
       initChat();
-      if (isChatOn() && canChat()) {
-        if (document.readyState !== 'loading') renderWidget();
-        else document.addEventListener('DOMContentLoaded', renderWidget);
-      }
+      if (document.readyState !== 'loading') renderWidget();
+      else document.addEventListener('DOMContentLoaded', renderWidget);
     }
   }
 

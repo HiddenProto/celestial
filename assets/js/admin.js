@@ -188,10 +188,16 @@
     document.getElementById('cst-badge-btn')?.remove();
     const appr = getApproval();
     if (!appr || Date.now() >= appr.expires) return;
+    // Start-page-only element: sit just above the footer links (discord / legal /
+    // partners). On any page WITHOUT that footer — the top index.html frame, a
+    // proxied site, etc. — the badge does not show. It's no longer a global
+    // fixed overlay floating over everything.
+    const footer = document.querySelector('footer.footer');
+    if (!footer) return;
     const btn = document.createElement('button');
     btn.id = 'cst-badge-btn';
     const hasBadges = appr.badges?.length > 0;
-    btn.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483644;' +
+    btn.style.cssText = 'position:absolute;right:10px;bottom:42px;z-index:100;' +
       'background:#0d0d0d;border:1px solid #222;border-radius:50px;padding:7px 14px;' +
       'color:#888;font-family:system-ui,sans-serif;font-size:.75rem;cursor:pointer;' +
       'display:flex;align-items:center;gap:6px;transition:background .15s;';
@@ -207,7 +213,7 @@
     btn.onmouseenter = () => btn.style.background = '#181818';
     btn.onmouseleave = () => btn.style.background = '#0d0d0d';
     btn.onclick = showBadgePanel;
-    document.body.appendChild(btn);
+    footer.parentNode.insertBefore(btn, footer);  // directly above the footer links
     // Live countdown — refresh every minute
     const _int = setInterval(() => {
       if (!document.body.contains(btn)) { clearInterval(_int); return; }
