@@ -4,8 +4,12 @@ const STORAGE_KEY   = 'celestial_chat_sessions';
 const LIMIT_TS_KEY  = 'celestial_prompt_ts';
 const LEGAL_KEY     = 'celestial_legal_agreed';
 const MODEL_KEY     = 'celestial_model';          
-const RESET_MS      = 3 * 60 * 60 * 1000;         
+const RESET_MS      = 3 * 60 * 60 * 1000;
 const MAX_PROMPTS   = 45;
+// Admins get unlimited AI prompts (the usual cap + infinity): no counting, no
+// 3-hour wait, no "limit reached" block. Detected via the same-origin admin
+// flag set by assets/js/admin.js. Everyone else keeps the MAX_PROMPTS cap.
+function isCstAdmin() { try { return localStorage.getItem('cst-admin') === '1'; } catch (e) { return false; } }
 let sessions        = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 let currentSessionId = null;
 let attachedImages  = [];
@@ -36,12 +40,16 @@ function setPromptCount(n) {
   updateCounter();
 }
 function promptsLeft() {
+  if (isCstAdmin()) return Infinity;
   return Math.max(0, MAX_PROMPTS - getPromptCount());
 }
 function updateCounter() {
-  document.getElementById('prompt-counter').textContent = promptsLeft() + ' prompts left';
+  const el = document.getElementById('prompt-counter');
+  if (!el) return;
+  el.textContent = isCstAdmin() ? 'unlimited prompts' : (promptsLeft() + ' prompts left');
 }
 function usePrompts(n) {
+  if (isCstAdmin()) { updateCounter(); return true; }  // unlimited — never count or block
   const total = getPromptCount() + n;
   setPromptCount(total);
   if (total >= MAX_PROMPTS) {
@@ -51,7 +59,7 @@ function usePrompts(n) {
   return true;
 }
 function checkLimit(n) {
-  if (getPromptCount() + n > MAX_PROMPTS) {
+  if (!isCstAdmin() && getPromptCount() + n > MAX_PROMPTS) {
     const resetAt = new Date(Date.now() + 10800000).toLocaleTimeString();
     showToast('You reached the limit, please wait until ' + resetAt + ' to prompt again.');
     return false;
@@ -366,7 +374,7 @@ async function sendMessage() {
   const input   = document.getElementById('msg-input');
   const text    = input.value.trim();
   if ((!text && !attachedImages.length) || isStreaming) return;
-  if (getPromptCount() >= MAX_PROMPTS) {
+  if (!isCstAdmin() && getPromptCount() >= MAX_PROMPTS) {
     showToast('You reached the limit, please wait 3 hours.');
     return;
   }

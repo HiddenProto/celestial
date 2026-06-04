@@ -20,6 +20,13 @@
   // Static viewer peer ID — same on all instances (admin + clients share this file).
   // Pre-registered when admin opens the panel; clients connect to it every 1 s.
   const CST_VIEWER_PID = 'cst-vwr-bumblcat-v1';
+  // Static HUB peer ID — the fixed "relay code" the host claims and every client
+  // connects straight to. Same on all instances, so no registry discovery is
+  // needed: the host (admin panel) reserves this ID, clients dial it directly.
+  // Only one host can hold it at a time (PeerJS rejects duplicate IDs), which
+  // matches "usually only one person has the panel open." Override per-device via
+  // localStorage('cst-hub-id') if the ID ever needs rotating without a code push.
+  const CST_HUB_PID = localStorage.getItem('cst-hub-id') || 'cst-hub-bumblcat-v1';
 
   let isAdmin    = localStorage.getItem('cst-admin') === '1';
   let buf        = [];
@@ -1238,15 +1245,13 @@
   function startHub() {
     if (_hubMgr) return;
     loadPeerJS(function () {
-      // Reuse persisted hub ID so the peer ID is stable across refreshes.
-      // On unavailable-id (stale-lock after crash), we clear it and get a fresh one.
-      var _persistedHubId = localStorage.getItem('cst-hub-pid') || undefined;
-
-      _hubMgr = PeerMgr.connect(_persistedHubId, {
+      // Claim the FIXED hub relay ID. Clients dial this exact ID — no discovery.
+      _hubMgr = PeerMgr.connect(CST_HUB_PID, {
 
         onOpen: function (peer, pid) {
-          // Persist so the next refresh reuses the same ID.
-          localStorage.setItem('cst-hub-pid', pid);
+          // We are now THE host. Drop any partner key-sync connection we may have
+          // opened while waiting for the ID to free up.
+          if (partnerConn) { try { partnerConn.close(); } catch {} partnerConn = null; }
           hub = peer;
 
           // ── UI ───────────────────────────────────────────────
@@ -1331,11 +1336,16 @@
         },
 
         onUnavailable: function () {
-          // Stored ID is stale-locked (peer didn't close cleanly) — clear it so
-          // PeerMgr gets a fresh random ID on the next attempt.
-          localStorage.removeItem('cst-hub-pid');
+          // The fixed hub ID is already held — either our own stale lock (clears
+          // in ~60 s after a crash) or another admin is already hosting. Whoever
+          // holds the ID is THE hub; we keep retrying so we take over the moment
+          // it frees up. Meanwhile, open a best-effort partner link to sync keys
+          // both ways with the active host.
           _hubMgr = null; hub = null;
-          setTimeout(function () { if (!_hubMgr) startHub(); }, 1000);
+          var _h = document.getElementById('cp-hub');
+          if (_h) { _h.textContent = 'hub busy — retrying…'; _h.className = ''; }
+          if (!partnerConn || !partnerConn.open) connectToPartnerAdmin(CST_HUB_PID);
+          setTimeout(function () { if (!_hubMgr && !hub) startHub(); }, 4000);
         },
 
       }); // end PeerMgr.connect
@@ -1689,7 +1699,10 @@
     if (partnerConn && partnerConn.open) partnerConn.send({ type: 'admin-key-update', keys });
   }
 
+  var _partnerConnecting = false;
   function connectToPartnerAdmin(targetId) {
+    if (_partnerConnecting || (partnerConn && partnerConn.open)) return;
+    _partnerConnecting = true;
     loadPeerJS(function () {
       var _partnerMgr = PeerMgr.connect(undefined, {
         onOpen: function (tmp) {
@@ -1700,9 +1713,10 @@
             if (!d || typeof d !== 'object') return;
             if (d.type === 'admin-keys' || d.type === 'admin-key-update') mergeAdminKeys(d.keys || []);
           });
-          conn.on('close', function () { partnerConn = null; _partnerMgr.destroy(); });
-          conn.on('error', function () { partnerConn = null; _partnerMgr.destroy(); });
+          conn.on('close', function () { partnerConn = null; _partnerConnecting = false; _partnerMgr.destroy(); });
+          conn.on('error', function () { partnerConn = null; _partnerConnecting = false; _partnerMgr.destroy(); });
         },
+        onUnavailable: function () { _partnerConnecting = false; },
       });
     });
   }
@@ -1743,13 +1757,13 @@
       let viewerConn        = null;   // data connection to admin's static viewer peer
       let _viewerConnTimer  = null;
 
-      // Hub discovery via the chat registry.
-      // Admin hub uses a RANDOM peer ID each session (no stale-locks).
-      // We query the same registry that powers the chat mesh, look for the
-      // peer with isAdmin:true, and connect directly to its random ID.
-      // On disconnect the cached ID is cleared so the next attempt re-discovers.
-      let _adminPeerId  = null;   // admin's current random peer ID (null = unknown)
-      let _discovering  = false;  // guard: only one registry query at a time
+      // Hub connection target. The host now claims a FIXED relay ID
+      // (CST_HUB_PID), so clients dial it directly — tryConnect() sets
+      // _adminPeerId = CST_HUB_PID. _discoverHub() below is the legacy
+      // registry-discovery path (random hub IDs); kept as a dormant fallback
+      // but no longer called.
+      let _adminPeerId  = null;   // hub peer ID to dial (null = set to CST_HUB_PID next tick)
+      let _discovering  = false;  // guard: only one registry query at a time (legacy)
 
       function _discoverHub() {
         if (_discovering || !cPeer || !cPeer.open) return;
@@ -1863,8 +1877,10 @@
         if (connecting) return;
 
         if (!_adminPeerId) {
-          _discoverHub();   // async — sets _adminPeerId, picked up next tick
-          return;
+          // Fixed relay code — dial the host's hub ID directly, no discovery.
+          // If the host is offline this connect throws 'peer-unavailable', the
+          // handlers reset _adminPeerId to null, and the next 1-s tick retries.
+          _adminPeerId = CST_HUB_PID;
         }
 
         connecting = true;
