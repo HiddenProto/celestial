@@ -1552,7 +1552,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.3.158";
+      var SITE_VER = "2.3.159";
 
       /**
        * Show a notification toast.
@@ -1576,6 +1576,36 @@
        *   { linkText:"Media", linkHref:"/path" }  or  { linkText, onClick:fn }
        *   Clicking it runs onClick (or navigates via cstGoTo) then dismisses.
        */
+      // ── Background tab notification badge ───────────────────────────
+      // When the tab is NOT being viewed, each notification that gets shown
+      // bumps a counter and the page title becomes "[N] Notification(s)..".
+      // Returning to the tab clears it. Skipped when notifications are disabled
+      // (Appearance → ✦ Chat off) and when the tab-switch cloak is active (so we
+      // never reveal the disguise).
+      let _cstBgNotifCount = 0;
+      let _cstTitleBeforeBg = null;
+      function _cstNotifsEnabled() {
+        try { return JSON.parse(localStorage.getItem("cst-appearance") || "{}").chatNotifs !== false; }
+        catch (e) { return true; }
+      }
+      function _cstCloakActive() {
+        return localStorage.getItem("switchCloakOn") === "true";
+      }
+      function _cstBumpTitleBadge() {
+        if (!document.hidden) return;          // only when the tab is in the background
+        if (!_cstNotifsEnabled()) return;      // respect the notifications toggle
+        if (_cstCloakActive()) return;         // tab-switch cloak wins — don't reveal
+        if (_cstTitleBeforeBg === null) _cstTitleBeforeBg = document.title;
+        _cstBgNotifCount++;
+        document.title = _cstBgNotifCount + " Notification" + (_cstBgNotifCount === 1 ? "" : "s") + "..";
+      }
+      document.addEventListener("visibilitychange", function () {
+        if (document.hidden) return;           // back on the tab — clear the badge
+        if (_cstBgNotifCount > 0 && _cstTitleBeforeBg !== null) document.title = _cstTitleBeforeBg;
+        _cstBgNotifCount = 0;
+        _cstTitleBeforeBg = null;
+      });
+
       window.notify = function (message, type = "info", duration = 6000, opts) {
         if (!["success","error","warning","info"].includes(type)) type = "info";
         opts = opts || {};
@@ -1621,6 +1651,7 @@
 
         setTimeout(dismiss, duration);
         container.appendChild(el);
+        _cstBumpTitleBadge();
       };
 
       /**

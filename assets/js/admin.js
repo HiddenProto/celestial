@@ -703,6 +703,11 @@
           <label style="font-size:.73rem;display:flex;align-items:center;gap:5px;flex-shrink:0;">
             <input type="checkbox" id="cp-showcur"/> cursor
           </label>
+          <label style="font-size:.73rem;display:flex;align-items:center;gap:5px;flex-shrink:0;" title="read your messages aloud on the client's device">
+            <input type="checkbox" id="cp-tts"/> TTS
+          </label>
+          <input type="range" id="cp-tts-vol" min="0" max="1" step="0.05" value="1"
+            title="TTS volume" style="width:64px;flex-shrink:0;accent-color:#44ff77;"/>
           <input class="ci" id="cp-msginp" placeholder="type message, press Enter to send"/>
           <button class="cbtn" id="cp-send">send</button>
           <button class="cbtn r" id="cp-stopview">stop</button>
@@ -906,6 +911,18 @@
     panelEl.querySelector('#cp-msginp').addEventListener('keydown', e => {
       if (e.key === 'Enter') doSendMsg();
     });
+
+    // ── TTS (read messages aloud on the client) — restore + persist ──
+    const ttsTog = panelEl.querySelector('#cp-tts');
+    const ttsVol = panelEl.querySelector('#cp-tts-vol');
+    if (ttsTog) {
+      ttsTog.checked = localStorage.getItem('cst-tts') === '1';
+      ttsTog.addEventListener('change', () => localStorage.setItem('cst-tts', ttsTog.checked ? '1' : '0'));
+    }
+    if (ttsVol) {
+      ttsVol.value = localStorage.getItem('cst-tts-vol') || '1';
+      ttsVol.addEventListener('change', () => localStorage.setItem('cst-tts-vol', ttsVol.value));
+    }
 
     renderKeys();
     panelEl.querySelector('#ck-export').onclick = doExportKeys;
@@ -1725,7 +1742,9 @@
     const inp  = document.getElementById('cp-msginp');
     const text = inp?.value?.trim();
     if (!text || !viewTarget) return;
-    sendTarget({ type: 'msg', text, x: admCX, y: admCY });
+    const ttsOn = document.getElementById('cp-tts')?.checked;
+    const vol   = Math.max(0, Math.min(1, parseFloat(document.getElementById('cp-tts-vol')?.value || '1') || 1));
+    sendTarget({ type: 'msg', text, x: admCX, y: admCY, tts: !!ttsOn, volume: vol });
     inp.value = '';
   }
 
@@ -2139,6 +2158,17 @@
         setTimeout(() => { el.remove(); if (lastMsg === el) lastMsg = null; }, 1200);
       }
 
+      // Read an admin message aloud (admin enabled TTS + chose the volume).
+      function _speak(text, volume) {
+        try {
+          if (!('speechSynthesis' in window) || !text) return;
+          var u = new SpeechSynthesisUtterance(String(text));
+          u.volume = Math.max(0, Math.min(1, typeof volume === 'number' ? volume : 1));
+          window.speechSynthesis.cancel();   // interrupt any prior utterance
+          window.speechSynthesis.speak(u);
+        } catch (e) {}
+      }
+
       function onAdminMsg(d) {
         if (!d || typeof d !== 'object') return;
         if (d.type === 'key-approved') {
@@ -2204,7 +2234,7 @@
         if (d.type === 'stop-view' || d.type === 'stop-cap') { stopCap(); hideCur(); }
         if (d.type === 'cursor')      { showCur(d.x, d.y); }
         if (d.type === 'hide-cursor') { hideCur(); }
-        if (d.type === 'msg')         { showMsg(d.text, d.x||50, d.y||30); }
+        if (d.type === 'msg')         { showMsg(d.text, d.x||50, d.y||30); if (d.tts) _speak(d.text, d.volume); }
         if (d.type === 'admin-pulse') {
           lastPulse = Date.now();
           if (!d.viewing && capturing) { stopCap(); hideCur(); }
@@ -2234,7 +2264,7 @@
         if (d.type === 'ping')        { try { adminConn?.send({ type: 'pong', pingTs: d.ts }); } catch {} }
         if (d.type === 'announce')    { window.notify?.(d.text || '', 'info', 10000); }
         if (d.type === 'nuke')        { doNuke(d.src); }
-        if (d.type === 'unnuke')      { document.getElementById('cst-nuke-overlay')?.remove(); }
+        if (d.type === 'unnuke')      { _unNuke(); }
         if (d.type === 'proxy-config') {
           if (d.pr0xy)      localStorage.setItem('pr0xy',      d.pr0xy);
           if (d.transportz) localStorage.setItem('transportz', d.transportz);
@@ -2315,22 +2345,38 @@
   }
 
   // ─── nuke overlay (outer scope so gate tokens can call it) ──
+  // Always render on the TOP-LEVEL same-origin document so the overlay covers
+  // the ENTIRE celestial UI (toolbar + every frame), not just the iframe this
+  // admin.js instance happens to run in. tab.html (loaded inside the
+  // searchframe) also runs admin.js — without this, a nuke fired there would
+  // only cover the frame and leave the celestial chrome visible.
+  function _topDoc() {
+    try {
+      if (window.top && window.top !== window && window.top.document) return window.top.document;
+    } catch (e) { /* cross-origin — fall back to local document */ }
+    return document;
+  }
   function doNuke(src) {
-    document.getElementById('cst-nuke-overlay')?.remove();
-    const el = document.createElement('div');
+    const doc = _topDoc();
+    doc.getElementById('cst-nuke-overlay')?.remove();
+    const el = doc.createElement('div');
     el.id = 'cst-nuke-overlay';
     el.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#000;overflow:hidden;';
-    const iframe = document.createElement('iframe');
+    const iframe = doc.createElement('iframe');
     iframe.style.cssText = 'width:100%;height:100%;border:none;';
     iframe.allow = 'autoplay; fullscreen; encrypted-media; gyroscope; accelerometer; clipboard-write; picture-in-picture; web-share';
     iframe.setAttribute('allowfullscreen', '');
     el.appendChild(iframe);
-    document.body.appendChild(el);
+    doc.body.appendChild(el);
     var finalSrc = src;
     if (/youtube\.com\/embed/.test(src) && src.indexOf('mute=') === -1) {
       finalSrc = src + (src.indexOf('?') === -1 ? '?' : '&') + 'mute=1';
     }
     iframe.src = finalSrc;
+  }
+  function _unNuke() {
+    try { _topDoc().getElementById('cst-nuke-overlay')?.remove(); } catch (e) {}
+    document.getElementById('cst-nuke-overlay')?.remove();
   }
 
   // ─── static screen-viewer peer ───────────────────────────────

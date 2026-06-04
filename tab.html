@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>06/03 — v2.3.159</summary>
+        <p>- When you tab away, the page title now shows how many notifications came in while you were gone (e.g. "3 Notifications.."), and clears when you come back. Respects your notification setting — off if you've turned notifications off — and won't override the tab-switch cloak.</p>
+      </details>
+
+      <details open>
         <summary>06/03 — v2.3.154</summary>
         <p>- The "ultraviolet" proxy engine works again — it was 404'ing on every request because its service worker code never loaded; it now loads sites reliably.</p>
         <p>- The "epoxy" transport works again. It was silently falling back to libcurl because its module was the wrong build; it's been replaced with a working one. Pick it under transport in settings.</p>
