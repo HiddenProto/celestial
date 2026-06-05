@@ -484,6 +484,7 @@ async function ensureBRC() {
 const _REMOTE_WISP  = "wss://celestial-wisp.onrender.com/";
 const _MERCURY_WISP = "wss://wisp.mercurywork.shop/";
 const _ULTRAPATCH_WISP = "wss://cst-celestial.loca.lt/wisp/";
+const _00X1_WISP    = "wss://celestial.press/wisp/"; // proper full wisp ("00x1")
 const _originWisp = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/wisp/";
 // Default mirrors index.html: same-origin on localhost (direct), Mercury Workshop everywhere else.
 // The ultrapatch (loca.lt) tunnel is only used when explicitly set via localStorage.
@@ -491,8 +492,9 @@ const _isLocalHostLjs = (location.hostname === "localhost" || location.hostname 
 const _wispDefaultLjs = _isLocalHostLjs ? _originWisp : _MERCURY_WISP;
 
 // Supported fallback servers, tried in order when the primary is unreachable.
-// Mercury Workshop first — lowest latency; bumblcat's server as secondary.
-const _WISP_FALLBACKS = [_MERCURY_WISP, _REMOTE_WISP];
+// 00x1 first — a proper full wisp, most reliable / most capable; then Mercury
+// Workshop; then bumblcat's server.
+const _WISP_FALLBACKS = [_00X1_WISP, _MERCURY_WISP, _REMOTE_WISP];
 
 /** Quick WebSocket reachability check — resolves true if the server accepts. */
 function _checkWispUrl(url, timeoutMs) {
@@ -532,7 +534,9 @@ const _wispCheckPromise = (async function _wispCheck() {
 		// For local instances save permanently (avoids re-checking a dead local server).
 		// For remote, keep in-memory only so the user's stored preference isn't overwritten.
 		if (isLocal) localStorage.setItem("location", fallback);
-		const name = fallback.includes("mercurywork") ? "Mercury Workshop" : "bumblcat's server";
+		const name = fallback.includes("celestial.press") ? "00x1"
+			: fallback.includes("mercurywork") ? "Mercury Workshop"
+			: "bumblcat's server";
 		console.warn(`lethal.js: wisp unreachable — fell back to ${name}`);
 		const _notifyEvt = new CustomEvent("notify", { detail: {
 			type: "warning",
