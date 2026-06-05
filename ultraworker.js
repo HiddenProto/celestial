@@ -145,8 +145,14 @@ async function handleRequest(event) {
     }
   }
 
-  // Non-proxied resources pass through normally
-  return fetch(event.request)
+  // Non-proxied resources pass through normally. Guard the fetch: a cross-origin
+  // request the page fired (e.g. an analytics beacon) can fail CORS / the network
+  // here — return a network-error Response instead of an uncaught rejection.
+  try {
+    return await fetch(event.request)
+  } catch (e) {
+    return Response.error()
+  }
 }
 
 self.addEventListener("fetch", (event) => {

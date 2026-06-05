@@ -59,7 +59,15 @@ async function handleRequest(event) {
     try { if (uv.route(event)) return await uv.fetch(event); } catch (e) {}
   }
 
-  return fetch(event.request);
+  // Passthrough for anything we don't proxy. A cross-origin request the page
+  // fired (e.g. an analytics beacon) can fail CORS / the network here — return a
+  // network-error Response instead of letting the rejection surface as an
+  // "Uncaught (in promise) Failed to fetch" in the console.
+  try {
+    return await fetch(event.request);
+  } catch (e) {
+    return Response.error();
+  }
 }
 
 self.addEventListener("fetch", (event) => event.respondWith(handleRequest(event)));
