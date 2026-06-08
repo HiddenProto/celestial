@@ -903,15 +903,24 @@
       acDrop.style.display = "block";
     }
 
+    // Built-ins are always shown; a quick LINK is dropped if a game/app with the
+    // same name already exists (e.g. TikTok / YouTube are already in the apps
+    // catalog) so we never show a duplicate.
+    function acStatics(items) {
+      const names = new Set((items || []).map(it => (it.name || "").toLowerCase()));
+      return _AC_STATIC.filter(s => s.badge !== "link" || !names.has(s.name.toLowerCase()));
+    }
+
     input?.addEventListener("input", async () => {
       const q = input.value.trim();
+      const items   = await acLoad().catch(() => []);
+      const statics = acStatics(items);
       // Empty bar → show the built-ins + quick links as default suggestions.
-      if (!q) { acRender(_AC_STATIC, ""); return; }
+      if (!q) { acRender(statics, ""); return; }
 
-      const items = await acLoad();
       const ql = q.toLowerCase();
       // Built-ins/links first, then matching games/apps.
-      const matches = [..._AC_STATIC, ...items]
+      const matches = [...statics, ...items]
         .filter(it => it.name && it.name.toLowerCase().includes(ql) &&
                       it.available !== false && !it.investigating && it.source !== "dice")
         .slice(0, 9);
@@ -920,8 +929,10 @@
     });
 
     // Focusing the empty bar shows the built-ins + quick links right away.
-    input?.addEventListener("focus", () => {
-      if (!input.value.trim()) acRender(_AC_STATIC, "");
+    input?.addEventListener("focus", async () => {
+      if (input.value.trim()) return;
+      const items = await acLoad().catch(() => []);
+      acRender(acStatics(items), "");
     });
 
     input?.addEventListener("keydown", (e) => {
