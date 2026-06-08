@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>06/03 — v2.3.166</summary>
+        <p>- The start-page search bar now suggests things as you type: celestial's built-in sections (games, quick apps, media, AI, settings, legal, partners, update log) and quick links like Google. Click the bar to see them, or type to filter — games and apps still show up too.</p>
+      </details>
+
+      <details open>
         <summary>06/03 — v2.3.160</summary>
         <p>- Chat: the online count now reflects people actually in chat instead of everyone browsing, so the number matches the names you see. The hover list of who's online no longer gets cut off by the chat window.</p>
         <p>- Your access badge (name + days left) now sits just above the links on the start page instead of floating in the corner on every page.</p>
@@ -796,6 +801,7 @@
 
     // Highlight matched portion: bright for the match, dim for surrounding text
     function acHighlight(name, query) {
+      if (!query) return `<span class="ac-match">${name}</span>`;
       const i = name.toLowerCase().indexOf(query.toLowerCase());
       if (i === -1) return `<span class="ac-match">${name}</span>`;
       const before  = name.slice(0, i);
@@ -823,14 +829,36 @@
     // Preload silently so first keypress is instant
     acLoad().catch(() => {});
 
+    // Built-in celestial destinations + quick links, always available in the
+    // dropdown (shown by default on focus; matched alongside games/apps when
+    // typing). `nav` → internal page, `top` → call a function on the top frame,
+    // `updlog` → open the update log, `url` + badge "link" → open via the proxy.
+    const _AC_STATIC = [
+      { name: "Games",      badge: "page", img: "/assets/img/gms.png",          nav: "/news/index.html?type=g" },
+      { name: "Quick Apps", badge: "page", img: "/assets/img/tools.png",        nav: "/tools/index.html?type=ap" },
+      { name: "Media",      badge: "page", img: "/assets/img/video.png",        nav: "/contact/index.html?type=m" },
+      { name: "AI",         badge: "page", img: "/assets/img/logo-blackbg.png", nav: "/support/index.html?type=ai" },
+      { name: "Settings",   badge: "page", img: "/assets/img/logo-blackbg.png", top: "setting" },
+      { name: "Legal",      badge: "page", img: "/assets/img/logo-blackbg.png", nav: "/legal/index.html?type=l" },
+      { name: "Partners",   badge: "page", img: "/assets/img/logo-blackbg.png", nav: "/partners/index.html?type=part" },
+      { name: "Update Log", badge: "page", img: "/assets/img/announcement.png", updlog: true },
+      // ── quick links (open through the proxy like an app) ──
+      { name: "Google",     badge: "link", img: "https://icons.duckduckgo.com/ip3/google.com.ico", url: "https://www.google.com/" },
+    ];
+
     // Launch a game/app exactly like clicking it in the games / quick-apps grid,
     // so the search bar and the grids behave identically:
     //   • apps           → /tab.html?autofill=URL   (matches t.js)
     //   • local games    → /news/frame.html?mbed=URL          (matches newscards.js)
     //   • proxied games  → /tab.html?autofill=URL, with a localFallback reachability check
     function launchItem(it) {
-      if (!it || !it.url) return;
-      if (it.badge === "app") {
+      if (!it) return;
+      // ── built-in celestial destinations ──
+      if (it.top)    { try { (window.top || window)[it.top](); } catch (e) { location.href = "/index.html"; } return; }
+      if (it.updlog) { try { showUpdLog(); } catch (e) {} return; }
+      if (it.nav)    { location.href = it.nav; return; }
+      if (!it.url) return;
+      if (it.badge === "app" || it.badge === "link") {
         // Normal transport (not photon — it can't stream video).
         location.href = "/tab.html?autofill=" + encodeURIComponent(it.url);
         return;
@@ -849,27 +877,14 @@
       }
     }
 
-    input?.addEventListener("input", async () => {
-      const q = input.value.trim();
-      if (!q) { acClose(); return; }
-
-      const items = await acLoad();
-      const ql = q.toLowerCase();
-      const matches = items
-        .filter(it => it.name && it.name.toLowerCase().includes(ql) &&
-                      it.available !== false && !it.investigating && it.source !== "dice")
-        .slice(0, 9);
-
+    function acRender(matches, q) {
       if (!matches.length) { acClose(); return; }
-
       acDrop.innerHTML = matches.map((it, idx) => `
         <div class="ac-item" data-idx="${idx}">
-          <img src="${it.img || '/assets/img/logo-blackbg.png'}" alt="" />
-          <span class="ac-name">${acHighlight(it.name, q)}</span>
+          <img src="${it.img || '/assets/img/logo-blackbg.png'}" alt="" onerror="this.onerror=null;this.src='/assets/img/logo-blackbg.png'" />
+          <span class="ac-name">${acHighlight(it.name, q || "")}</span>
           <span class="ac-badge">${it.badge}</span>
         </div>`).join("");
-
-      // Wire up click handlers
       acDrop.querySelectorAll(".ac-item").forEach((el, i) => {
         const it = matches[i];
         el.addEventListener("mousedown", (e) => {
@@ -878,8 +893,28 @@
           launchItem(it); // same launch path as the games / quick-apps grids
         });
       });
-
       acDrop.style.display = "block";
+    }
+
+    input?.addEventListener("input", async () => {
+      const q = input.value.trim();
+      // Empty bar → show the built-ins + quick links as default suggestions.
+      if (!q) { acRender(_AC_STATIC, ""); return; }
+
+      const items = await acLoad();
+      const ql = q.toLowerCase();
+      // Built-ins/links first, then matching games/apps.
+      const matches = [..._AC_STATIC, ...items]
+        .filter(it => it.name && it.name.toLowerCase().includes(ql) &&
+                      it.available !== false && !it.investigating && it.source !== "dice")
+        .slice(0, 9);
+
+      acRender(matches, q);
+    });
+
+    // Focusing the empty bar shows the built-ins + quick links right away.
+    input?.addEventListener("focus", () => {
+      if (!input.value.trim()) acRender(_AC_STATIC, "");
     });
 
     input?.addEventListener("keydown", (e) => {
