@@ -188,8 +188,8 @@
       <hr>
 
       <details open>
-        <summary>06/03 — v2.3.166</summary>
-        <p>- The start-page search bar now suggests things as you type: celestial's built-in sections (games, quick apps, media, AI, settings, legal, partners, update log) and quick links like Google. Click the bar to see them, or type to filter — games and apps still show up too.</p>
+        <summary>06/03 — v2.3.167</summary>
+        <p>- The start-page search bar now suggests things as you type: celestial's built-in sections (games, quick apps, media, AI, settings, legal, partners, update log) and quick links to popular sites (Google, YouTube, Discord, Reddit, Spotify, Twitch, TikTok). Click the bar to see them, or type to filter — games and apps still show up too.</p>
       </details>
 
       <details open>
@@ -842,8 +842,15 @@
       { name: "Legal",      badge: "page", img: "/assets/img/logo-blackbg.png", nav: "/legal/index.html?type=l" },
       { name: "Partners",   badge: "page", img: "/assets/img/logo-blackbg.png", nav: "/partners/index.html?type=part" },
       { name: "Update Log", badge: "page", img: "/assets/img/announcement.png", updlog: true },
-      // ── quick links (open through the proxy like an app) ──
-      { name: "Google",     badge: "link", img: "https://icons.duckduckgo.com/ip3/google.com.ico", url: "https://www.google.com/" },
+      // ── quick links (open through the proxy like an app) — the popular,
+      //    commonly-school-blocked destinations people actually want the proxy for ──
+      { name: "Google",   badge: "link", img: "https://icons.duckduckgo.com/ip3/google.com.ico",  url: "https://www.google.com/" },
+      { name: "YouTube",  badge: "link", img: "https://icons.duckduckgo.com/ip3/youtube.com.ico", url: "https://www.youtube.com/" },
+      { name: "Discord",  badge: "link", img: "https://icons.duckduckgo.com/ip3/discord.com.ico", url: "https://discord.com/app" },
+      { name: "Reddit",   badge: "link", img: "https://icons.duckduckgo.com/ip3/reddit.com.ico",  url: "https://www.reddit.com/" },
+      { name: "Spotify",  badge: "link", img: "https://icons.duckduckgo.com/ip3/spotify.com.ico", url: "https://open.spotify.com/" },
+      { name: "Twitch",   badge: "link", img: "https://icons.duckduckgo.com/ip3/twitch.tv.ico",   url: "https://www.twitch.tv/" },
+      { name: "TikTok",   badge: "link", img: "https://icons.duckduckgo.com/ip3/tiktok.com.ico",  url: "https://www.tiktok.com/" },
     ];
 
     // Launch a game/app exactly like clicking it in the games / quick-apps grid,
