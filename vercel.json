@@ -1,6 +1,8 @@
 {
   "outputDirectory": ".",
-  "rewrites": [],
+  "rewrites": [
+    { "source": "/cdn/:path*", "destination": "https://celestial.press/:path*" }
+  ],
   "headers": [
     {
       "source": "/player.html",

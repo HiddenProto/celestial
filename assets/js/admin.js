@@ -156,6 +156,8 @@
       created: extra.created ?? prev?.created ?? Date.now(),
       uid:     extra.uid     ?? prev?.uid     ?? makeUID(),
       badges:  extra.badges  ?? prev?.badges  ?? [],
+      nameVer: extra.nameVer ?? prev?.nameVer ?? 0,
+      nameTs:  extra.nameTs  ?? prev?.nameTs  ?? 0,
     };
     if (extra.isFirstUser && !data.badges.includes('first-user')) data.badges.push('first-user');
     localStorage.setItem('cst-approved', JSON.stringify(data));
@@ -1498,6 +1500,26 @@
       c.uid        = d.uid        || null;
       c.deviceId   = d.deviceId   || null;
       c.keyExpires = d.keyExpires || null;  // client's locally-stored expiry
+      c.nameVer    = d.nameVer    || 0;
+      c.nameTs     = d.nameTs     || 0;
+
+      // Username convergence: reconcile the client's name with the key record by
+      // version (higher version, or later timestamp on a tie, wins).
+      if (c.uid) {
+        const _ks = loadKeys();
+        const _km = _ks.find(x => x.uid === c.uid);
+        if (_km) {
+          if (_nameWins(_km.nameVer, _km.nameTs, c.nameVer, c.nameTs) && _km.name && _km.name !== c.name) {
+            // Key has the newer name → push it to the client.
+            c.name = _km.name; c.nameVer = _km.nameVer || 0; c.nameTs = _km.nameTs || 0;
+            sendTo(cid, { type: 'name-update', name: c.name, ver: c.nameVer, ts: c.nameTs });
+          } else if (_nameWins(c.nameVer, c.nameTs, _km.nameVer, _km.nameTs) && c.name) {
+            // Client has the newer name → store it on the key + sync to admins.
+            _km.name = c.name; _km.usedBy = c.name; _km.nameVer = c.nameVer; _km.nameTs = c.nameTs;
+            saveKeys(_ks); renderKeys(); broadcastKeysToPartner();
+          }
+        }
+      }
 
       // Dedup: if a stale connection from the same device is already in clients
       // (e.g. user refreshed — old WebRTC connection lingers for 20-30 s before
@@ -1665,6 +1687,7 @@
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0;align-items:center;">
           ${!c.approved ? `<button class="cbtn" onclick="__cstAuthorize('${id}')" title="authorize this client" style="padding:5px 8px;font-size:.72rem;color:#44ff77;border-color:#1e4a1e;">authorize</button>` : ''}
+          ${c.approved ? `<button class="cbtn" onclick="__cstRename('${id}')" title="change this user's username" style="padding:5px 8px;font-size:.72rem;">✎</button>` : ''}
           <button class="cbtn" onclick="__cstAnn1('${id}')" title="announce to this user" style="padding:5px 8px;font-size:.72rem;">📢</button>
           <button class="cbtn r" onclick="__cstNuke1('${id}')" title="nuke this client" style="padding:5px 8px;font-size:.72rem;">💥</button>
           <button class="cbtn r" onclick="__cstRemove('${id}')" style="flex-shrink:0;">remove</button>
@@ -1691,6 +1714,37 @@
 
     list.innerHTML = ctrlHtml + chatOnlyHtml;
   }
+
+  // ─── username editing (version-resolved) ─────────────────────
+  // A username carries a plain integer version + a timestamp. Higher version
+  // wins; ties (e.g. two admins editing at once) break on the later timestamp.
+  // The (name, ver, ts) lives on the key record so every admin converges, and
+  // on the client's stored approval so reconnects reconcile.
+  function _nameWins(aVer, aTs, bVer, bTs) {
+    aVer = aVer || 0; bVer = bVer || 0; aTs = aTs || 0; bTs = bTs || 0;
+    if (aVer !== bVer) return aVer > bVer;
+    return aTs > bTs;
+  }
+
+  window.__cstRename = id => {
+    const c = clients[id];
+    if (!c) return;
+    const cur = c.name || '';
+    const raw = prompt('New username for "' + cur + '":', cur);
+    if (raw === null) return;
+    const name = raw.trim();
+    if (!name || name === cur) return;
+    const ks = loadKeys();
+    const k  = c.uid ? ks.find(x => x.uid === c.uid) : null;
+    const ver = Math.max(c.nameVer || 0, k ? (k.nameVer || 0) : 0) + 1; // bump
+    const ts  = Date.now();
+    if (k) { k.name = name; k.usedBy = name; k.nameVer = ver; k.nameTs = ts; saveKeys(ks); renderKeys(); }
+    c.name = name; c.nameVer = ver; c.nameTs = ts;
+    sendTo(id, { type: 'name-update', name, ver, ts });
+    broadcastKeysToPartner();
+    renderClients();
+    showToast('Renamed to "' + name + '"');
+  };
 
   let _viewPingTimer = null;
   window.__cstView = id => {
@@ -1804,6 +1858,13 @@
       } else {
         const ex = ours[idx.get(k.key)];
         if (!ex.used && k.used) { ex.used = true; ex.usedBy = k.usedBy; changed = true; }
+        // Higher key expiry wins (renewals propagate between admins).
+        if ((k.expires || 0) > (ex.expires || 0)) { ex.expires = k.expires; ex.days = k.days; changed = true; }
+        // Username convergence: take the higher-version name (later ts on a tie).
+        if (k.name && _nameWins(k.nameVer, k.nameTs, ex.nameVer, ex.nameTs)) {
+          ex.name = k.name; ex.usedBy = k.usedBy || k.name;
+          ex.nameVer = k.nameVer || 0; ex.nameTs = k.nameTs || 0; changed = true;
+        }
       }
     }
     if (changed) { saveKeys(ours); renderKeys(); }
@@ -2031,6 +2092,8 @@
               uid:        appr?.uid     || null,
               deviceId:   getDeviceId(),
               keyExpires: appr?.expires || null,
+              nameVer:    appr?.nameVer || 0,
+              nameTs:     appr?.nameTs  || 0,
             });
             if (window.__cstPendingKey) {
               conn.send({ type: 'register-key', key: window.__cstPendingKey, deviceId: getDeviceId() });
@@ -2322,6 +2385,21 @@
               const absDays = Math.abs(deltaDays);
               const msg = `Your key validity has been decreased by ${absDays} day${absDays !== 1 ? 's' : ''}`;
               showToast(msg); window.notify?.(msg, 'warning', 8000);
+            }
+          }
+        }
+        if (d.type === 'name-update' && d.name) {
+          // Admin changed this user's username. Apply only if the incoming
+          // version wins (higher version, or later timestamp on a tie) so two
+          // admins editing at once converge deterministically.
+          const apprN = getApproval();
+          if (apprN) {
+            const lv = apprN.nameVer || 0, lt = apprN.nameTs || 0;
+            if ((d.ver || 0) > lv || ((d.ver || 0) === lv && (d.ts || 0) > lt)) {
+              apprN.name = d.name; apprN.nameVer = d.ver || 0; apprN.nameTs = d.ts || 0;
+              localStorage.setItem('cst-approved', JSON.stringify(apprN));
+              renderBadgeButton();
+              window.notify?.('Your username was changed to "' + d.name + '"', 'info', 8000);
             }
           }
         }

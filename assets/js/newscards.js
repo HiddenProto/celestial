@@ -1,5 +1,18 @@
 import storage from "./storage.js";
 
+// For Game Popup mode: turn a game URL into one that opens as OUR resource.
+// celestial.press is blocked on some school networks but callanambulance isn't,
+// so route celestial.press game assets through our same-origin /cdn/ proxy
+// (a Vercel rewrite) — same-origin, school-friendly, and the source stays hidden.
+function _cstPopupUrl(u) {
+  try {
+    var p = new URL(u, location.href);
+    if (p.hostname === "celestial.press") return "/cdn" + p.pathname + p.search;
+    if (p.origin === location.origin) return p.pathname + p.search;
+  } catch (e) {}
+  return u;
+}
+
 var grid = document.querySelector(".gs");
 var search = document.querySelector(".textbook");
 var cat = document.querySelectorAll("select")[0];
@@ -155,7 +168,7 @@ function showGames(list) {
       // Game Popup mode: open the game directly in its own new tab — just the
       // game, no celestial wrapper or proxy around it (faster, esp. local games).
       if (g.source !== "dice" && localStorage.getItem("cst-game-popup") === "1") {
-        window.open(g.url, "_blank", "noopener");
+        window.open(_cstPopupUrl(g.url), "_blank", "noopener");
         return;
       }
       if (g.source === "dice") {
@@ -289,7 +302,7 @@ function rngGame() {
       );
       const rand = available[Math.floor(Math.random() * available.length)];
       if (localStorage.getItem("cst-game-popup") === "1") {
-        window.open(rand.url, "_blank", "noopener");
+        window.open(_cstPopupUrl(rand.url), "_blank", "noopener");
         return;
       }
       location.href =

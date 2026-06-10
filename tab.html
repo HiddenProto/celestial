@@ -876,8 +876,15 @@
         return;
       }
       // Game Popup mode: open the game directly in its own new tab — just the game.
+      // Route celestial.press assets through our same-origin /cdn/ proxy so it
+      // works on networks where celestial.press is blocked but callanambulance isn't.
       if (it.badge === "game" && localStorage.getItem("cst-game-popup") === "1") {
-        window.open(it.url, "_blank", "noopener");
+        var _pu = it.url;
+        try { var _p = new URL(it.url, location.href);
+          if (_p.hostname === "celestial.press") _pu = "/cdn" + _p.pathname + _p.search;
+          else if (_p.origin === location.origin) _pu = _p.pathname + _p.search;
+        } catch (e) {}
+        window.open(_pu, "_blank", "noopener");
         return;
       }
       if (it.source === "local") {
