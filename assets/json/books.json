@@ -3367,9 +3367,9 @@
     },
     {
         "name": "Just Shapes And Beats",
-        "img": "https://celestial.press/assets/img/gms/jsab.png",
+        "img": "/cdn/assets/img/gms/jsab.png",
         "type": "exclusive",
-        "url": "https://celestial.press/assets/src/jsab/index.html",
+        "url": "https://justanotherjsab.vercel.app/",
         "categories": [
             "rhythm",
             "port",
