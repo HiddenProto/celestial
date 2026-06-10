@@ -706,9 +706,7 @@
                 change how the pr<span>o</span>xy is handled, can lead to sites
                 that were broken to work or lead to sites that were working to break
               </p>
-              <select class="select" id="tselect">
-                <option value="photon" disabled style="color:#888">photon (bumblcat) — coming soon</option>
-                <option value="epoxy">epoxy</option>
+              <select class="select" id="tselect" data-cst-list="transports">
                 <option value="libcurl" selected>libcurl</option>
               </select>
             </div>
@@ -717,25 +715,15 @@
               <p class="desc">
                 change which rewriter engine handles pr<span>o</span>xied pages
               </p>
-              <select class="select" id="pr0xySelect">
+              <select class="select" id="pr0xySelect" data-cst-list="proxies">
                 <option value="scram" selected>bumblcat rrc</option>
-                <option value="scramjet">sc<span>ram</span>jet</option>
-                <option value="violet">ul<span>tr</span>av<span>io</span>l<span>e</span>t</option>
               </select>
             </div>
             <div class="box">
               <h3>Wisp Server <span class="info-icon"><span class="tip">The WebSocket relay server that routes proxy traffic.<br><br><b>bumblcat's server</b> — always-on Render server. Easy, no setup. Type: <b>private server</b>.<br><br><b>mercury / anura / nodeppt</b> — free public servers. May show Google CAPTCHA. Type: <b>public server</b>.<br><br><b>local Wisp</b> — your own device. Enter IP and port (e.g. 192.168.1.5 : 58443). Only works on your network. Type: <b>self-hosted</b>.<br><br><b>no Wisp (static)</b> — disables the Wisp relay. Only static content works; most sites will fail. Use if you have a custom transport. Type: <b>none</b>.<br><br><b>custom</b> — any Wisp URL you supply. Type: <b>user-defined</b>.</span></span></h3>
               <p class="desc">the server that routes your proxied traffic</p>
-              <select class="select" id="wispSelect">
-                <option value="wss://cst-celestial.loca.lt/wisp/" disabled style="color:#555;font-style:italic;">bumblcat ultrapatch (unavailable)</option>
-                <option value="wss://celestial.press/wisp/">00x1</option>
-                <option value="wss://celestial-wisp.onrender.com/">bumblcat's server</option>
+              <select class="select" id="wispSelect" data-cst-list="wisps">
                 <option value="wss://wisp.mercurywork.shop/">mercury workshop</option>
-                <option value="wss://anura.pro/wisp/">anura (free)</option>
-                <option value="wss://wisp.nodeppt.com/">nodeppt (free)</option>
-                <option value="__local__">local Wisp</option>
-                <option value="static">no Wisp (photon)</option>
-                <option value="custom">custom server...</option>
               </select>
               <button onclick="__testWisp()" style="margin-top:6px;" class="button">test &amp; auto-pick fastest</button>
               <p id="wisp-test-out" style="font-size:.75rem;color:#666;margin:6px 0 0;min-height:14px;"></p>
@@ -760,44 +748,8 @@
             <div class="box">
               <h3>Themes</h3>
               <p class="desc">customize the color scheme of celestial</p>
-              <select id="themepicker">
-                <option value="default" style="color: white; background: black" selected>
-                  default
-                </option>
-                <option value="light" style="color: black; background: #f5f5f5">
-                  light
-                </option>
-                <option value="midnight" style="color: white; background: darkblue">
-                  midnight blue
-                </option>
-                <option value="mocha" style="color: white; background: rgb(24, 18, 14)">
-                  mocha
-                </option>
-                <option value="pisscolorlmao" style="color: #adad43; background: #222222">
-                  jmw v6
-                </option>
-                <option value="quasar" style="color: white; background: rgb(73, 153, 219)">
-                  quasar
-                </option>
-                <option value="ccm" style="color: white; background: #1a1b26">
-                  catppuccin mocha
-                </option>
-                <option value="frappe" style="color: #d9e0ee; background: #0d0d1f">
-                  catppuccin frappe
-                </option>
-                <option value="saywallahibro" style="color: black; background: yellow">
-                  no name brand
-                </option>
-                <option value="eww" style="color: white; background: pink" disabled>
-                  secret theme...
-                </option>
-                <option value="chad" style="color: white; background: red" disabled>
-                  secret theme 2...
-                </option>
-                <option value="apex" style="color:#c084ff;background:#04000d" disabled>Exotic: Apex</option>
-                <option value="breakaway" style="color: #ff3333; background: #070707">
-                  breakaway
-                </option>
+              <select id="themepicker" data-cst-list="themes">
+                <option value="default" style="color: white; background: black" selected>default</option>
               </select>
             </div>
             <!-- bumblcat's favorite songs — toggle hidden for now (feature intact for anyone already using it) -->
@@ -1554,7 +1506,7 @@
       const ICONS = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
       const LABELS = { success: "success", error: "error", warning: "warning", info: "info" };
       const container = document.getElementById("notif-container");
-      var SITE_VER = "2.3.168";
+      var SITE_VER = "2.3.169";
 
       /**
        * Show a notification toast.
@@ -2000,6 +1952,7 @@
 
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"0ce07c47b5f045988b5b960df629825b","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
+<script src="/assets/js/cst-lists.js"></script>
 <script src="/assets/js/theme.js"></script>
 <script src="/assets/js/s.js"></script>
 <script src="/assets/js/picker.js"></script>

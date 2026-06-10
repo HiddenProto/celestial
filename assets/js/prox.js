@@ -81,7 +81,10 @@ window.addEventListener('DOMContentLoaded', () => {
             wispCustom.style.display = 'block';
             wispCustom.value = localWisp;
         } else {
-            wispSelect.value = _ULTRAPATCH_WISP;
+            // New users: show the actual default wisp (Mercury Workshop, what
+            // lithium uses) — NOT the dead ultrapatch tunnel, which left new
+            // users appearing to be on an unavailable server.
+            wispSelect.value = 'wss://wisp.mercurywork.shop/';
         }
     } else if ([...wispSelect.options].some(o => o.value === savedWisp)) {
         wispSelect.value = savedWisp;

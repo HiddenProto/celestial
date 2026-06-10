@@ -454,14 +454,14 @@ function cookieStorage() {
   if (savedWisp === '__origin__') { localStorage.removeItem('location'); savedWisp = null; }
 
   if (!savedWisp) {
-    // No Wisp saved: default to bumblcat ultrapatch on regular sites;
-    // on localhost show same-origin URL in custom field (direct, no roundtrip).
+    // No Wisp saved: show the actual default wisp (Mercury Workshop, what lithium
+    // uses); on localhost show the same-origin URL in the custom field.
     if (_isLocalHost) {
       const localWisp = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wisp/';
       wispSelect.value = 'custom';
       if (wispCustom) { wispCustom.style.display = 'block'; wispCustom.value = localWisp; }
     } else {
-      wispSelect.value = _ULTRAPATCH_WISP;
+      wispSelect.value = 'wss://wisp.mercurywork.shop/';
     }
   } else if ([...wispSelect.options].some(o => o.value === savedWisp)) {
     wispSelect.value = savedWisp;

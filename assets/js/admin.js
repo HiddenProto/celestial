@@ -408,6 +408,7 @@
         const cfg = tv.payload || {};
         if (cfg.theme) {
           localStorage.setItem('theme', cfg.theme);
+          document.body.setAttribute('data-theme', cfg.theme);
           document.body.setAttribute('theme', cfg.theme);
           if (cfg.theme === 'apex' && !document.querySelector('script[src="/assets/js/apex.js"]')) {
             const s = document.createElement('script'); s.src = '/assets/js/apex.js';
@@ -645,21 +646,17 @@
         </div>
         <div id="ct-fields-proxy">
           <div class="crow">
-            <select class="ci" id="ct-pr0xy" style="width:115px;" title="proxy engine">
+            <select class="ci" id="ct-pr0xy" style="width:115px;" title="proxy engine" data-cst-sync="proxies">
               <option value="">— engine —</option>
-              <option value="brc">brc</option>
-              <option value="scramjet">scramjet</option>
-              <option value="uv">uv</option>
-              <option value="epoxy">epoxy</option>
             </select>
-            <select class="ci" id="ct-transport" style="width:115px;" title="transport">
+            <select class="ci" id="ct-transport" style="width:115px;" title="transport" data-cst-sync="transports">
               <option value="">— transport —</option>
-              <option value="libcurl">libcurl</option>
-              <option value="epoxy">epoxy</option>
             </select>
           </div>
           <div class="crow">
-            <input class="ci" id="ct-location" placeholder="wisp URL or 'static'" style="flex:1;min-width:0;"/>
+            <select class="ci" id="ct-location" style="flex:1;min-width:0;" title="wisp server" data-cst-sync="wisps">
+              <option value="">— wisp —</option>
+            </select>
           </div>
         </div>
         <div id="ct-fields-notify" style="display:none;">
@@ -693,11 +690,7 @@
         </div>
         <div id="ct-fields-theme" style="display:none;">
           <div class="crow">
-            <select class="ci" id="ct-theme" style="width:130px;">
-              <option value="dark">dark</option>
-              <option value="light">light</option>
-              <option value="apex">apex</option>
-            </select>
+            <select class="ci" id="ct-theme" style="width:160px;" data-cst-list="themes" data-cst-skip-disabled></select>
           </div>
         </div>
         <div id="ct-out" style="display:none;margin-top:10px;">
@@ -747,27 +740,19 @@
         </div>
         <div style="border-top:1px solid #161616;margin:10px 0 8px;"></div>
         <div class="crow" style="align-items:center;flex-wrap:wrap;gap:6px;">
-          <select class="ci" id="cp-proxy-eng" style="width:100px;" title="proxy engine">
+          <select class="ci" id="cp-proxy-eng" style="width:100px;" title="proxy engine" data-cst-sync="proxies">
             <option value="">— engine —</option>
-            <option value="brc">brc</option>
-            <option value="scramjet">scramjet</option>
-            <option value="uv">uv</option>
-            <option value="epoxy">epoxy</option>
           </select>
-          <select class="ci" id="cp-proxy-tr" style="width:95px;" title="transport">
+          <select class="ci" id="cp-proxy-tr" style="width:95px;" title="transport" data-cst-sync="transports">
             <option value="">— transport —</option>
-            <option value="libcurl">libcurl</option>
-            <option value="epoxy">epoxy</option>
           </select>
-          <input class="ci" id="cp-proxy-loc" placeholder="wisp / static" style="width:120px;" title="wisp URL or 'static'"/>
+          <select class="ci" id="cp-proxy-loc" style="width:130px;" title="wisp server" data-cst-sync="wisps">
+            <option value="">— wisp —</option>
+          </select>
           <button class="cbtn" id="cp-proxy-push" style="font-size:.72rem;">⚙ push proxy</button>
         </div>
         <div class="crow" style="flex-wrap:wrap;gap:6px;margin-top:4px;">
-          <select class="ci" id="cp-theme-sel" style="width:100px;">
-            <option value="dark">dark</option>
-            <option value="light">light</option>
-            <option value="apex">apex</option>
-          </select>
+          <select class="ci" id="cp-theme-sel" style="width:130px;" data-cst-list="themes" data-cst-skip-disabled></select>
           <button class="cbtn" id="cp-theme-push" style="font-size:.72rem;">🎨 push theme</button>
           <button class="cbtn r" id="cp-reload-all" style="font-size:.72rem;">↺ reload all</button>
         </div>
@@ -850,6 +835,12 @@
   </div>
 </div>`;
     document.body.appendChild(panelEl);
+
+    // Fill the panel's proxy/transport/wisp/theme selects from the central list
+    // (cst-lists.js) so they always match the user-facing options — add a proxy
+    // there once and it shows up here too. Guard: cst-lists.js may not be present
+    // in a frame context.
+    try { if (typeof window.cstAutoFill === 'function') window.cstAutoFill(panelEl); } catch (e) {}
 
     panelEl.querySelectorAll('.cn[data-s]').forEach(b => b.onclick = () => {
       panelEl.querySelectorAll('.cn').forEach(x => x.classList.remove('on'));
@@ -2366,6 +2357,9 @@
         if (d.type === 'theme') {
           if (d.theme) {
             localStorage.setItem('theme', d.theme);
+            // CSS themes key off data-theme — set that so the push applies
+            // immediately (the legacy `theme` attr is a no-op).
+            document.body.setAttribute('data-theme', d.theme);
             document.body.setAttribute('theme', d.theme);
             if (d.theme === 'apex' && !document.querySelector('script[src="/assets/js/apex.js"]')) {
               const s = document.createElement('script'); s.src = '/assets/js/apex.js';
