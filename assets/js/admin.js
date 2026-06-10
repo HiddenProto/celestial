@@ -147,6 +147,7 @@
   function isApproved() {
     if (isAdmin) return true;
     const a = getApproval();
+    if (a && a.permanent) return true;   // Summer badge = never expires
     return !!(a && Date.now() < a.expires);
   }
   function setApproved(name, expires, extra = {}) {
@@ -255,6 +256,7 @@
   // ─── badge system ────────────────────────────────────────────
   const BADGE_DEFS = {
     'first-user': { label: 'First User', icon: '★', desc: 'Among the very first users of Celestial.' },
+    'summer':     { label: 'Summer', icon: '☀️', desc: 'Permanent access — awarded to existing users.' },
   };
 
   function renderBadgeButton() {
@@ -275,10 +277,10 @@
       'color:#888;font-family:system-ui,sans-serif;font-size:.75rem;cursor:pointer;' +
       'display:flex;align-items:center;gap:6px;transition:background .15s;';
     function _daysLeft() { return Math.max(0, Math.ceil((appr.expires - Date.now()) / 86400000)); }
+    const _badgeIcon = appr.badges?.includes('summer') ? '☀️' : (hasBadges ? '★' : '');
     function _updateBtn() {
-      const d = _daysLeft();
-      const dLabel = d === 0 ? 'today' : `${d}d`;
-      btn.innerHTML = (hasBadges ? '<span style="font-size:.9rem">★</span>' : '') +
+      const dLabel = appr.permanent ? '∞' : (_daysLeft() === 0 ? 'today' : `${_daysLeft()}d`);
+      btn.innerHTML = (_badgeIcon ? `<span style="font-size:.9rem">${_badgeIcon}</span>` : '') +
         `<span>${appr.name || 'user'}</span>` +
         `<span id="cst-badge-days" style="color:#444;font-size:.7rem;">${dLabel}</span>`;
     }
@@ -1173,13 +1175,14 @@
     if (!ks.length) { list.innerHTML = '<p style="color:#333;font-size:.8rem;">no keys yet.</p>'; return; }
     list.innerHTML = ks.slice().reverse().map((k, ri) => {
       const i      = ks.length - 1 - ri;
+      const perm   = !!k.permanent;   // Summer = permanent / unlimited
       const expTs  = k.expires || (k.created + (k.days || 7) * 86400000);
       const dLeft  = Math.ceil((expTs - Date.now()) / 86400000);
-      const exp    = dLeft <= 0;
-      const cls    = exp ? 'ke' : (k.used ? 'ka' : 'kw');
-      const lbl    = exp ? 'expired' : (k.used ? 'active' : 'pending');
+      const exp    = !perm && dLeft <= 0;
+      const cls    = perm ? 'ka' : (exp ? 'ke' : (k.used ? 'ka' : 'kw'));
+      const lbl    = perm ? 'permanent' : (exp ? 'expired' : (k.used ? 'active' : 'pending'));
       const meta   = [
-        `exp ${exp ? 'expired' : _fmtDate(expTs)}`,
+        perm ? 'unlimited ☀️' : `exp ${exp ? 'expired' : _fmtDate(expTs)}`,
         k.used && k.usedBy ? k.usedBy : null,
         k.uid        ? '· ' + k.uid.slice(-6)       : null,
         k.deviceId   ? '· dev …' + k.deviceId.slice(-6) : null,
@@ -1189,7 +1192,7 @@
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;">
             <span style="font-size:.8rem;color:#aaa;font-weight:600;">${_adminEsc(k.name)}</span>
             <span class="kb ${cls}">${lbl}</span>
-            ${!exp ? `<span style="font-size:.68rem;color:#2a2a2a;">${dLeft}d left</span>` : ''}
+            ${perm ? `<span style="font-size:.68rem;color:#44cc88;">unlimited</span>` : (!exp ? `<span style="font-size:.68rem;color:#2a2a2a;">${dLeft}d left</span>` : '')}
           </div>
           <div class="ck-code">${k.key}</div>
           <div style="font-size:.67rem;color:#2a2a2a;margin-top:3px;">${meta}</div>
@@ -1513,6 +1516,20 @@
       c.keyExpires = d.keyExpires || null;  // client's locally-stored expiry
       c.nameVer    = d.nameVer    || 0;
       c.nameTs     = d.nameTs     || 0;
+      c.permanent  = !!d.permanent;
+
+      // Permanent (Summer) access: mark the matching key so the admin sees the
+      // user's day count as "unlimited" in the key manager.
+      if (c.permanent && c.uid) {
+        const _pk = loadKeys();
+        const _pm = _pk.find(x => x.uid === c.uid);
+        if (_pm && !_pm.permanent) {
+          _pm.permanent = true;
+          if (!Array.isArray(_pm.badges)) _pm.badges = [];
+          if (_pm.badges.indexOf('summer') === -1) _pm.badges.push('summer');
+          saveKeys(_pk); renderKeys(); broadcastKeysToPartner();
+        }
+      }
 
       // Username convergence: reconcile the client's name with the key record by
       // version (higher version, or later timestamp on a tie, wins).
@@ -1890,6 +1907,13 @@
         if (!ex.used && k.used) { ex.used = true; ex.usedBy = k.usedBy; changed = true; }
         // Higher key expiry wins (renewals propagate between admins).
         if ((k.expires || 0) > (ex.expires || 0)) { ex.expires = k.expires; ex.days = k.days; changed = true; }
+        // Permanent (Summer) propagates between admins.
+        if (k.permanent && !ex.permanent) {
+          ex.permanent = true;
+          if (!Array.isArray(ex.badges)) ex.badges = [];
+          if (ex.badges.indexOf('summer') === -1) ex.badges.push('summer');
+          changed = true;
+        }
         // Username convergence: take the higher-version name (later ts on a tie).
         if (k.name && _nameWins(k.nameVer, k.nameTs, ex.nameVer, ex.nameTs)) {
           ex.name = k.name; ex.usedBy = k.usedBy || k.name;
@@ -2125,6 +2149,7 @@
               keyExpires: appr?.expires || null,
               nameVer:    appr?.nameVer || 0,
               nameTs:     appr?.nameTs  || 0,
+              permanent:  !!appr?.permanent,
             });
             if (window.__cstPendingKey) {
               conn.send({ type: 'register-key', key: window.__cstPendingKey, deviceId: getDeviceId() });
@@ -2739,6 +2764,31 @@
       setTimeout(function () {
         try { window.notify && window.notify('Your key has been extended by 30 days', 'success', 9000); } catch (e) {}
       }, 1800);
+    } catch (e) {}
+  })();
+
+  // ── Summer: grant permanent access + the Summer badge to EXISTING approved
+  // users (once). Skipped for brand-new users (not pre-existing) and expired
+  // users — they keep their normal timed access. Permanent users never expire
+  // and the admin sees their day count as "unlimited".
+  (function summerGrant() {
+    if (localStorage.getItem('cst-summer-granted')) return;
+    try {
+      if (!window.__cstPreexisting) return;            // brand-new user → skip
+      var raw = localStorage.getItem('cst-approved');
+      if (!raw) return;
+      var a = JSON.parse(raw);
+      if (!a || Date.now() >= a.expires) return;        // expired / invalid → skip
+      localStorage.setItem('cst-summer-granted', '1');
+      a.permanent = true;
+      a.expires   = Date.now() + 100 * 365 * 86400000;  // far future so day-math never expires
+      if (!Array.isArray(a.badges)) a.badges = [];
+      if (a.badges.indexOf('summer') === -1) a.badges.push('summer');
+      localStorage.setItem('cst-approved', JSON.stringify(a));
+      setTimeout(function () {
+        try { window.notify && window.notify('You have access to the site permanently — and earned the Summer badge ☀️', 'success', 11000); } catch (e) {}
+        try { renderBadgeButton(); } catch (e) {}
+      }, 2400);
     } catch (e) {}
   })();
 
