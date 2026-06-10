@@ -152,6 +152,12 @@ function showGames(list) {
     if (g.investigating || g.available === false || deadUrls.has(g.url)) card.classList.add("unavailable");
     card.onclick = () => {
       if (card.classList.contains("unavailable")) return;
+      // Game Popup mode: open the game directly in its own new tab — just the
+      // game, no celestial wrapper or proxy around it (faster, esp. local games).
+      if (g.source !== "dice" && localStorage.getItem("cst-game-popup") === "1") {
+        window.open(g.url, "_blank", "noopener");
+        return;
+      }
       if (g.source === "dice") {
         rngGame();
       } else if (g.source === "local") {
@@ -282,6 +288,10 @@ function rngGame() {
           g.name !== "! RANDOM GAME"
       );
       const rand = available[Math.floor(Math.random() * available.length)];
+      if (localStorage.getItem("cst-game-popup") === "1") {
+        window.open(rand.url, "_blank", "noopener");
+        return;
+      }
       location.href =
         rand.source === "local"
           ? "/news/frame.html?mbed=" + encodeURIComponent(rand.url)

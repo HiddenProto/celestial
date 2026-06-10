@@ -53,6 +53,15 @@ if (proxyToolsSelect) {
     });
 }
 
+// Game Popup mode — open games in their own new tab as just the game.
+const gamePopupSelect = document.getElementById('gamePopupSelect');
+if (gamePopupSelect) {
+    gamePopupSelect.value = localStorage.getItem('cst-game-popup') === '1' ? '1' : '0';
+    gamePopupSelect.addEventListener('change', () => {
+        localStorage.setItem('cst-game-popup', gamePopupSelect.value === '1' ? '1' : '0');
+    });
+}
+
 window.addEventListener('DOMContentLoaded', () => {
     const savedProxy = localStorage.getItem('pr0xy');
     if (savedProxy && [...pr0xySelect.options].some(o => o.value === savedProxy))

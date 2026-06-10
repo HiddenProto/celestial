@@ -188,6 +188,11 @@
       <hr>
 
       <details open>
+        <summary>06/03 — v2.3.170</summary>
+        <p>- New "Game Popup" setting: when on, games open in their own new tab as just the game itself — no celestial wrapper around them — for better performance (especially the local games). Toggle it in settings under Game Popup.</p>
+      </details>
+
+      <details open>
         <summary>06/03 — v2.3.167</summary>
         <p>- The start-page search bar now suggests things as you type: celestial's built-in sections (games, quick apps, media, AI, settings, legal, partners, update log) and quick links to popular sites (Google, YouTube, Discord, Reddit, Spotify, Twitch, TikTok). Click the bar to see them, or type to filter — games and apps still show up too.</p>
       </details>
@@ -868,6 +873,11 @@
       if (it.badge === "app" || it.badge === "link") {
         // Normal transport (not photon — it can't stream video).
         location.href = "/tab.html?autofill=" + encodeURIComponent(it.url);
+        return;
+      }
+      // Game Popup mode: open the game directly in its own new tab — just the game.
+      if (it.badge === "game" && localStorage.getItem("cst-game-popup") === "1") {
+        window.open(it.url, "_blank", "noopener");
         return;
       }
       if (it.source === "local") {

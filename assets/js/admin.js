@@ -1193,7 +1193,9 @@
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;padding-left:8px;">
           <button onclick="__cstCopyKey(${i})" class="cbtn" style="font-size:.67rem;padding:2px 8px;">copy</button>
-          ${!exp ? `<button onclick="__cstExtendKey(${i})" class="cbtn" style="font-size:.67rem;padding:2px 8px;">±days</button>` : ''}
+          ${exp
+            ? `<button onclick="__cstRenewKey(${i})" class="cbtn g" style="font-size:.67rem;padding:2px 8px;">↻ renew</button>`
+            : `<button onclick="__cstExtendKey(${i})" class="cbtn" style="font-size:.67rem;padding:2px 8px;">±days</button>`}
           ${exp
             ? `<button onclick="__cstDeleteKey(${i})" style="background:none;border:none;color:#663333;cursor:pointer;font-size:.68rem;padding:0;margin-top:2px;">× remove</button>`
             : `<button onclick="__cstRevoke(${i})" style="background:none;border:none;color:#2a2a2a;cursor:pointer;font-size:.66rem;padding:0;margin-top:2px;">revoke</button>`
@@ -1210,6 +1212,26 @@
 
   window.__cstDeleteKey = i => {
     const ks = loadKeys(); ks.splice(i, 1); saveKeys(ks); renderKeys();
+  };
+
+  // Renew an EXPIRED key: extend its expiry from now, keeping the same key/uid/
+  // device so the user's expired-but-retained access springs back to life. If
+  // they're online, push it immediately; otherwise the beacon auto-sync re-approves
+  // them (and drops their gate) the next time they connect with the now-valid key.
+  window.__cstRenewKey = i => {
+    const ks = loadKeys(); const k = ks[i];
+    if (!k) return;
+    const d = parseInt(prompt(`Renew "${k.name}" for how many days (from now)?`, '7'));
+    if (!d || isNaN(d) || d <= 0) return;
+    ks[i].expires = Date.now() + d * 86400000;
+    ks[i].days    = (ks[i].days || 0) + d;
+    if (!ks[i].used) ks[i].used = true; // keep it as an issued/used key
+    saveKeys(ks); renderKeys(); broadcastKeysToPartner();
+    if (k.uid) {
+      const cid = Object.keys(clients).find(id => clients[id].uid === k.uid);
+      if (cid) sendTo(cid, { type: 'key-extended', expires: ks[i].expires });
+    }
+    showToast(`Renewed ${k.name} — ${d}d from now`);
   };
 
   window.__cstCopyKey = i => {
@@ -2290,6 +2312,9 @@
             appr2.expires     = d.expires;
             localStorage.setItem('cst-approved', JSON.stringify(appr2));
             renderBadgeButton();
+            // If the key is now valid again (e.g. admin renewed an expired one),
+            // drop the access gate so the user is let straight back in.
+            if (d.expires > Date.now()) { document.getElementById('cst-gate')?.remove(); bc?.postMessage('approved'); }
             if (deltaDays > 0) {
               const msg = `Your key validity has been extended by ${deltaDays} day${deltaDays !== 1 ? 's' : ''}`;
               showToast(msg); window.notify?.(msg, 'success', 8000);
