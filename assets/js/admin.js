@@ -56,6 +56,7 @@
   let cPeer       = null;
   let clients     = {};
   let partnerConn = null;
+  let _partnerRoster = [];   // multi-admin: client roster relayed from the active host
   let viewTarget  = null;
   let _hubMgr         = null;   // PeerMgr handle for the admin hub
   let _heartbeatTimer = null;   // hub heartbeat interval
@@ -1423,6 +1424,16 @@
               if (clients[id]) return; // already sent via control channel above
               try { adminChatConns[id].conn.send(Object.assign({}, _pulse, { _adm: 1 })); } catch {}
             });
+            // Multi-admin: relay the client roster to any connected secondary
+            // admins (admin-hello peers) so they can see the clients too.
+            var _adminPeers = Object.keys(clients).filter(function (id) { return clients[id].isAdminPeer; });
+            if (_adminPeers.length) {
+              var _roster = Object.keys(clients).filter(function (id) { return !clients[id].isAdminPeer; }).map(function (id) {
+                var c = clients[id];
+                return { id: id, name: c.name, online: !!(c.conn && c.conn.open), approved: !!c.approved, url: c.url, uid: c.uid || null, vp: c.vp || null };
+              });
+              _adminPeers.forEach(function (id) { try { clients[id].conn.send({ type: 'admin-clients', roster: _roster }); } catch {} });
+            }
             window.__cstHubOnline   = realCount;
             window.__cstHubOnlineTs = Date.now();
             window.dispatchEvent(new CustomEvent('cst-hub-online'));
@@ -1644,6 +1655,25 @@
   function renderClients() {
     const list = document.getElementById('cp-clist');
     if (!list) return;
+
+    // Secondary admin (not holding the hub): show the read-only roster relayed
+    // from the active host, so a second admin on a "busy" hub can still see who's
+    // connected. Key/token management + sync work normally; live actions
+    // (view/nuke) stay with the host that owns the hub.
+    if (!hub && _partnerRoster.length) {
+      var _cnt = document.getElementById('cp-online-cnt');
+      if (_cnt) { _cnt.textContent = _partnerRoster.length + ' client' + (_partnerRoster.length === 1 ? '' : 's') + ' online'; _cnt.style.display = ''; }
+      list.innerHTML =
+        '<p style="color:#557;font-size:.72rem;margin:0 0 8px;">viewing via the active host (another admin owns the hub) — read-only.</p>' +
+        _partnerRoster.map(function (r) {
+          var dot = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' +
+            (r.online ? '#44ff77' : '#ff5555') + ';margin-right:5px;"></span>';
+          return '<div class="ccl"><div class="ccl-info"><div class="cn2" style="display:flex;align-items:center;">' +
+            dot + _adminEsc(r.name || '?') + (r.approved ? '' : ' <span style="color:#ffaa44;font-size:.7rem;margin-left:4px;">(pending)</span>') +
+            '</div><div class="cm" style="margin-left:12px;">' + (r.online ? 'online' : 'offline') + ' · ' + _adminEsc(r.url || '—') + '</div></div></div>';
+        }).join('');
+      return;
+    }
 
     // Full control-channel clients
     const ctrlIds = Object.keys(clients).filter(id => !clients[id].isAdminPeer);
@@ -1893,6 +1923,7 @@
           conn.on('data', function (d) {
             if (!d || typeof d !== 'object') return;
             if (d.type === 'admin-keys' || d.type === 'admin-key-update') mergeAdminKeys(d.keys || []);
+            if (d.type === 'admin-clients') { _partnerRoster = Array.isArray(d.roster) ? d.roster : []; renderClients(); }
           });
           conn.on('close', function () { partnerConn = null; _partnerConnecting = false; _partnerMgr.destroy(); });
           conn.on('error', function () { partnerConn = null; _partnerConnecting = false; _partnerMgr.destroy(); });
