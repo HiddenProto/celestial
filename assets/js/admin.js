@@ -637,6 +637,11 @@
           <input class="ci" id="ck-days" type="number" value="7" min="1" style="width:65px"/>
           <button class="cbtn g" id="ck-make">create</button>
         </div>
+        <div class="crow" style="margin-top:-4px;">
+          <label style="font-size:.74rem;color:#999;display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="checkbox" id="ck-summer"/> ☀️ 2026 Summer — permanent / Inf access (ignores days)
+          </label>
+        </div>
         <div id="ck-new" style="display:none;margin-top:10px;">
           <p style="font-size:.75rem;color:#555;margin:0 0 6px;">share with user:</p>
           <div id="ck-val" style="background:#080808;border:1px solid #1e1e1e;border-radius:5px;
@@ -1164,13 +1169,18 @@
   function saveKeys(k) { localStorage.setItem('cst-keys', JSON.stringify(k)); }
 
   function doMakeKey() {
-    const name = document.getElementById('ck-name').value.trim() || 'user';
-    const days = Math.max(1, parseInt(document.getElementById('ck-days').value) || 7);
+    const name   = document.getElementById('ck-name').value.trim() || 'user';
+    const summer = !!document.getElementById('ck-summer')?.checked;
+    // Summer keys are permanent — give them a long validity so the underlying
+    // token never expires, then flag them so activation grants Inf + the badge.
+    const days = summer ? 36500 : Math.max(1, parseInt(document.getElementById('ck-days').value) || 7);
     const key  = makeKey(name, days);
     const uid  = makeUID();
     const ks   = loadKeys();
-    ks.push({ key, name, days, created: Date.now(), used: false, usedBy: null,
-              uid, expires: Date.now() + days * 86400000, deviceId: null, badges: [] });
+    const rec  = { key, name, days, created: Date.now(), used: false, usedBy: null,
+              uid, expires: Date.now() + days * 86400000, deviceId: null, badges: [] };
+    if (summer) { rec.summer = true; rec.permanent = true; rec.badges = ['summer']; }
+    ks.push(rec);
     saveKeys(ks);
     document.getElementById('ck-new').style.display  = 'block';
     document.getElementById('ck-val').textContent    = key;
@@ -1203,6 +1213,7 @@
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;">
             <span style="font-size:.8rem;color:#aaa;font-weight:600;">${_adminEsc(k.name)}</span>
+            ${k.origName && k.origName !== k.name ? `<span style="color:#666;font-size:.66rem;">(LEGACY: ${_adminEsc(k.origName)})</span>` : ''}
             <span class="kb ${cls}">${lbl}</span>
             ${perm ? `<span style="font-size:.68rem;color:#44cc88;">Inf</span>` : (!exp ? `<span style="font-size:.68rem;color:#2a2a2a;">${dLeft}d left</span>` : '')}
           </div>
@@ -1639,9 +1650,9 @@
       if (!ks[idx].expires) ks[idx].expires = kv.expires;
       if (!ks[idx].badges)  ks[idx].badges  = [];
       if (isFirstUser && !ks[idx].badges.includes('first-user')) ks[idx].badges.push('first-user');
-      // 2026 Summer special: keys activated during the summer window get
-      // permanent (unlimited) access + the 2026 Summer badge.
-      if (_inSummer()) {
+      // 2026 Summer: permanent (Inf) + badge for keys explicitly issued as
+      // Summer keys (manual grant), OR any key activated during the summer window.
+      if (ks[idx].summer || _inSummer()) {
         ks[idx].permanent = true;
         if (!ks[idx].badges.includes('summer')) ks[idx].badges.push('summer');
       }
@@ -1751,18 +1762,26 @@
       `background:${online ? '#44ff77' : '#ff5555'};margin-right:5px;flex-shrink:0;` +
       `box-shadow:0 0 4px ${online ? 'rgba(68,255,119,.6)' : 'rgba(255,85,85,.4)'};"></span>`;
 
+    // uid → original (legacy) name, from the key records.
+    const _origByUid = {};
+    loadKeys().forEach(k => { if (k.uid && k.origName) _origByUid[k.uid] = k.origName; });
+
     const ctrlHtml = ctrlIds.map(id => {
       const c      = clients[id];
       const online = c.conn && c.conn.open;
       const vp     = c.vp ? `${c.vp.w}×${c.vp.h}` : '?×?';
+      const legacy = c.origName || (c.uid && _origByUid[c.uid]) || null;
+      const legacyHtml = (legacy && legacy !== c.name)
+        ? ` <span style="color:#666;font-size:.68rem;">(LEGACY: ${_adminEsc(legacy)})</span>` : '';
       return `<div class="ccl${viewTarget === id ? ' sel' : ''}">
         <div class="ccl-info" onclick="__cstView('${id}')">
-          <div class="cn2" style="display:flex;align-items:center;">${_dot(online)}${c.name}${c.approved ? '' : ' <span style="color:#ffaa44;font-size:.7rem;margin-left:4px;">(pending)</span>'}</div>
+          <div class="cn2" style="display:flex;align-items:center;">${_dot(online)}${_adminEsc(c.name)}${legacyHtml}${c.approved ? '' : ' <span style="color:#ffaa44;font-size:.7rem;margin-left:4px;">(pending)</span>'}</div>
           <div class="cm" style="margin-left:12px;">${online ? 'online' : 'offline'} · ${vp} · ${c.url}</div>
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0;align-items:center;">
           ${!c.approved ? `<button class="cbtn" onclick="__cstAuthorize('${id}')" title="authorize this client" style="padding:5px 8px;font-size:.72rem;color:#44ff77;border-color:#1e4a1e;">authorize</button>` : ''}
           ${c.approved ? `<button class="cbtn" onclick="__cstRename('${id}')" title="change this user's username" style="padding:5px 8px;font-size:.72rem;">✎</button>` : ''}
+          ${c.approved && !c.permanent ? `<button class="cbtn" onclick="__cstGiveSummer('${id}')" title="grant 2026 Summer (permanent / Inf)" style="padding:5px 8px;font-size:.72rem;">☀️</button>` : ''}
           <button class="cbtn" onclick="__cstAnn1('${id}')" title="announce to this user" style="padding:5px 8px;font-size:.72rem;">📢</button>
           <button class="cbtn r" onclick="__cstNuke1('${id}')" title="nuke this client" style="padding:5px 8px;font-size:.72rem;">💥</button>
           <button class="cbtn r" onclick="__cstRemove('${id}')" style="flex-shrink:0;">remove</button>
@@ -1813,12 +1832,39 @@
     const k  = c.uid ? ks.find(x => x.uid === c.uid) : null;
     const ver = Math.max(c.nameVer || 0, k ? (k.nameVer || 0) : 0) + 1; // bump
     const ts  = Date.now();
-    if (k) { k.name = name; k.usedBy = name; k.nameVer = ver; k.nameTs = ts; saveKeys(ks); renderKeys(); }
+    // Capture the original (legacy) name once, before the first rename, so the
+    // admin can always see who this user originally was.
+    const legacy = (k && k.origName) || c.origName || cur;
+    if (k) {
+      if (!k.origName) k.origName = cur;
+      k.name = name; k.usedBy = name; k.nameVer = ver; k.nameTs = ts;
+      saveKeys(ks); renderKeys();
+    }
+    if (!c.origName) c.origName = cur;
     c.name = name; c.nameVer = ver; c.nameTs = ts;
-    sendTo(id, { type: 'name-update', name, ver, ts });
+    sendTo(id, { type: 'name-update', name, ver, ts, legacy });
     broadcastKeysToPartner();
     renderClients();
-    showToast('Renamed to "' + name + '"');
+    showToast('Renamed to "' + name + '" (was "' + legacy + '")');
+  };
+
+  // Manually grant 2026 Summer (permanent / Inf) to an existing user.
+  window.__cstGiveSummer = id => {
+    const c = clients[id];
+    if (!c) return;
+    if (!confirm('Give "' + (c.name || 'this user') + '" permanent 2026 Summer (Inf) access?')) return;
+    const ks = loadKeys();
+    const k  = c.uid ? ks.find(x => x.uid === c.uid) : null;
+    if (k) {
+      k.permanent = true;
+      if (!Array.isArray(k.badges)) k.badges = [];
+      if (k.badges.indexOf('summer') === -1) k.badges.push('summer');
+      saveKeys(ks); renderKeys(); broadcastKeysToPartner();
+    }
+    c.permanent = true;
+    sendTo(id, { type: 'key-extended', expires: Date.now() + 100 * 365 * 86400000, permanent: true });
+    renderClients();
+    showToast('Gave 2026 Summer to ' + (c.name || 'user'));
   };
 
   let _viewPingTimer = null;
