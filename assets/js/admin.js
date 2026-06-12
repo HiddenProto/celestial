@@ -263,8 +263,22 @@
   // ─── badge system ────────────────────────────────────────────
   const BADGE_DEFS = {
     'first-user': { label: 'First User', icon: '★', desc: 'Among the very first users of Celestial.' },
-    'summer':     { label: '2026 Summer', icon: '☀️', desc: 'Permanent access — awarded to keys activated or renewed during summer 2026.' },
+    'summer':     { label: '2026 Summer', icon: '', grad: true, desc: 'Permanent access — awarded to keys activated or renewed during summer 2026.' },
   };
+
+  // Radiant reddish-orange → yellow animated text (used for the 2026 Summer badge).
+  function _ensureSummerStyle() {
+    if (document.getElementById('cst-summer-style')) return;
+    const st = document.createElement('style');
+    st.id = 'cst-summer-style';
+    st.textContent =
+      '@keyframes cst-summer-grad{0%{background-position:0% 50%}100%{background-position:200% 50%}}' +
+      '.cst-summer-text{background:linear-gradient(90deg,#ff2d00,#ff6a00,#ffae00,#ffe400,#ffae00,#ff6a00,#ff2d00);' +
+      'background-size:200% auto;-webkit-background-clip:text;background-clip:text;' +
+      '-webkit-text-fill-color:transparent;color:transparent;font-weight:700;' +
+      'animation:cst-summer-grad 3s linear infinite;}';
+    document.head.appendChild(st);
+  }
 
   function renderBadgeButton() {
     document.getElementById('cst-badge-btn')?.remove();
@@ -283,13 +297,18 @@
       'background:#0d0d0d;border:1px solid #222;border-radius:50px;padding:7px 14px;' +
       'color:#888;font-family:system-ui,sans-serif;font-size:.75rem;cursor:pointer;' +
       'display:flex;align-items:center;gap:6px;transition:background .15s;';
+    _ensureSummerStyle();
     function _daysLeft() { return Math.max(0, Math.ceil((appr.expires - Date.now()) / 86400000)); }
-    const _badgeIcon = appr.badges?.includes('summer') ? '☀️' : (hasBadges ? '★' : '');
+    // No sun on the badge — the sun stays only on the admin grant button.
+    const _badgeIcon = hasBadges ? '★' : '';
+    const _isSummer  = appr.permanent || appr.badges?.includes('summer');
     function _updateBtn() {
       const dLabel = appr.permanent ? 'Inf' : (_daysLeft() === 0 ? 'today' : `${_daysLeft()}d`);
+      const daysHtml = _isSummer
+        ? `<span id="cst-badge-days" class="cst-summer-text" style="font-size:.72rem;">${dLabel}</span>`
+        : `<span id="cst-badge-days" style="color:#444;font-size:.7rem;">${dLabel}</span>`;
       btn.innerHTML = (_badgeIcon ? `<span style="font-size:.9rem">${_badgeIcon}</span>` : '') +
-        `<span>${appr.name || 'user'}</span>` +
-        `<span id="cst-badge-days" style="color:#444;font-size:.7rem;">${dLabel}</span>`;
+        `<span>${appr.name || 'user'}</span>` + daysHtml;
     }
     _updateBtn();
     btn.onmouseenter = () => btn.style.background = '#181818';
@@ -310,14 +329,19 @@
     if (!appr) return;
     const p = document.createElement('div');
     p.id = 'cst-badge-panel';
+    _ensureSummerStyle();
     const dLeft = Math.max(0, Math.ceil((appr.expires - Date.now()) / 86400000));
     const badges = (appr.badges || []).map(id => {
       const b = BADGE_DEFS[id];
-      return b ? `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;
+      if (!b) return '';
+      const labelHtml = b.grad
+        ? `<div style="font-size:.85rem;" class="cst-summer-text">${b.label}</div>`
+        : `<div style="font-size:.8rem;color:#ccc;">${b.label}</div>`;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;
         background:#0a0a0a;border:1px solid #1c1c1c;border-radius:6px;margin-bottom:6px;">
-        <span style="font-size:1.1rem">${b.icon}</span>
-        <div><div style="font-size:.8rem;color:#ccc;">${b.label}</div>
-        <div style="font-size:.7rem;color:#444;">${b.desc}</div></div></div>` : '';
+        ${b.icon ? `<span style="font-size:1.1rem">${b.icon}</span>` : ''}
+        <div>${labelHtml}
+        <div style="font-size:.7rem;color:#444;">${b.desc}</div></div></div>`;
     }).join('');
     p.style.cssText = 'position:fixed;bottom:54px;right:16px;z-index:2147483644;' +
       'background:#080808;border:1px solid #1e1e1e;border-radius:10px;' +
@@ -462,7 +486,7 @@
       setApproved(name, expires, extra);
       renderBadgeButton();
       if (extra.permanent) {
-        try { window.notify?.('You have permanent access — 2026 Summer ☀️', 'success', 9000); } catch (e) {}
+        try { window.notify?.('You have permanent access — 2026 Summer', 'success', 9000); } catch (e) {}
       }
       d.remove();
       delete window.__cstGateApproved;
@@ -1192,6 +1216,7 @@
     const list = document.getElementById('ck-list');
     const cnt  = document.getElementById('ck-cnt');
     if (!list) return;
+    _ensureSummerStyle();
     const ks = loadKeys();
     if (cnt) cnt.textContent = `(${ks.length})`;
     if (!ks.length) { list.innerHTML = '<p style="color:#333;font-size:.8rem;">no keys yet.</p>'; return; }
@@ -1204,7 +1229,7 @@
       const cls    = perm ? 'ka' : (exp ? 'ke' : (k.used ? 'ka' : 'kw'));
       const lbl    = perm ? 'permanent' : (exp ? 'expired' : (k.used ? 'active' : 'pending'));
       const meta   = [
-        perm ? 'Inf ☀️ (2026 Summer)' : `exp ${exp ? 'expired' : _fmtDate(expTs)}`,
+        perm ? 'Inf (2026 Summer)' : `exp ${exp ? 'expired' : _fmtDate(expTs)}`,
         k.used && k.usedBy ? k.usedBy : null,
         k.uid        ? '· ' + k.uid.slice(-6)       : null,
         k.deviceId   ? '· dev …' + k.deviceId.slice(-6) : null,
@@ -1215,7 +1240,7 @@
             <span style="font-size:.8rem;color:#aaa;font-weight:600;">${_adminEsc(k.name)}</span>
             ${k.origName && k.origName !== k.name ? `<span style="color:#666;font-size:.66rem;">(LEGACY: ${_adminEsc(k.origName)})</span>` : ''}
             <span class="kb ${cls}">${lbl}</span>
-            ${perm ? `<span style="font-size:.68rem;color:#44cc88;">Inf</span>` : (!exp ? `<span style="font-size:.68rem;color:#2a2a2a;">${dLeft}d left</span>` : '')}
+            ${perm ? `<span class="cst-summer-text" style="font-size:.7rem;">Inf</span>` : (!exp ? `<span style="font-size:.68rem;color:#2a2a2a;">${dLeft}d left</span>` : '')}
           </div>
           <div class="ck-code">${k.key}</div>
           <div style="font-size:.67rem;color:#2a2a2a;margin-top:3px;">${meta}</div>
@@ -2509,7 +2534,7 @@
               appr2.permanent = true;
               if (!Array.isArray(appr2.badges)) appr2.badges = [];
               if (appr2.badges.indexOf('summer') === -1) appr2.badges.push('summer');
-              window.notify?.('You now have permanent access — 2026 Summer ☀️', 'success', 9000);
+              window.notify?.('You now have permanent access — 2026 Summer', 'success', 9000);
             }
             localStorage.setItem('cst-approved', JSON.stringify(appr2));
             renderBadgeButton();
