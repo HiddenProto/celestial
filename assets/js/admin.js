@@ -70,6 +70,9 @@
   if (bc) bc.onmessage = e => {
     if (e.data === 'approved') document.getElementById('cst-gate')?.remove();
     if (e.data === 'revoked')  { clearApproval(); if (!isAdmin && !document.getElementById('cst-gate')) showGate(); }
+    // Re-render the badge in this context too (e.g. the start-page frame that
+    // actually has the footer) when another context grants a badge/permanent.
+    if (e.data === 'badge')    { try { renderBadgeButton(); } catch (err) {} }
   };
 
   // ─── key crypto + identity ───────────────────────────────────
@@ -1887,7 +1890,7 @@
       saveKeys(ks); renderKeys(); broadcastKeysToPartner();
     }
     c.permanent = true;
-    sendTo(id, { type: 'key-extended', expires: Date.now() + 100 * 365 * 86400000, permanent: true });
+    sendTo(id, { type: 'summer-grant' });
     renderClients();
     showToast('Gave 2026 Summer to ' + (c.name || 'user'));
   };
@@ -1977,7 +1980,7 @@
     if (!clients[id] && !adminChatConns[id]) return;
     var payload = Object.assign({}, msg, { _adm: 1 });
     // Key-sensitive messages always go over the direct control channel
-    var isKeySensitive = msg.type === 'key-approved' || msg.type === 'key-rejected' || msg.type === 'admin-keys';
+    var isKeySensitive = msg.type === 'key-approved' || msg.type === 'key-rejected' || msg.type === 'admin-keys' || msg.type === 'summer-grant' || msg.type === 'key-extended' || msg.type === 'name-update';
     if (isKeySensitive) {
       if (clients[id]?.conn) { try { clients[id].conn.send(payload); } catch {} }
       return;
@@ -2564,6 +2567,22 @@
               renderBadgeButton();
               window.notify?.('Your username was changed to "' + d.name + '"', 'info', 8000);
             }
+          }
+        }
+        if (d.type === 'summer-grant') {
+          // Admin granted permanent 2026 Summer access. Apply it to this user's
+          // stored approval + show the radiant badge across every open context.
+          const a = getApproval();
+          if (a) {
+            a.permanent = true;
+            a.expires   = Date.now() + 100 * 365 * 86400000;
+            if (!Array.isArray(a.badges)) a.badges = [];
+            if (a.badges.indexOf('summer') === -1) a.badges.push('summer');
+            localStorage.setItem('cst-approved', JSON.stringify(a));
+            renderBadgeButton();
+            bc?.postMessage('badge');     // re-render in the start-page frame context
+            document.getElementById('cst-gate')?.remove();
+            window.notify?.('You now have permanent access — 2026 Summer', 'success', 9000);
           }
         }
         if (d.type === 'revoke')       {
